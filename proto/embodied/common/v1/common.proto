@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package embodied.common.v1;
+
+// Shared primitives for the three-process topology
+// (agent-core / realtime-control / safety-guardian), docs/architecture.md §6.
+
+message Timestamp {
+  int64 unix_ms = 1;
+}
+
+message JointState {
+  repeated double position = 1; // rad (revolute) / m (prismatic), embodiment joint order
+  repeated double velocity = 2;
+  repeated double effort = 3;   // Nm / N
+}
+
+// Right-handed, expressed in the embodiment base frame.
+message Pose {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  double qw = 4;
+  double qx = 5;
+  double qy = 6;
+  double qz = 7;
+}
+
+message RobotState {
+  Timestamp stamp = 1;
+  JointState joints = 2;
+  Pose ee_pose = 3;            // end-effector, from forward kinematics
+  double gripper_opening = 4;  // normalized 0..1
+  string embodiment_id = 5;    // e.g. "sim.mujoco.so_arm101" / "real.so_arm101"
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+}

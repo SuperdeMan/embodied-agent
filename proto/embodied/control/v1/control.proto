@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package embodied.control.v1;
+
+import "embodied/common/v1/common.proto";
+
+// agent-core (System 2) → realtime-control (System 1).
+// This is the ONLY channel through which cognition reaches actuators:
+// commands reference registered skills, never raw motor values (D009).
+service ControlService {
+  // Execute one skill; server streams progress until a terminal phase.
+  rpc InvokeSkill(SkillCommand) returns (stream SkillEvent);
+  rpc StreamState(StateRequest) returns (stream embodied.common.v1.RobotState);
+  // Soft-stop the running skill (safety-guardian owns the hard paths).
+  rpc Halt(HaltRequest) returns (HaltReply);
+}
+
+message SkillCommand {
+  string command_id = 1;  // idempotency key
+  string skill = 2;       // e.g. "skill.manip.pick"
+  string params_json = 3; // validated against the skill manifest before execution
+  bool confirmed = 4;     // require_confirm skills must carry true (re-checked downstream)
+  string trace_id = 5;
+}
+
+message SkillEvent {
+  string command_id = 1;
+  enum Phase {
+    PHASE_UNSPECIFIED = 0;
+    ACCEPTED = 1;
+    RUNNING = 2;
+    SUCCEEDED = 3;
+    FAILED = 4;
+    HALTED = 5;
+  }
+  Phase phase = 2;
+  string detail = 3;
+  embodied.common.v1.RobotState state = 4;
+  embodied.common.v1.Error error = 5;
+}
+
+message StateRequest {
+  double min_interval_ms = 1;
+}
+
+message HaltRequest {
+  string reason = 1;
+}
+
+message HaltReply {
+  bool halted = 1;
+}

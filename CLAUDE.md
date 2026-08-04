@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-**M0 规范与骨架（2026-08）**。文档已齐备，代码尚未落地。动手前先读 `docs/roadmap.md` 对应阶段的任务清单与 DoD；移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md` 的分级清单与迁移规矩。
+**M1 仿真闭环（2026-08 起）**。M0 已于 2026-08-04 完成：包骨架、P0 移植（providers/obs/runtime/permission）、最小认知环与 `embodied chat` 文本模式、proto v1 与生成链路、CI 门禁、SO-ARM100 仿真资产验证。动手前先读 `docs/roadmap.md` 的 M1 任务与 DoD；移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md` 的分级清单、迁移规矩与执行记录。
 
 ## 目录结构
 
@@ -25,12 +25,20 @@
 ## 语言与风格
 
 - 文档中文；代码、标识符、注释、commit message 英文；commit 用 Conventional Commits（`feat:`/`fix:`/`docs:`/`refactor:`/`test:`/`chore:`）。
+- **例外**：从 car-agent 移植的文件保留原有中文注释（它们承载事故复盘与设计动机，且保持与源文件可对照）；移植文件中新增/改写的注释与全部新写代码一律英文。
 - 术语纪律：vehicle/cockpit/座舱等 car-agent 领域词不得出现在本仓库代码中。
 
 ## 验证
 
-- **当前（文档阶段）**：改动后自查文档间相对链接有效、`roadmap.md` 阶段状态与实际一致。
-- **代码落地后（M0 完成时补充具体命令）**：`uv run ruff check` + `uv run pytest` 必须绿；移植模块的测试随行迁移；契约测试（加技能不动内核、危险动作须确认、S2S 无执行通道）不许跳过或注释。
+- 代码改动后必须绿：`uv run ruff check .` + `uv run pytest -q`。
+- 契约测试（确认门禁 `test_registry_contract`、术语纪律 `test_no_forbidden_terms`、技能扩展缝）不许跳过、注释或放宽断言。
+- proto 变更后运行 `scripts/gen-proto.ps1`（或 `.sh`）确认编译通过；生成物在 `gen/`（不进 git）。
+- 文档改动后自查相对链接有效、`roadmap.md` 阶段状态与实际一致。
+
+## 已知环境约束
+
+- **国内网络**：uv 拉包直连 PyPI 会超时，用每次命令的环境变量走镜像（不写入任何全局配置）：`UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple`。
+- **仓库路径含中文**（`产品/`）：MuJoCo 等原生库无法直接打开非 ASCII 路径下的文件，加载前需复制到 ASCII 临时目录（参考 `scripts/sim_smoke.py` 的 `_load_model` 回退）。新增涉及原生库文件加载的代码时注意同类处理。
 
 ## 工程红线（继承全局 CLAUDE.md，另加本项目条款）
 

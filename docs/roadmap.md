@@ -23,16 +23,17 @@
 **目标**：把「约束先行」落满，把 car-agent 可直接复用资产搬进来，让后续每个会话都有据可依。
 
 **任务**
-- [x] 项目规则（CLAUDE.md）、架构设计、路线图、决策记录、复用评估（本次会话完成）
-- [ ] uv 初始化 `src/embodied/` 单包骨架 + 目录结构（按架构 §10），ruff + pytest 配置
-- [ ] GitHub Actions CI：lint + 单测 + 无硬件 smoke（空跑即可，先把闸门立起来）
-- [ ] 按[复用评估](reuse-from-car-agent.md)执行 P0 移植清单：providers 体系、runtime、observability、memory 客户端层、Agent SDK 中的 ledger/testing 工具
-- [ ] proto 首版：agent-core ↔ realtime-control ↔ safety-guardian 三进程契约
-- [ ] `.env.example` 建立（参数名从 car-agent 精简，值全空）
+- [x] 项目规则（CLAUDE.md）、架构设计、路线图、决策记录、复用评估（2026-08-04）
+- [x] uv 初始化 `src/embodied/` 单包骨架 + 目录结构（按架构 §10），ruff + pytest 配置
+- [x] GitHub Actions CI：lint + 单测门禁
+- [x] P0 移植（执行记录见[复用评估](reuse-from-car-agent.md) §3）：providers LLM 体系、obs（JSONL sink 改造）、ledger/testing、permission + 机器人域 scopes（memory 服务按复用评估属 P2，原文误列于此，已修正）
+- [x] proto 首版：三进程契约 + grpcio-tools 生成链路（D011）
+- [x] `.env.example` 建立（参数名从 car-agent 精简，值全空）
+- [x] 附加完成：最小认知环（bounded tool loop）+ `embodied chat` 文本模式 + SO-ARM100 仿真资产与渲染验证（M1 探路）
 
-**DoD**：`uv run pytest` 绿；agent-core 纯文本模式可对话并调用一个 mock 技能；移植模块的原测试跟随迁移并通过。
+**DoD 达成（2026-08-04）**：219 个测试全绿（其中约 189 个为移植随行/新增）；`embodied chat` 离线全链路通过（自然语言 → 技能调用 → 结果汇报，危险技能确认拒绝）；术语纪律契约测试在集成中拦下一处泄漏后全清。
 
-**风险**：移植贪多嚼不烂 → 严格按 P0 清单，P1/P2 留给用到时再搬。
+**风险**（保留供回顾）：移植贪多嚼不烂 → 严格按 P0 清单执行，P1/P2 留给用到时再搬。
 
 ## M1 仿真闭环：see-think-act（2026-08 ~ 09，约 4-6 周）
 
@@ -46,6 +47,7 @@
 - [ ] Safety Guardian v0：工作区围栏、速度限幅、心跳看门狗、命令白名单
 - [ ] 控制台 v0：复用 HMI 语音栈接入，场景画面 + 执行时间线
 - [ ] Episode 录制 → LeRobotDataset 格式落盘
+- [ ] 接线 M0 移植库：providers 的 cache/ratelimit/健康记录进入服务路径；ledger 持久化后端选型（M0 为 in-memory）
 
 **DoD**：「把红色方块放到盒子里」类自然语言指令，10 次运行 ≥8 次成功（脚本技能 + 真值感知条件下）；每次运行自动产出可回放的 episode；断网时已注册技能仍可通过控制台指令执行。
 
@@ -126,10 +128,10 @@
 2. **垂直场景产品**：桌面陪伴/效率/教育机器人（语音交互是现成强项），走「智能硬件 + 订阅」。
 3. **行业轻方案**：小商户/轻工业桌面级分拣整理 PoC，按项目收费验证付费意愿。
 
-## 近期两周行动清单（M0 具体化）
+## 近期行动清单（M1 起步，2026-08-04 更新）
 
-1. uv + ruff + pytest 骨架，目录结构按架构 §10 落地
-2. 移植 P0 清单第一批：`providers/`（LLM 部分）+ `runtime/` + `observability/`（本地 sink 改造）
-3. proto 三进程契约草案 + `make proto` 工作流（Windows 用 ps1，沿 car-agent 方案）
-4. GitHub Actions：lint + test 门禁
-5. MuJoCo + SO-101 模型跑通渲染（为 M1 探路，确认资产可用性）
+M0 两周清单已全部完成（原第 3 条的 buf 方案改为 grpcio-tools，见 D011；第 5 条 SO-ARM100 物理 + 离屏渲染验证通过）。M1 前三步：
+
+1. `Embodiment` 接口 + MuJoCo sim driver（复用 `scripts/sim_smoke.py` 的资产与 ASCII 路径回退）
+2. 移植改造 planner 引擎（PlanBuilder/DagExecutor/verify）替换 M0 最小环，同步接线 providers 的 cache/ratelimit
+3. 脚本技能三件套（home/pick/place）+ Safety Guardian v0（围栏/限速/看门狗/命令白名单）

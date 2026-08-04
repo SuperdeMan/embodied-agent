@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package embodied.safety.v1;
+
+import "embodied/common/v1/common.proto";
+
+// safety-guardian (SG-2): deterministic supervisor, docs/architecture.md §4.5.
+// Validates intent BEFORE motion, watches liveness DURING motion.
+// It must never depend on any AI output being correct.
+service SafetyService {
+  // Pre-motion gate: workspace fence / velocity limits / command whitelist.
+  rpc ValidateCommand(ValidateRequest) returns (ValidateReply);
+  // Bidirectional liveness: lost heartbeat on either side → controller halts.
+  rpc Heartbeat(stream HeartbeatPing) returns (stream HeartbeatPong);
+  // Software e-stop (SG-0 hardware e-stop stays physical and independent).
+  rpc EStop(EStopRequest) returns (EStopReply);
+}
+
+message ValidateRequest {
+  string command_id = 1;
+  string skill = 2;
+  string params_json = 3;
+  embodied.common.v1.RobotState current = 4;
+}
+
+message ValidateReply {
+  bool allowed = 1;
+  string reason = 2; // populated when denied: fence / velocity / whitelist / ...
+}
+
+message HeartbeatPing {
+  string source = 1;
+  embodied.common.v1.Timestamp stamp = 2;
+}
+
+message HeartbeatPong {
+  embodied.common.v1.Timestamp stamp = 1;
+}
+
+message EStopRequest {
+  string reason = 1;
+}
+
+message EStopReply {
+  bool stopped = 1;
+}

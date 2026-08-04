@@ -65,6 +65,13 @@
 **理由**：座舱的安全纪律在会动的机器人上只会更必要；这些红线在 car-agent 已被契约测试钉死，方法论成熟。
 **替代方案**：无。此条不设重估触发器，只加严不放松。
 
+## D011 · proto 工具链：grpcio-tools 替代 buf
+**日期**：2026-08-04 · **状态**：生效
+**决策**：proto 生成用 uv `rpc` 依赖组内的 grpcio-tools（`scripts/gen-proto.ps1|.sh`），不引入 buf。
+**理由**：buf 是全局二进制安装（触碰全局依赖红线），M0 仅 3 个 proto，grpcio-tools 在项目内闭环、跨平台一致。
+**替代方案**：buf（生态标准、lint/breaking 检测与多语言生成更强）。
+**重估触发器**：proto 数量明显增长，或需要为 console（TypeScript）生成 stubs 时，改用 buf 并记录新决策。
+
 ## D010 · 许可证：Apache-2.0
 **日期**：2026-08-04 · **状态**：生效
 **决策**：沿用仓库初始化时的 Apache-2.0。

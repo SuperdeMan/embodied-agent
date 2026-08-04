@@ -1,0 +1,116 @@
+# Ported from car-agent observability/tracing.py @ f0b08f8, changes: default service name neutralized; docstring de-domained; logic unchanged (OTel already optional via in-function import + fallback).
+"""Trace 贯通。trace_id 随每个请求生成并在进程内/跨进程透传。
+
+有 OTEL_EXPORTER_OTLP_ENDPOINT 且装了 OpenTelemetry SDK 时接真实 OTel；
+否则用 contextvars 简化版（no-op tracer fallback）。OTel 不是硬依赖。
+"""
+from __future__ import annotations
+
+import contextvars
+import logging
+import os
+import uuid
+
+logger = logging.getLogger("obs.tracing")
+
+# 全局 trace 上下文（简化版，OTel SDK 未就绪时使用）
+_current_trace: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "current_trace_id",
+    default="",
+)
+
+# 会话上下文：与 trace 同模式。请求入口 set 一次，
+# 观测事件（events._emit）与结构化日志自动携带——不必逐个 emit_span 调用点透传。
+_current_session: contextvars.ContextVar[str] = contextvars.ContextVar(
+    "current_session_id",
+    default="",
+)
+
+# OTel SDK 句柄（延迟初始化）
+_tracer = None
+
+
+def setup_tracing(service_name: str = "embodied"):
+    """初始化 tracing。有 endpoint 且 OTel SDK 可用时接 OTel；否则简化版。"""
+    global _tracer
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+
+    if endpoint:
+        try:
+            from opentelemetry import trace
+            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+            from opentelemetry.sdk.resources import Resource
+            from opentelemetry.sdk.trace import TracerProvider
+            from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+            resource = Resource.create({"service.name": service_name})
+            provider = TracerProvider(resource=resource)
+            exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True)
+            provider.add_span_processor(BatchSpanProcessor(exporter))
+            trace.set_tracer_provider(provider)
+            _tracer = trace.get_tracer(service_name)
+            logger.info("OTel tracing initialized: %s (service=%s)", endpoint, service_name)
+            return True
+        except ImportError:
+            logger.warning("OTel SDK not installed, falling back to simplified tracing. "
+                           "Install: pip install opentelemetry-api opentelemetry-sdk "
+                           "opentelemetry-exporter-otlp-proto-grpc")
+        except Exception as e:
+            logger.warning("OTel setup failed: %s, falling back to simplified tracing", e)
+
+    logger.info("Using simplified tracing (no OTLP endpoint)")
+    return True
+
+
+def new_trace_id() -> str:
+    return uuid.uuid4().hex[:16]
+
+
+def get_trace_id() -> str:
+    if _tracer:
+        from opentelemetry import trace
+        span = trace.get_current_span()
+        ctx = span.get_span_context()
+        if ctx.is_valid:
+            return format(ctx.trace_id, '032x')
+    return _current_trace.get()
+
+
+def set_trace_id(trace_id: str):
+    _current_trace.set(trace_id)
+
+
+def get_session_id() -> str:
+    return _current_session.get()
+
+
+def set_session_id(session_id: str):
+    _current_session.set(session_id or "")
+
+
+def trace_context_from_meta(meta: dict) -> str:
+    tid = meta.get("trace_id", "")
+    if not tid:
+        tid = new_trace_id()
+    set_trace_id(tid)
+    return tid
+
+
+def inject_trace_meta(meta: dict) -> dict:
+    tid = get_trace_id()
+    if tid:
+        meta["trace_id"] = tid
+    return meta
+
+
+def start_span(name: str):
+    """创建 span（OTel SDK 可用时用真实 span，否则用 no-op）。"""
+    if _tracer:
+        return _tracer.start_as_current_span(name)
+    # No-op context manager
+    from contextlib import contextmanager
+
+    @contextmanager
+    def _noop():
+        yield
+    return _noop()

@@ -21,6 +21,7 @@ certs/*
 !certs/.gitkeep
 
 # --- Data, models, recordings (pointers only in git; see assets/README) ---
+assets/menagerie/
 *.safetensors
 *.ckpt
 *.pt

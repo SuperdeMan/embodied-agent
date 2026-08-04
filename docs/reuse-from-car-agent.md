@@ -42,6 +42,11 @@
 **P1（M1 执行）**：`orchestrator/cloud/` 规划-执行引擎改造、`proto/` 继承部分、HMI 语音栈接入 console、providers 的 ASR/TTS 部分、`registry/`。
 **P2（M2+ 按需）**：`memory/` 全量、S2S、proactive、edge NLU、E2E harness 思想。
 
+### 执行记录
+
+- **P0 完成（2026-08-04）**：providers LLM 体系（llm/runtime/cache/ratelimit/health，Redis 剥离）、obs（events 改 JSONL sink、logging、tracing 可选 OTel、redact 随行）、ledger（PG → in-memory，公开 API 不变）、privacy scope 过滤、permission + 机器人域 scopes、testing 助手。约 2,300 行实现 + 189 个测试随行/新增，全部通过。
+- **对本文档的两处事实修正**：① `context_scopes` 过滤机制的真实来源是 `orchestrator/cloud/clients.py`（`_SENSITIVE_SCOPE` + `_merge_meta`）；`runtime/privacy_registry.py` 实为 GDPR 目标注册表，其 adapter 依赖未移植模块，留 M1。② `observability/collector/` 未搬，由 JSONL sink 替代（按计划）。
+
 ## 4. 迁移规矩（写给未来的每次移植）
 
 1. **复制改造，不做跨仓依赖**：embodied-agent 永不 import car-agent；文件头注明来源与改造说明（`# Ported from car-agent <path> @ <commit>, changes: ...`），License 同为 Apache-2.0，合规。
