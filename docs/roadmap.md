@@ -40,14 +40,17 @@
 **目标**：在 MuJoCo 中打通「语音→规划→技能→执行→验证→汇报」全链路，数据录制默认开启。
 
 **任务**
-- [ ] MuJoCo 桌面场景 + SO-101 模型（Menagerie/LeRobot 现成资产）；`Embodiment` 接口 + sim driver
-- [ ] 脚本技能三件套：`skill.manip.pick` / `skill.manip.place` / `skill.arm.home`（IK + 轨迹 + 终止判定）
-- [ ] SkillRegistry + manifest 加载 + 契约测试（「加技能不动内核」钉死）
-- [ ] 移植改造 planner 引擎（PlanBuilder/DagExecutor/verify），WorldState v0（本体状态 + 仿真真值物体表——感知留到 M2 再上）
-- [ ] Safety Guardian v0：工作区围栏、速度限幅、心跳看门狗、命令白名单
+- [x] MuJoCo 桌面场景 + SO-ARM100 模型；`Embodiment` 接口 + sim driver（2026-08-05，Menagerie 尚无 101，fetch 脚本按设计回退 100）
+- [x] 脚本技能三件套：`skill.manip.pick` / `skill.manip.place` / `skill.arm.home`（DLS IK + 插值轨迹 + 执行后世界状态验证；抓取参数为网格扫描标定，见 manip.py 注释）
+- [x] SkillRegistry + manifest 加载 + 契约测试（M0 完成）
+- [x] WorldState v0（本体状态 + 仿真真值物体表 + 区域谓词；感知 M2 再上）
+- [ ] 移植改造 planner 引擎（PlanBuilder/DagExecutor/verify）替换 M0 最小环
+- [x] Safety Guard v0：工作区围栏（越界闩锁）、速率限幅、命令来源白名单，接入 driver 写路径（2026-08-05）；心跳看门狗随三进程拆分实现（proto 已备）
 - [ ] 控制台 v0：复用 HMI 语音栈接入，场景画面 + 执行时间线
-- [ ] Episode 录制 → LeRobotDataset 格式落盘
+- [x] Episode 录制落盘（LeRobot 字段对齐的中间格式，D012；转换器 M2 实现）
 - [ ] 接线 M0 移植库：providers 的 cache/ratelimit/健康记录进入服务路径；ledger 持久化后端选型（M0 为 in-memory）
+
+**阶段进展（2026-08-05）**：垂直切片打通——`embodied sim --eval 10` 随机化 pick&place **9/10 成功**（真值感知），`embodied sim` 文本指挥（离线序列规则：一句「把方块放进盒子」→ pick→place 逐步执行、失败中断）可用，episode 录制默认可开。DoD 的语音链路与 planner 引擎移植未完成，M1 继续。
 
 **DoD**：「把红色方块放到盒子里」类自然语言指令，10 次运行 ≥8 次成功（脚本技能 + 真值感知条件下）；每次运行自动产出可回放的 episode；断网时已注册技能仍可通过控制台指令执行。
 
@@ -128,10 +131,11 @@
 2. **垂直场景产品**：桌面陪伴/效率/教育机器人（语音交互是现成强项），走「智能硬件 + 订阅」。
 3. **行业轻方案**：小商户/轻工业桌面级分拣整理 PoC，按项目收费验证付费意愿。
 
-## 近期行动清单（M1 起步，2026-08-04 更新）
+## 近期行动清单（M1 后半程，2026-08-05 更新）
 
-M0 两周清单已全部完成（原第 3 条的 buf 方案改为 grpcio-tools，见 D011；第 5 条 SO-ARM100 物理 + 离屏渲染验证通过）。M1 前三步：
+垂直切片（sim driver + IK + 技能三件套 + Guard v0 + 录制 + 评测 harness）已完成，评测 9/10。剩余四步：
 
-1. `Embodiment` 接口 + MuJoCo sim driver（复用 `scripts/sim_smoke.py` 的资产与 ASCII 路径回退）
-2. 移植改造 planner 引擎（PlanBuilder/DagExecutor/verify）替换 M0 最小环，同步接线 providers 的 cache/ratelimit
-3. 脚本技能三件套（home/pick/place）+ Safety Guardian v0（围栏/限速/看门狗/命令白名单）
+1. 移植改造 planner 引擎（PlanBuilder/DagExecutor/verify）替换 M0 最小环，同步接线 providers 的 cache/ratelimit
+2. 控制台 v0 + 语音接入（复用 HMI 栈），打通 DoD 要求的「语音→规划→执行→汇报」全链路
+3. 把 `--eval` 扩展成版本化评测任务集（位置随机化维度记录、失败案例归档），修掉扇区边缘抓取失败（10 局中的那 1 局：近基座 + 采样边界角）
+4. 三进程拆分（realtime-control / safety-guardian 独立进程 + 心跳看门狗，proto 已备）——可与 2 并行

@@ -65,6 +65,13 @@
 **理由**：座舱的安全纪律在会动的机器人上只会更必要；这些红线在 car-agent 已被契约测试钉死，方法论成熟。
 **替代方案**：无。此条不设重估触发器，只加严不放松。
 
+## D012 · Episode 录制 v0 用轻量中间格式，lerobot/torch 依赖推迟到 M2
+**日期**：2026-08-05 · **状态**：生效
+**决策**：M1 录制器落 `meta.json + steps.npz + events.jsonl`（字段名 1:1 映射 LeRobotDataset v3，映射表随 meta 落盘），`to_lerobot()` 转换器以 stub 存在；`lerobot`/`torch` 到 M2 训练管线搭建时才进依赖。
+**理由**：lerobot 会拉 torch（>2GB），M1 无训练需求；字段级对齐保证 M2 转换是机械工作，不违背 D003 的格式对齐承诺。
+**替代方案**：直接依赖 lerobot（安装重、当前零收益）；自研格式不对齐（违背 D003）。
+**重估触发器**：M2 训练管线开工时实现转换器，并用社区可视化工具验证互操作。
+
 ## D011 · proto 工具链：grpcio-tools 替代 buf
 **日期**：2026-08-04 · **状态**：生效
 **决策**：proto 生成用 uv `rpc` 依赖组内的 grpcio-tools（`scripts/gen-proto.ps1|.sh`），不引入 buf。

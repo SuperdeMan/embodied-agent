@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-**M1 仿真闭环（2026-08 起）**。M0 已于 2026-08-04 完成：包骨架、P0 移植（providers/obs/runtime/permission）、最小认知环与 `embodied chat` 文本模式、proto v1 与生成链路、CI 门禁、SO-ARM100 仿真资产验证。动手前先读 `docs/roadmap.md` 的 M1 任务与 DoD；移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md` 的分级清单、迁移规矩与执行记录。
+**M1 仿真闭环，后半程（2026-08-05 起）**。垂直切片已通：sim driver + 脚本技能 pick&place（`embodied sim --eval 10` 达 9/10）+ Safety Guard v0 + episode 录制。剩余：planner 引擎移植、控制台语音接入、评测任务集版本化、三进程拆分。动手前先读 `docs/roadmap.md` 的 M1 任务与阶段进展；移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md`。仿真代码涉及抓取参数改动时，先跑 `uv run --group sim embodied sim --eval 10` 确认不回退。
 
 ## 目录结构
 

@@ -1,0 +1,45 @@
+<!-- Tabletop pick-and-place scene (M1). Loaded via embodied.control.simassets.stage_tabletop,
+     which replaces __ARM_XML__ with the staged Menagerie arm file (grasp site patched in).
+     Object/bin placement is calibrated to the arm's reachable ring; keep changes in sync with
+     the workspace fence in the sim driver. -->
+<mujoco model="embodied_tabletop">
+  <include file="__ARM_XML__"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="120" elevation="-25"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.25 0.3 0.35" rgb2="0.15 0.2 0.25"
+      markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.1"/>
+    <material name="bin_mat" rgba="0.2 0.45 0.7 1"/>
+    <material name="cube_red" rgba="0.85 0.12 0.12 1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane" friction="0.8 0.005 0.0001"/>
+
+    <camera name="top" pos="0.05 -0.20 0.75" xyaxes="1 0 0 0 1 0"/>
+    <camera name="side" pos="0.50 -0.45 0.35" xyaxes="0.485 0.875 0 -0.440 0.244 0.864"/>
+
+    <body name="obj_cube" pos="0.0 -0.25 0.0155">
+      <freejoint name="obj_cube_free"/>
+      <geom name="obj_cube_geom" type="box" size="0.015 0.015 0.015" material="cube_red" mass="0.025"
+        friction="1 0.005 0.0001" solimp="2 1 0.01" solref="0.01 1"/>
+    </body>
+
+    <body name="bin" pos="0.16 -0.18 0">
+      <geom name="bin_floor" type="box" size="0.05 0.05 0.003" pos="0 0 0.003" material="bin_mat"/>
+      <geom name="bin_w1" type="box" size="0.05 0.004 0.02" pos="0 0.046 0.023" material="bin_mat"/>
+      <geom name="bin_w2" type="box" size="0.05 0.004 0.02" pos="0 -0.046 0.023" material="bin_mat"/>
+      <geom name="bin_w3" type="box" size="0.004 0.05 0.02" pos="0.046 0 0.023" material="bin_mat"/>
+      <geom name="bin_w4" type="box" size="0.004 0.05 0.02" pos="-0.046 0 0.023" material="bin_mat"/>
+      <site name="bin_region" type="box" size="0.045 0.045 0.04" pos="0 0 0.045" rgba="0 1 0 0.06" group="4"/>
+    </body>
+  </worldbody>
+</mujoco>

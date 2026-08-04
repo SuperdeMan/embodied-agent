@@ -14,12 +14,23 @@ from __future__ import annotations
 import re
 from typing import Any
 
-Rule = tuple[str, str, dict[str, Any]]
+Call = tuple[str, dict[str, Any]]
+# (pattern, tool, args) single-call form, or (pattern, [calls...]) sequence form.
+Rule = tuple[str, str, dict[str, Any]] | tuple[str, list[Call]]
 
 DEFAULT_RULES: list[Rule] = [
     (r"回零|归位|回家|\bhome\b", "skill-arm-home", {}),
     (r"挥手|打招呼|\bwave\b", "skill-arm-wave", {"times": 2}),
     (r"关机|断电|power\s*off|shutdown", "skill-system-power_off", {}),
+]
+
+# Sim tabletop rules: multi-step sequences run one call per round, driven by the
+# planner feeding tool results back (pick first, then place). Order matters.
+SIM_RULES: list[Rule] = [
+    (r"(方块|积木|cube).*(盒|箱|bin)|收拾|整理", [("skill-manip-pick", {}), ("skill-manip-place", {})]),
+    (r"抓|捡|拿起|夹起|\bpick\b|\bgrasp\b", [("skill-manip-pick", {})]),
+    (r"放下|放进|放好|\bplace\b|\bdrop\b", [("skill-manip-place", {})]),
+    (r"回零|归位|回家|\bhome\b", [("skill-arm-home", {})]),
 ]
 
 _RESULTS_TAG = "<tool_results>"
@@ -37,12 +48,30 @@ def _summarize(content: str) -> str:
     return "执行完成：\n" + inner if inner else "执行完成。"
 
 
+def _normalize(rules: list[Rule]) -> list[tuple[str, list[Call]]]:
+    out: list[tuple[str, list[Call]]] = []
+    for rule in rules:
+        if len(rule) == 3:
+            pattern, tool, args = rule  # type: ignore[misc]
+            out.append((pattern, [(str(tool), dict(args))]))
+        else:
+            pattern, seq = rule  # type: ignore[misc]
+            out.append((pattern, [(str(t), dict(a)) for t, a in seq]))
+    return out
+
+
 class ScriptedToolProvider:
-    """Maps keyword rules to tool calls; echoes otherwise. Fully deterministic."""
+    """Maps keyword rules to tool calls (single or sequential); echoes otherwise.
+
+    Sequences are drained one call per round: the planner executes a call, feeds the
+    result back, and the next round pops the next call — same cadence a real LLM
+    produces, so the planner code path is identical. Fully deterministic.
+    """
 
     def __init__(self, rules: list[Rule] | None = None):
-        self.rules = list(DEFAULT_RULES) if rules is None else rules
+        self.rules = _normalize(list(DEFAULT_RULES) if rules is None else rules)
         self._calls = 0
+        self._pending: list[Call] = []
 
     async def complete(self, messages, model, temperature, max_tokens, thinking=None, timeout_s=None):
         user = _last_user(messages)
@@ -51,16 +80,25 @@ class ScriptedToolProvider:
     async def complete_tools(
         self, messages, model, temperature, max_tokens, tools=None, tool_choice=None, thinking=None, timeout_s=None
     ):
+        allowed = {t.get("function", {}).get("name") for t in (tools or [])}
         last = messages[-1] if messages else {}
         content = str(last.get("content", ""))
         if last.get("role") == "user" and content.startswith(_RESULTS_TAG):
+            if "ok=False" in content or "NOT EXECUTED" in content:
+                self._pending.clear()  # a failed step aborts the rest of the sequence
+                return _summarize(content), "scripted", "stop", (0, 0), []
+            if self._pending:
+                return "", "scripted", "tool_use", (0, 0), [self._emit(self._pending.pop(0))]
             return _summarize(content), "scripted", "stop", (0, 0), []
         user = _last_user(messages)
-        allowed = {t.get("function", {}).get("name") for t in (tools or [])}
-        for pattern, tool, args in self.rules:
-            if re.search(pattern, user, re.IGNORECASE) and tool in allowed:
-                self._calls += 1
-                call = {"id": f"scripted-{self._calls}", "name": tool, "arguments": dict(args)}
-                return "", "scripted", "tool_use", (0, 0), [call]
+        for pattern, seq in self.rules:
+            if re.search(pattern, user, re.IGNORECASE) and all(t in allowed for t, _ in seq):
+                self._pending = list(seq)
+                return "", "scripted", "tool_use", (0, 0), [self._emit(self._pending.pop(0))]
         text, used, finish, usage = await self.complete(messages, model, temperature, max_tokens)
         return text, used, finish, usage, []
+
+    def _emit(self, call: Call) -> dict[str, Any]:
+        self._calls += 1
+        tool, args = call
+        return {"id": f"scripted-{self._calls}", "name": tool, "arguments": dict(args)}
