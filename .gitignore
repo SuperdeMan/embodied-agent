@@ -1,0 +1,48 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.uv-cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+
+# --- Secrets & local config ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+certs/*
+!certs/.gitkeep
+
+# --- Data, models, recordings (pointers only in git; see assets/README) ---
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.trt
+datasets/
+recordings/
+outputs/
+wandb/
+runs/
+
+# --- Generated code ---
+gen/
+
+# --- Node / console ---
+node_modules/
+console/dist/
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
