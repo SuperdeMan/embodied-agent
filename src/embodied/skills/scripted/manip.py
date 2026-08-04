@@ -48,6 +48,12 @@ PICK = SkillManifest(
     effects=["object grasped and lifted"],
     scopes=["arm.move", "gripper.close"],
     termination=TerminationSpec(timeout_s=60.0, success="object held above table"),
+    verification={
+        "mode": "state_predicate",
+        "expect": {"predicate": "gripper_holding", "args": {"object": "$param:object"}},
+        "timeout_ms": 1500,
+        "on_fail": "report",
+    },
 )
 
 PLACE = SkillManifest(
@@ -58,6 +64,10 @@ PLACE = SkillManifest(
     effects=["object inside target region"],
     scopes=["arm.move", "gripper.open"],
     termination=TerminationSpec(timeout_s=60.0, success="object center inside region box"),
+    # Schema mode: the skill returns {object, region} only after its own in-skill region
+    # check passed — asserting real data present exercises the second evaluator without
+    # duplicating the spatial predicate (which pick already demonstrates).
+    verification={"mode": "schema", "expect": {"data_keys": ["object", "region"]}, "on_fail": "report"},
 )
 
 

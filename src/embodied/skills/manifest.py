@@ -55,6 +55,13 @@ class SkillManifest(BaseModel):
     impl: Literal["scripted", "policy"] = "scripted"
     # Permission scopes the skill needs (enforced by the executor from M1 on).
     scopes: list[str] = Field(default_factory=list)
+    # Post-execution reconciliation declaration, consumed by cognition/verify.py:
+    # {"mode": "state_predicate"|"schema", "expect": {"predicate": ..., "args": {...}} |
+    #  {"data_keys": [...]}, "timeout_ms": int, "on_fail": "report"|"retry",
+    #  "max_attempts": int}. Empty = don't verify. Args support "$param:<name>" refs to
+    # the step's actual params. Declarative by iron rule: the engine has no skill-name
+    # branches — a new skill gets verification by declaring it HERE (car-agent M2 lesson).
+    verification: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("name")
     @classmethod

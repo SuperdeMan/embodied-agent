@@ -54,18 +54,19 @@ def _add_common(p: argparse.ArgumentParser) -> None:
     p.add_argument("--yes", action="store_true", help="auto-confirm dangerous skills (demos only)")
 
 
-def _build_provider(kind: str, offline_rules: Any = None) -> tuple[Any, str]:
+def _build_provider(kind: str, plan_rules: Any = None) -> tuple[Any, str]:
     if kind == "offline" or (kind == "auto" and not os.getenv("LLM_API_KEY")):
-        from embodied.cognition.offline import ScriptedToolProvider
+        from embodied.cognition.offline import ScriptedPlanProvider
 
-        return ScriptedToolProvider(offline_rules), "offline-scripted"
+        return ScriptedPlanProvider(plan_rules), "offline-scripted"
     from embodied.providers import build_provider
+    from embodied.providers.guarded import GuardedProvider
 
-    p = build_provider()
-    return p, type(p).__name__
+    p = GuardedProvider(build_provider())
+    return p, f"guarded({type(p.inner).__name__})"
 
 
-async def _repl(planner: Any, registry: Any, banner: str) -> int:
+async def _repl(engine: Any, registry: Any, banner: str) -> int:
     print(banner)
     print("输入自然语言指令；/skills 列出技能；/exit 退出。")
     while True:
@@ -83,13 +84,11 @@ async def _repl(planner: Any, registry: Any, banner: str) -> int:
                 flag = " [confirm]" if m.require_confirm else ""
                 print(f"  {m.name}{flag} — {m.description}")
             continue
-        turn = await planner.turn(line)
-        for rec in turn.calls:
-            if rec.result is None:
-                status = f"skipped ({rec.note})"
-            else:
-                status = "ok" if rec.result.ok else f"failed: {rec.result.detail}"
-            print(f"  [skill] {rec.skill} → {status}")
+        turn = await engine.turn(line)
+        for r in turn.results:
+            plan_step = next((s for s in (turn.plan.steps if turn.plan else []) if s.id == r.step_id), None)
+            skill = plan_step.skill if plan_step else r.step_id
+            print(f"  [step] {r.step_id} {skill} → {r.status.value}{': ' + (r.detail or r.error) if (r.detail or r.error) else ''}")
         print(f"agent> {turn.text}")
     return 0
 
@@ -106,20 +105,36 @@ def _make_confirm(auto_yes: bool):
 
 
 async def _chat(kind: str, auto_yes: bool) -> int:
-    from embodied.cognition.planner import PlannerConfig, TextPlanner
+    from embodied.cognition.engine import PlannerEngine
+    from embodied.cognition.offline import CHAT_PLAN_RULES
     from embodied.skills.builtin.mock import register_builtin
     from embodied.skills.registry import SkillRegistry
 
     registry = SkillRegistry()
     register_builtin(registry)
-    provider, pname = _build_provider(kind)
-    planner = TextPlanner(provider, registry, PlannerConfig(), confirm=_make_confirm(auto_yes))
-    return await _repl(planner, registry, f"embodied agent-core · provider={pname} · skills={len(registry.catalog())}")
+    provider, pname = _build_provider(kind, plan_rules=CHAT_PLAN_RULES)
+    engine = PlannerEngine(provider, registry, confirm=_make_confirm(auto_yes))
+    return await _repl(engine, registry, f"embodied agent-core · provider={pname} · skills={len(registry.catalog())}")
+
+
+def _make_sim_engine(sim: Any, registry: Any, provider: Any, confirm: Any) -> Any:
+    from embodied.cognition.engine import PlannerEngine
+    from embodied.cognition.world_state import WorldSnapshot
+
+    def world_fn() -> Any:
+        return WorldSnapshot.from_observation(sim.read())
+
+    def context_fn() -> str:
+        snap = world_fn()
+        objs = ", ".join(f"{k}@({v.pos[0]:.2f},{v.pos[1]:.2f},{v.pos[2]:.2f})" for k, v in snap.objects.items())
+        regions = ", ".join(snap.regions)
+        return f"objects: {objs or 'none'}\nregions: {regions or 'none'}\ngripper_opening: {snap.gripper_opening:.2f}"
+
+    return PlannerEngine(provider, registry, confirm=confirm, world_fn=world_fn, context_fn=context_fn)
 
 
 async def _sim(args: argparse.Namespace) -> int:
-    from embodied.cognition.offline import SIM_RULES
-    from embodied.cognition.planner import PlannerConfig, TextPlanner
+    from embodied.cognition.offline import SIM_PLAN_RULES
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.skills.registry import SkillRegistry
     from embodied.skills.scripted.manip import register_sim_skills
@@ -132,10 +147,10 @@ async def _sim(args: argparse.Namespace) -> int:
     if args.eval > 0:
         code = await _sim_eval(sim, registry, n=int(args.eval), record=bool(args.record))
     else:
-        provider, pname = _build_provider(args.provider, offline_rules=SIM_RULES)
-        planner = TextPlanner(provider, registry, PlannerConfig(), confirm=_make_confirm(bool(args.yes)))
+        provider, pname = _build_provider(args.provider, plan_rules=SIM_PLAN_RULES)
+        engine = _make_sim_engine(sim, registry, provider, _make_confirm(bool(args.yes)))
         code = await _repl(
-            planner, registry, f"embodied sim · provider={pname} · {sim.spec().embodiment_id} · skills={len(registry.catalog())}"
+            engine, registry, f"embodied sim · provider={pname} · {sim.spec().embodiment_id} · skills={len(registry.catalog())}"
         )
     if args.snapshot:
         from PIL import Image
@@ -145,8 +160,16 @@ async def _sim(args: argparse.Namespace) -> int:
     return code
 
 
+EVAL_COMMAND = "把红色方块放进盒子"
+
+
 async def _sim_eval(sim: Any, registry: Any, *, n: int, record: bool) -> int:
-    """Headless DoD harness: N randomized pick&place episodes, success rate report."""
+    """Headless DoD harness: N randomized episodes driven end-to-end through the
+    PlannerEngine (text command → plan → DAG → skills → verified report). Success is
+    judged INDEPENDENTLY against sim ground truth, never by the agent's self-report."""
+    from embodied.cognition.offline import SIM_PLAN_RULES, ScriptedPlanProvider
+    from embodied.cognition.world_state import WorldSnapshot, object_in_region
+
     recorder = None
     if record:
         from embodied.data_engine import EpisodeRecorder
@@ -157,36 +180,29 @@ async def _sim_eval(sim: Any, registry: Any, *, n: int, record: bool) -> int:
     for i in range(n):
         obs = sim.reset(randomize=True)
         cube = tuple(round(v, 3) for v in obs.objects["obj_cube"].pos)
+        # Fresh engine per episode: no cross-episode history leakage in eval
+        engine = _make_sim_engine(sim, registry, ScriptedPlanProvider(SIM_PLAN_RULES), confirm=None)
         writer = None
         if recorder is not None:
             writer = recorder.start(
-                task="put the red cube into the bin",
-                embodiment_id=sim.spec().embodiment_id,
-                seed=i,
+                task=EVAL_COMMAND, embodiment_id=sim.spec().embodiment_id, seed=i,
             )
             sim.set_hooks(
                 on_step=writer.on_step,
                 on_guard_event=lambda e, w=writer: w.on_event("safety", {"kind": e.kind, "reason": e.reason}),
             )
         try:
+            turn = await engine.turn(EVAL_COMMAND)
+            snap = WorldSnapshot.from_observation(sim.read())
+            success = object_in_region(snap, "obj_cube", "bin_region", margin=0.005)
             if writer:
-                writer.on_event("skill_start", {"skill": "skill.manip.pick"})
-            r1 = await registry.invoke("skill.manip.pick", {})
-            if writer:
-                writer.on_event("skill_end", {"skill": "skill.manip.pick", "ok": r1.ok, "detail": r1.detail})
-            if r1.ok:
-                if writer:
-                    writer.on_event("skill_start", {"skill": "skill.manip.place"})
-                r2 = await registry.invoke("skill.manip.place", {})
-                if writer:
-                    writer.on_event("skill_end", {"skill": "skill.manip.place", "ok": r2.ok, "detail": r2.detail})
-            else:
-                from embodied.skills.registry import SkillResult
-
-                r2 = SkillResult(ok=False, detail="skipped: pick failed")
-            success = r1.ok and r2.ok
-            if writer:
-                writer.finish(success, detail=f"pick={r1.detail} | place={r2.detail}")
+                for r in turn.results:
+                    writer.on_event(
+                        "skill_end",
+                        {"step": r.step_id, "status": r.status.value, "detail": r.detail or r.error},
+                    )
+                writer.on_event("note", {"report": turn.text[:400]})
+                writer.finish(bool(success), detail=turn.text[:200])
         except Exception as e:
             if writer:
                 writer.abort(repr(e))
@@ -195,8 +211,8 @@ async def _sim_eval(sim: Any, registry: Any, *, n: int, record: bool) -> int:
             if recorder is not None:
                 sim.set_hooks(None, None)
         wins += int(success)
-        print(f"episode {i + 1:>2}/{n}: cube={cube} pick={'ok' if r1.ok else r1.detail} "
-              f"place={'ok' if r2.ok else r2.detail} -> {'SUCCESS' if success else 'FAIL'}")
+        steps = " ".join(f"{r.step_id}={r.status.value}" for r in turn.results) or "no-steps"
+        print(f"episode {i + 1:>2}/{n}: cube={cube} {steps} -> {'SUCCESS' if success else 'FAIL'}")
     rate = wins / n if n else 0.0
     print(f"\nresult: {wins}/{n} success ({rate:.0%})")
     return 0 if rate >= 0.8 else 1
