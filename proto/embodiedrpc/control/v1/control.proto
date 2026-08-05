@@ -2,17 +2,43 @@ syntax = "proto3";
 
 package embodied.control.v1;
 
-import "embodied/common/v1/common.proto";
+import "embodiedrpc/common/v1/common.proto";
 
 // agent-core (System 2) → realtime-control (System 1).
 // This is the ONLY channel through which cognition reaches actuators:
 // commands reference registered skills, never raw motor values (D009).
 service ControlService {
+  // Skill catalog so agent-core can build its planner registry remotely.
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsReply);
   // Execute one skill; server streams progress until a terminal phase.
   rpc InvokeSkill(SkillCommand) returns (stream SkillEvent);
   rpc StreamState(StateRequest) returns (stream embodied.common.v1.RobotState);
-  // Soft-stop the running skill (safety-guardian owns the hard paths).
+  // Halt latches the estop state; only an explicit Reset releases it.
   rpc Halt(HaltRequest) returns (HaltReply);
+  rpc Reset(ResetRequest) returns (ResetReply);
+  // Liveness channel held open by the safety guardian (SG-2 chain:
+  // agent-core -> guardian Heartbeat, guardian -> control SupervisorLink).
+  // Stale/absent link while supervision is required => halt.
+  rpc SupervisorLink(stream embodied.common.v1.Timestamp)
+      returns (stream embodied.common.v1.Timestamp);
+}
+
+message ListSkillsRequest {}
+
+message ListSkillsReply {
+  repeated SkillInfo skills = 1;
+}
+
+message SkillInfo {
+  string manifest_json = 1; // full SkillManifest, JSON-serialized (schema owned by python model)
+}
+
+message ResetRequest {
+  string reason = 1;
+}
+
+message ResetReply {
+  bool reset = 1;
 }
 
 message SkillCommand {
@@ -37,6 +63,7 @@ message SkillEvent {
   string detail = 3;
   embodied.common.v1.RobotState state = 4;
   embodied.common.v1.Error error = 5;
+  string data_json = 6; // SkillResult.data on terminal events (param_refs need it upstream)
 }
 
 message StateRequest {

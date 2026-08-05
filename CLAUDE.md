@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-**M1 仿真闭环，收尾（2026-08-05）**。已通：sim driver + 脚本技能（评测三种子 30/30）+ Safety Guard v0 + episode 录制 + planner 引擎（plan-execute-verify + 有界循环）+ 控制台 v0 语音链路（`embodied console`，keyless 可跑）。剩余：评测任务集版本化、三进程拆分、控制台真机浏览器人工验证。动手前先读 `docs/roadmap.md` 的 M1 任务与阶段进展；移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md`。仿真代码涉及抓取参数改动时，先跑 `uv run --group sim embodied sim --eval 10` 确认不回退（当前基线 10/10，多种子 30/30）。
+**M1 完成（2026-08-05），M2 准备中**。已通：sim driver + 脚本技能 + Safety Guard + episode 录制 + planner 引擎（plan-execute-verify + 有界循环）+ 控制台语音链路（`embodied console`，keyless 可跑）+ 版本化评测（`eval/tasks/`，基线 30/30 见 `eval/BASELINES.md`）+ 三进程拆分（serve-control/serve-guardian，活性链 D013）。唯一人工遗留：用户浏览器验证 `embodied console`。M2 任务见 `docs/roadmap.md` 近期行动清单；移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md`。**抓取/策略参数改动必须先跑 `uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml` 确认不回退，基线只能被数据推翻**。
 
 ## 目录结构
 
@@ -32,7 +32,7 @@
 
 - 代码改动后必须绿：`uv run ruff check .` + `uv run pytest -q`。
 - 契约测试（确认门禁 `test_registry_contract`、术语纪律 `test_no_forbidden_terms`、技能扩展缝）不许跳过、注释或放宽断言。
-- proto 变更后运行 `scripts/gen-proto.ps1`（或 `.sh`）确认编译通过；生成物在 `gen/`（不进 git）。
+- proto 变更后运行 `scripts/gen-proto.ps1`（或 `.sh`）确认编译通过；生成物在 `gen/`（不进 git）。进程拆分相关改动加跑 `uv run --group rpc pytest tests/rpc`（无 stubs/grpc 时自动跳过，CI 不覆盖，本地必跑）。
 - 文档改动后自查相对链接有效、`roadmap.md` 阶段状态与实际一致。
 
 ## 已知环境约束

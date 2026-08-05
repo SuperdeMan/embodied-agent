@@ -1,0 +1,33 @@
+# Versioned eval task (schema eval.task/v1). Tasks are immutable once baselined:
+# changing ANYTHING here (seeds, margins, sector, command) means a new version file —
+# baselines are only comparable within one task version (docs/roadmap.md 评测驱动).
+schema: eval.task/v1
+name: tabletop_pick_place
+version: v1
+description: >
+  Voice-style text command drives the full engine path (plan -> DAG -> skills) to move
+  the red cube into the bin. Success judged INDEPENDENTLY against sim ground truth.
+
+command: "把红色方块放进盒子"
+embodiment: sim.mujoco.so_arm100
+
+episodes:
+  # Each entry seeds the sim RNG stream; object placement derives deterministically.
+  seeds: [0, 1, 2]
+  per_seed: 10
+
+randomization:
+  # Documented dims (implemented by TabletopSim._randomize_objects; recorded here so a
+  # future change to the sampler is visibly a task-version change):
+  object: obj_cube
+  radial_m: [0.18, 0.27]
+  angle_deg: [230, 310]
+  keepout: "0.10 m around bin center"
+
+judge:
+  predicate: object_in_region
+  object: obj_cube
+  region: bin_region
+  margin_m: 0.005
+
+pass_threshold: 0.8

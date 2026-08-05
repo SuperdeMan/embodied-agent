@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package embodied.safety.v1;
 
-import "embodied/common/v1/common.proto";
+import "embodiedrpc/common/v1/common.proto";
 
 // safety-guardian (SG-2): deterministic supervisor, docs/architecture.md §4.5.
 // Validates intent BEFORE motion, watches liveness DURING motion.

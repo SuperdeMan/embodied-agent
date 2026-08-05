@@ -30,16 +30,30 @@ def main(argv: list[str] | None = None) -> int:
 
     sim = sub.add_parser("sim", help="tabletop simulation: chat control, or headless eval")
     _add_common(sim)
-    sim.add_argument("--eval", type=int, default=0, metavar="N", help="run N randomized pick&place episodes, report success rate")
+    sim.add_argument("--eval", type=int, default=0, metavar="N", help="quick eval: N episodes on --seed (ad-hoc, not versioned)")
+    sim.add_argument("--task", default="", metavar="YAML", help="versioned eval task file (eval/tasks/*.yaml); overrides --eval")
     sim.add_argument("--seed", type=int, default=0)
     sim.add_argument("--record", action="store_true", help="record episodes to outputs/episodes (EPISODES_DIR)")
     sim.add_argument("--snapshot", default="", help="save a scene PNG to this path on exit")
+    sim.add_argument("--remote", default="", metavar="ADDR", help="drive a serve-control process instead of a local sim")
+    sim.add_argument("--guardian", default="", metavar="ADDR", help="stream agent heartbeats to this guardian (with --remote)")
 
     console = sub.add_parser("console", help="web console: voice/text control of the tabletop sim")
     _add_common(console)
     console.add_argument("--host", default="127.0.0.1")
     console.add_argument("--port", type=int, default=8390)
     console.add_argument("--seed", type=int, default=0)
+
+    sc = sub.add_parser("serve-control", help="realtime-control process (gRPC ControlService)")
+    sc.add_argument("--port", type=int, default=8391)
+    sc.add_argument("--seed", type=int, default=0)
+    sc.add_argument("--require-supervisor", action="store_true",
+                    help="halt unless the safety guardian holds SupervisorLink (production topology)")
+    sc.add_argument("--mock", action="store_true", help="serve mock skills instead of the sim (no mujoco)")
+
+    sg = sub.add_parser("serve-guardian", help="safety-guardian process (gRPC SafetyService)")
+    sg.add_argument("--port", type=int, default=8392)
+    sg.add_argument("--control", default="127.0.0.1:8391", metavar="ADDR")
 
     args = parser.parse_args(argv)
     if args.cmd in (None, "chat"):
@@ -48,6 +62,10 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_sim(args))
     if args.cmd == "console":
         return _console(args)
+    if args.cmd == "serve-control":
+        return asyncio.run(_serve_control(args))
+    if args.cmd == "serve-guardian":
+        return asyncio.run(_serve_guardian(args))
     parser.error(f"unknown command {args.cmd!r}")
     return 2
 
@@ -141,18 +159,103 @@ def _make_sim_engine(sim: Any, registry: Any, provider: Any, confirm: Any) -> An
     return PlannerEngine(provider, registry, confirm=confirm, world_fn=world_fn, context_fn=context_fn)
 
 
+async def _serve_control(args: argparse.Namespace) -> int:
+    import logging
+
+    from embodied.control.service import ControlState, serve, watchdog_loop
+    from embodied.skills.registry import SkillRegistry
+
+    logging.basicConfig(level=logging.INFO)
+    registry = SkillRegistry()
+    sim = None
+    if args.mock:
+        from embodied.skills.builtin.mock import register_builtin
+
+        register_builtin(registry)
+    else:
+        from embodied.control.drivers.mujoco_sim import TabletopSim
+        from embodied.skills.scripted.manip import register_sim_skills
+
+        sim = TabletopSim(seed=int(args.seed))
+        register_sim_skills(registry, sim)
+    state = ControlState(registry, sim, require_supervisor=bool(args.require_supervisor))
+    server, bound = await serve(state, port=int(args.port))
+    print(f"realtime-control on 127.0.0.1:{bound} (skills={len(registry.catalog())}, "
+          f"require_supervisor={state.require_supervisor})")
+    wd = asyncio.create_task(watchdog_loop(state))
+    try:
+        await server.wait_for_termination()
+    finally:
+        wd.cancel()
+    return 0
+
+
+async def _serve_guardian(args: argparse.Namespace) -> int:
+    import logging
+
+    from embodied.safety.guard import GuardLimits
+    from embodied.safety.guardian import GuardianState, agent_watchdog_loop, serve, supervisor_link_loop
+
+    logging.basicConfig(level=logging.INFO)
+    state = GuardianState(str(args.control), GuardLimits(joint_lower=(), joint_upper=()))
+    server, bound = await serve(state, port=int(args.port))
+    print(f"safety-guardian on 127.0.0.1:{bound}, supervising control at {args.control}")
+    tasks = [asyncio.create_task(agent_watchdog_loop(state)), asyncio.create_task(supervisor_link_loop(state))]
+    try:
+        await server.wait_for_termination()
+    finally:
+        for t in tasks:
+            t.cancel()
+    return 0
+
+
+async def _sim_remote(args: argparse.Namespace) -> int:
+    """agent-core against a serve-control process. World-state context/verification are
+    local-sim features; remotely the verifier reads UNKNOWN (never convicts) until a
+    world streaming channel exists (noted in roadmap)."""
+    import grpc
+
+    from embodied.cognition.engine import PlannerEngine
+    from embodied.cognition.offline import SIM_PLAN_RULES
+    from embodied.runtime.liveness import agent_heartbeat_loop
+    from embodied.skills.remote import RemoteSkillRegistry
+
+    provider, pname = _build_provider(args.provider, plan_rules=SIM_PLAN_RULES)
+    channel = grpc.aio.insecure_channel(str(args.remote))
+    registry = await RemoteSkillRegistry(channel).connect()
+    engine = PlannerEngine(provider, registry, confirm=_make_confirm(bool(args.yes)))
+    beat = None
+    if args.guardian:
+        beat = asyncio.create_task(agent_heartbeat_loop(str(args.guardian)))
+        print(f"heartbeats -> guardian {args.guardian}")
+    try:
+        return await _repl(
+            engine, registry,
+            f"embodied agent-core(remote) · provider={pname} · control={args.remote} · skills={len(registry.catalog())}",
+        )
+    finally:
+        if beat is not None:
+            beat.cancel()
+        await channel.close()
+
+
 async def _sim(args: argparse.Namespace) -> int:
     from embodied.cognition.offline import SIM_PLAN_RULES
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.skills.registry import SkillRegistry
     from embodied.skills.scripted.manip import register_sim_skills
 
+    if args.remote:
+        return await _sim_remote(args)
+
     sim = TabletopSim(seed=int(args.seed))
     registry = SkillRegistry()
     register_sim_skills(registry, sim)
 
     code: int
-    if args.eval > 0:
+    if args.task:
+        code = await _sim_eval_task(str(args.task), record=bool(args.record))
+    elif args.eval > 0:
         code = await _sim_eval(sim, registry, n=int(args.eval), record=bool(args.record))
     else:
         provider, pname = _build_provider(args.provider, plan_rules=SIM_PLAN_RULES)
@@ -195,6 +298,33 @@ def _console(args: argparse.Namespace) -> int:
     ctx = AppContext(sim, registry, make_engine, asr, tts)
     run_console(ctx, host=str(args.host), port=int(args.port))
     return 0
+
+
+async def _sim_eval_task(task_path: str, *, record: bool) -> int:
+    """Versioned eval: fresh sim per seed, fresh engine per episode, result JSON persisted."""
+    from embodied.cognition.offline import SIM_PLAN_RULES, ScriptedPlanProvider
+    from embodied.control.drivers.mujoco_sim import TabletopSim
+    from embodied.data_engine.evaluation import EvalTask, run_task
+    from embodied.skills.registry import SkillRegistry
+    from embodied.skills.scripted.manip import register_sim_skills
+
+    task = EvalTask.load(task_path)
+
+    def make_sim(seed: int):
+        sim = TabletopSim(seed=seed)
+        registry = SkillRegistry()
+        register_sim_skills(registry, sim)
+        sim._eval_registry = registry  # paired at creation; engine factory reads it back
+        return sim
+
+    def make_engine(sim):
+        return _make_sim_engine(sim, sim._eval_registry, ScriptedPlanProvider(SIM_PLAN_RULES), confirm=None)
+
+    report = await run_task(task, make_sim=make_sim, make_engine=make_engine, record=record)
+    print(f"\n[{report.task_id}] result: {report.wins}/{len(report.episodes)} "
+          f"({report.rate:.0%}) -> {'PASS' if report.passed else 'FAIL'}")
+    print(f"result file: {report.out_path}")
+    return 0 if report.passed else 1
 
 
 EVAL_COMMAND = "把红色方块放进盒子"

@@ -52,7 +52,9 @@
 
 **阶段进展（2026-08-05 第二批）**：planner 引擎移植完成，`embodied sim --eval 10` 改为全链路引擎评测（文本指令→submit_plan→DAG→技能→独立世界状态裁判）仍 **9/10**（失败局为已知扇区边缘位，非引擎回退）；技能 manifest 新增声明式 `verification` 字段（pick 用 `gripper_holding` 谓词、place 用 schema 模式）。
 
-**阶段进展（2026-08-05 第三批）**：控制台 v0 + 语音链路落地（headless 协议冒烟通过：文本/语音指令→执行→TTS 回流、确认弹窗桥接、场景流）；ASR/TTS provider 族移植完成（21 类，与源 diff 验证零逻辑改动）；**扇区边缘抓取失败修复**（根因：斜接近角下固定指下降途中推移方块 9mm；两段式下降 + 中途重瞄）——评测三种子 **30/30**。剩余：评测集版本化、三进程拆分；语音 DoD 的真机浏览器人工验证待用户执行 `embodied console`。
+**阶段进展（2026-08-05 第三批）**：控制台 v0 + 语音链路落地（headless 协议冒烟通过：文本/语音指令→执行→TTS 回流、确认弹窗桥接、场景流）；ASR/TTS provider 族移植完成（21 类，与源 diff 验证零逻辑改动）；**扇区边缘抓取失败修复**（根因：斜接近角下固定指下降途中推移方块 9mm；两段式下降 + 中途重瞄）——评测三种子 **30/30**。
+
+**M1 完成（2026-08-05 第四批）**：①评测任务集版本化——`eval/tasks/tabletop_pick_place_v1.yaml`（种子/随机化维度/裁判/阈值声明式）+ `--task` 运行器 + 结果 JSON 落盘 + `eval/BASELINES.md` 只增账本（首条基线 30/30）；②三进程拆分——`serve-control`/`serve-guardian`/`sim --remote` 三进程拓扑，活性链 agent→guardian→control（D013），真实进程冒烟验证「kill guardian → control 闩锁拒绝执行」；RemoteSkillRegistry 使确认门禁跨进程成立。全量 384 测试绿。**遗留到 M2 前**：控制台真机浏览器人工验证（用户执行 `embodied console`）；远程模式的世界状态流（当前远程验证退化为 UNKNOWN 不定罪，需扩展 StreamState 或增 WorldService）。
 
 **DoD**：「把红色方块放到盒子里」类自然语言指令，10 次运行 ≥8 次成功（脚本技能 + 真值感知条件下）；每次运行自动产出可回放的 episode；断网时已注册技能仍可通过控制台指令执行。
 
@@ -133,10 +135,11 @@
 2. **垂直场景产品**：桌面陪伴/效率/教育机器人（语音交互是现成强项），走「智能硬件 + 订阅」。
 3. **行业轻方案**：小商户/轻工业桌面级分拣整理 PoC，按项目收费验证付费意愿。
 
-## 近期行动清单（M1 后半程，2026-08-05 第二批更新）
+## 近期行动清单（M2 准备，2026-08-05 更新）
 
-垂直切片与 planner 引擎移植均已完成，全链路引擎评测 9/10。剩余三步：
+M1 全部任务完成（唯一人工项：用户跑一次 `embodied console` 做真机浏览器验证）。M2 起步四件事：
 
-1. 控制台 v0 + 语音接入（复用 HMI 栈），打通 DoD 要求的「语音→规划→执行→汇报」全链路
-2. 把 `--eval` 扩展成版本化评测任务集（位置随机化维度记录、失败案例归档），修掉扇区边缘抓取失败（10 局中的那 1 局：近基座 + 采样边界角）
-3. 三进程拆分（realtime-control / safety-guardian 独立进程 + 心跳看门狗，proto 已备）——可与 1 并行
+1. 仿真遥操作输入（键鼠/手柄 → teleop 通道），采集 pick&place 50-100 episodes
+2. lerobot 依赖引入（D012 触发器到期）：实现 `to_lerobot()` 转换器并用社区可视化工具验证互操作，训练管线 `scripts/train.py` 一条命令跑通 ACT 基线
+3. PolicyProvider：checkpoint → ONNX → 学习技能接入 SkillRegistry（manifest 不变、实现替换）
+4. 感知 v1（Grounding DINO + SAM2 + 深度）替换真值物体表，sim 内先验证感知链路

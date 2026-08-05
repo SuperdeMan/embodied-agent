@@ -65,6 +65,13 @@
 **理由**：座舱的安全纪律在会动的机器人上只会更必要；这些红线在 car-agent 已被契约测试钉死，方法论成熟。
 **替代方案**：无。此条不设重估触发器，只加严不放松。
 
+## D013 · 三进程活性链：agent→guardian→control 单向监督，看门狗是唯一执法点
+**日期**：2026-08-05 · **状态**：生效
+**决策**：进程拆分的活性设计为单向链——agent-core 向 guardian 流式心跳（SafetyService.Heartbeat），guardian 向 realtime-control 持有 SupervisorLink；`--require-supervisor` 下链路缺失/过期即闩锁停机，仅显式 Reset 释放。halt 的执法权集中在**轮询看门狗循环**，绝不放在流断开的 teardown 里（gRPC 会取消 servicer 协程，`finally` 中的 await 送不出去——契约测试与真实进程冒烟各验证过一次）。附带：proto 生成物 python 根目录改为 `embodiedrpc/`（proto package 名保持 `embodied.<service>.v1` 约定），根治与真实 `embodied` 包的命名空间冲突。
+**理由**：单向链让每个进程只信任下游的存在性，不依赖任何 AI 输出；kill 任一上游进程，机械臂停且保持停。
+**替代方案**：网状互相心跳（复杂度高、成环推理难）；teardown 内发 halt（已被证伪）。
+**重估触发器**：真机阶段（M3）若引入独立急停硬件通道，软件链降级为第二道防线，重审超时参数。
+
 ## D012 · Episode 录制 v0 用轻量中间格式，lerobot/torch 依赖推迟到 M2
 **日期**：2026-08-05 · **状态**：生效
 **决策**：M1 录制器落 `meta.json + steps.npz + events.jsonl`（字段名 1:1 映射 LeRobotDataset v3，映射表随 meta 落盘），`to_lerobot()` 转换器以 stub 存在；`lerobot`/`torch` 到 M2 训练管线搭建时才进依赖。
