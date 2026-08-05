@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-**M1 仿真闭环，后半程（2026-08-05 起）**。垂直切片已通：sim driver + 脚本技能 pick&place（`embodied sim --eval 10` 达 9/10）+ Safety Guard v0 + episode 录制。剩余：planner 引擎移植、控制台语音接入、评测任务集版本化、三进程拆分。动手前先读 `docs/roadmap.md` 的 M1 任务与阶段进展；移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md`。仿真代码涉及抓取参数改动时，先跑 `uv run --group sim embodied sim --eval 10` 确认不回退。
+**M1 仿真闭环，收尾（2026-08-05）**。已通：sim driver + 脚本技能（评测三种子 30/30）+ Safety Guard v0 + episode 录制 + planner 引擎（plan-execute-verify + 有界循环）+ 控制台 v0 语音链路（`embodied console`，keyless 可跑）。剩余：评测任务集版本化、三进程拆分、控制台真机浏览器人工验证。动手前先读 `docs/roadmap.md` 的 M1 任务与阶段进展；移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md`。仿真代码涉及抓取参数改动时，先跑 `uv run --group sim embodied sim --eval 10` 确认不回退（当前基线 10/10，多种子 30/30）。
 
 ## 目录结构
 

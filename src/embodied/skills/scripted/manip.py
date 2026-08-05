@@ -20,6 +20,7 @@ from embodied.skills.registry import SkillRegistry, SkillResult
 from embodied.skills.scripted import motions
 
 PREGRASP_DZ = 0.08
+MID_DZ = 0.035  # re-aim height: below nudge-risk, above contact
 GRASP_DZ = 0.010  # site above object center: pads grip the lower half without fingertips striking the floor
 # The gripper has a FIXED finger on the site's +x side: aim the site slightly to that
 # side of the object so the fixed finger slides past the object face instead of landing
@@ -106,9 +107,16 @@ def _pick_sync(emb: Any, obj: str) -> SkillResult:
         return SkillResult(ok=False, detail="guard denied gripper open")
     if not motions.move_to_q(emb, pregrasp.qpos, gripper=OPEN_FOR_GRASP):
         return SkillResult(ok=False, detail="pregrasp motion denied")
-    fresh = np.asarray(_snap(emb).objects[obj].pos)  # descent aims at the (possibly nudged) live pose
-    grasp_target = fresh + GRASP_LATERAL_OFF * _jaw_x_world(emb) + [0, 0, GRASP_DZ]
-    if not motions.reach(emb, grasp_target, max_pos_err=0.006, seconds=1.2, gripper=OPEN_FOR_GRASP):
+    # Two-stage descent with mid-height re-aim: at oblique approach angles (sector edges)
+    # the fixed finger can clip and shove the object during descent; whatever the first
+    # stage did to it, the final stage re-reads the LIVE pose and aims there.
+    fresh = np.asarray(_snap(emb).objects[obj].pos)
+    mid_target = fresh + GRASP_LATERAL_OFF * _jaw_x_world(emb) + [0, 0, MID_DZ]
+    if not motions.reach(emb, mid_target, max_pos_err=0.008, seconds=0.8, gripper=OPEN_FOR_GRASP):
+        return SkillResult(ok=False, detail="mid descent unreachable or denied")
+    fresh2 = np.asarray(_snap(emb).objects[obj].pos)
+    grasp_target = fresh2 + GRASP_LATERAL_OFF * _jaw_x_world(emb) + [0, 0, GRASP_DZ]
+    if not motions.reach(emb, grasp_target, max_pos_err=0.006, seconds=0.7, gripper=OPEN_FOR_GRASP):
         return SkillResult(ok=False, detail="grasp descent unreachable or denied")
     if not motions.set_gripper(emb, 0.0, seconds=0.6):
         return SkillResult(ok=False, detail="guard denied gripper close")

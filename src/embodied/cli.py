@@ -35,11 +35,19 @@ def main(argv: list[str] | None = None) -> int:
     sim.add_argument("--record", action="store_true", help="record episodes to outputs/episodes (EPISODES_DIR)")
     sim.add_argument("--snapshot", default="", help="save a scene PNG to this path on exit")
 
+    console = sub.add_parser("console", help="web console: voice/text control of the tabletop sim")
+    _add_common(console)
+    console.add_argument("--host", default="127.0.0.1")
+    console.add_argument("--port", type=int, default=8390)
+    console.add_argument("--seed", type=int, default=0)
+
     args = parser.parse_args(argv)
     if args.cmd in (None, "chat"):
         return asyncio.run(_chat(getattr(args, "provider", "auto"), bool(getattr(args, "yes", False))))
     if args.cmd == "sim":
         return asyncio.run(_sim(args))
+    if args.cmd == "console":
+        return _console(args)
     parser.error(f"unknown command {args.cmd!r}")
     return 2
 
@@ -158,6 +166,35 @@ async def _sim(args: argparse.Namespace) -> int:
         Image.fromarray(sim.render("side")).save(args.snapshot)
         print(f"snapshot -> {args.snapshot}")
     return code
+
+
+def _console(args: argparse.Namespace) -> int:
+    from embodied.cognition.offline import SIM_PLAN_RULES
+    from embodied.control.drivers.mujoco_sim import TabletopSim
+    from embodied.hri.server import AppContext, run_console
+    from embodied.providers.audio import (
+        MockStreamingTTSProvider,
+        build_asr_provider,
+        build_tts_stream_provider,
+    )
+    from embodied.skills.registry import SkillRegistry
+    from embodied.skills.scripted.manip import register_sim_skills
+
+    sim = TabletopSim(seed=int(args.seed))
+    registry = SkillRegistry()
+    register_sim_skills(registry, sim)
+
+    def make_engine(confirm):
+        provider, _ = _build_provider(args.provider, plan_rules=SIM_PLAN_RULES)
+        return _make_sim_engine(sim, registry, provider, confirm)
+
+    asr = build_asr_provider()
+    # Factory returns None when streaming TTS is unconfigured (origin semantics: off);
+    # the console always speaks, so fall back to the silent mock.
+    tts = build_tts_stream_provider() or MockStreamingTTSProvider()
+    ctx = AppContext(sim, registry, make_engine, asr, tts)
+    run_console(ctx, host=str(args.host), port=int(args.port))
+    return 0
 
 
 EVAL_COMMAND = "把红色方块放进盒子"

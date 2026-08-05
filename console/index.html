@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>embodied console</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; }
+  body { font: 14px/1.5 system-ui, sans-serif; background: #101418; color: #dde3ea;
+         display: grid; grid-template-columns: 1fr 380px; grid-template-rows: auto 1fr auto;
+         gap: 10px; height: 100vh; padding: 10px; }
+  header { grid-column: 1 / 3; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 16px; font-weight: 600; }
+  #status { font-size: 12px; color: #8b98a5; }
+  #scene-pane { background: #000; border-radius: 8px; overflow: hidden; display: flex;
+                align-items: center; justify-content: center; min-height: 0; }
+  #scene { max-width: 100%; max-height: 100%; }
+  #side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .card { background: #1a2027; border-radius: 8px; padding: 10px; overflow-y: auto; }
+  #log { flex: 3; min-height: 0; }
+  #timeline { flex: 2; min-height: 0; font-size: 12px; }
+  .msg { margin-bottom: 8px; }
+  .msg .who { font-size: 11px; color: #8b98a5; }
+  .msg.user .body { color: #9ecbff; }
+  .msg.agent .body { white-space: pre-wrap; }
+  .msg.err .body { color: #ff8f8f; }
+  .step { display: flex; gap: 6px; margin-bottom: 4px; }
+  .step .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
+  .ok .dot { background: #4cd964; } .failed .dot { background: #ff5f57; }
+  .skipped .dot { background: #8b98a5; } .need_confirm .dot { background: #ffbd2e; }
+  footer { grid-column: 1 / 3; display: flex; gap: 8px; }
+  #text { flex: 1; background: #1a2027; border: 1px solid #2c3540; color: inherit;
+          border-radius: 8px; padding: 10px 12px; font: inherit; }
+  button { border: 0; border-radius: 8px; padding: 10px 16px; font: inherit; cursor: pointer;
+           background: #2c3540; color: inherit; }
+  button:active { transform: translateY(1px); }
+  #talk { background: #274668; min-width: 130px; }
+  #talk.rec { background: #a33; }
+  dialog { border: 0; border-radius: 10px; background: #222a33; color: inherit; padding: 18px;
+           max-width: 380px; }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog .actions { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
+  #approve { background: #a33; }
+</style>
+</head>
+<body>
+<header>
+  <h1>embodied console</h1>
+  <span id="status">connecting…</span>
+</header>
+<div id="scene-pane"><img id="scene" alt="scene"></div>
+<div id="side">
+  <div class="card" id="log"></div>
+  <div class="card" id="timeline"><em style="color:#8b98a5">执行时间线</em></div>
+</div>
+<footer>
+  <input id="text" placeholder="输入指令，如：把红色方块放进盒子" autocomplete="off">
+  <button id="send">发送</button>
+  <button id="talk">按住说话</button>
+</footer>
+<dialog id="confirm-dlg">
+  <div id="confirm-text"></div>
+  <div class="actions">
+    <button id="deny">取消</button>
+    <button id="approve">确认执行</button>
+  </div>
+</dialog>
+<script type="module" src="/console/app.js"></script>
+</body>
+</html>

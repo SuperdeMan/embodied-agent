@@ -44,6 +44,8 @@
 
 ### 执行记录
 
+- **P1 主体完成（2026-08-05）**：①规划-执行引擎（plan/plan_builder/executor/verify/engine，改造要点见各文件头）；②providers 音频段全量（audio.py 1196 行，21 类，与源 diff 仅格式差异）；③控制台语音：**HMI 栈按「设计移植、代码精简重写」处理**——v0 采用按住说话（无 VAD/KWS），浏览器端 pcm.js 仅承载采集/回放，car-agent 的 VoiceLoop 状态机、silero 端点、sherpa KWS 与打断体系推迟到 S2S 升级时按原设计接入（端点判定权在客户端这一结论已内建到 hri.v0 协议）。proto 与 registry 的移植随三进程拆分执行。
+
 - **P0 完成（2026-08-04）**：providers LLM 体系（llm/runtime/cache/ratelimit/health，Redis 剥离）、obs（events 改 JSONL sink、logging、tracing 可选 OTel、redact 随行）、ledger（PG → in-memory，公开 API 不变）、privacy scope 过滤、permission + 机器人域 scopes、testing 助手。约 2,300 行实现 + 189 个测试随行/新增，全部通过。
 - **对本文档的两处事实修正**：① `context_scopes` 过滤机制的真实来源是 `orchestrator/cloud/clients.py`（`_SENSITIVE_SCOPE` + `_merge_meta`）；`runtime/privacy_registry.py` 实为 GDPR 目标注册表，其 adapter 依赖未移植模块，留 M1。② `observability/collector/` 未搬，由 JSONL sink 替代（按计划）。
 

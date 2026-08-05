@@ -46,11 +46,13 @@
 - [x] WorldState v0（本体状态 + 仿真真值物体表 + 区域谓词；感知 M2 再上）
 - [x] 移植改造 planner 引擎替换 M0 最小环（2026-08-05）：Plan/Step 模型、PlanBuilder（submit_plan 工具通道、原子校验、manifest 权威链）、DagExecutor（拓扑分层并行、param_refs 三形态、副作用防抖、确认闸 fail-closed）、verify 三态对账（SAT/UNSAT/UNKNOWN、声明式谓词注册表、`$param:` 动态期望、须确认步永不重试）、有界 replan 循环（分档预算）。M0 最小环保留为降级路径
 - [x] Safety Guard v0：工作区围栏（越界闩锁）、速率限幅、命令来源白名单，接入 driver 写路径（2026-08-05）；心跳看门狗随三进程拆分实现（proto 已备）
-- [ ] 控制台 v0：复用 HMI 语音栈接入，场景画面 + 执行时间线
+- [x] 控制台 v0（2026-08-05）：`embodied console` — 浏览器按住说话（AudioWorklet 16k PCM 上行）→ ASR → 引擎 → step 时间线 + 流式 TTS 回放 + 场景视图 5fps + 危险技能确认弹窗；单 WS 会话协议（hri.v0），无 key 时 mock 音频离线可用。语音前端为精简重写而非整栈移植（VAD/KWS 唤醒与打断随 S2S 升级引入，见 reuse 文档执行记录）
 - [x] Episode 录制落盘（LeRobot 字段对齐的中间格式，D012；转换器 M2 实现）
 - [x] 接线 M0 移植库（2026-08-05）：GuardedProvider 把 ratelimit 挂到 complete/complete_tools、cache 挂到 complete（ported cache 只存文本形态，规划调用刻意不缓存以免丢 tool_calls）；ledger 持久化后端选型仍留 M2
 
-**阶段进展（2026-08-05 第二批）**：planner 引擎移植完成，`embodied sim --eval 10` 改为全链路引擎评测（文本指令→submit_plan→DAG→技能→独立世界状态裁判）仍 **9/10**（失败局为已知扇区边缘位，非引擎回退）；技能 manifest 新增声明式 `verification` 字段（pick 用 `gripper_holding` 谓词、place 用 schema 模式）。剩余：控制台语音、评测集版本化、三进程拆分。
+**阶段进展（2026-08-05 第二批）**：planner 引擎移植完成，`embodied sim --eval 10` 改为全链路引擎评测（文本指令→submit_plan→DAG→技能→独立世界状态裁判）仍 **9/10**（失败局为已知扇区边缘位，非引擎回退）；技能 manifest 新增声明式 `verification` 字段（pick 用 `gripper_holding` 谓词、place 用 schema 模式）。
+
+**阶段进展（2026-08-05 第三批）**：控制台 v0 + 语音链路落地（headless 协议冒烟通过：文本/语音指令→执行→TTS 回流、确认弹窗桥接、场景流）；ASR/TTS provider 族移植完成（21 类，与源 diff 验证零逻辑改动）；**扇区边缘抓取失败修复**（根因：斜接近角下固定指下降途中推移方块 9mm；两段式下降 + 中途重瞄）——评测三种子 **30/30**。剩余：评测集版本化、三进程拆分；语音 DoD 的真机浏览器人工验证待用户执行 `embodied console`。
 
 **DoD**：「把红色方块放到盒子里」类自然语言指令，10 次运行 ≥8 次成功（脚本技能 + 真值感知条件下）；每次运行自动产出可回放的 episode；断网时已注册技能仍可通过控制台指令执行。
 
