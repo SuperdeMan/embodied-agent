@@ -1,8 +1,16 @@
-# embodied-agent
+# Embodied Agent
 
 [![ci](https://github.com/SuperdeMan/embodied-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/SuperdeMan/embodied-agent/actions/workflows/ci.yml)
 ![python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![license](https://img.shields.io/badge/license-Apache--2.0-green)
+
+[Quick Start](#快速开始) ·
+[Architecture](docs/architecture.md) ·
+[Roadmap](docs/roadmap.md) ·
+[Evaluation](eval/) ·
+[Design Decisions](docs/decisions.md)
+
+**A safety-bounded, embodiment-agnostic runtime for intelligent robots.**
 
 **跨本体的具身智能体运行时**——「大脑—小脑—本体」分层架构：LLM 负责认知规划（System 2），技能层负责闭环执行（System 1），硬件抽象层隔离本体；安全监督、数据引擎、可观测三条竖切贯穿。桌面操作机器人场景起步，仿真先行、真机跟进（SO-101）。
 
