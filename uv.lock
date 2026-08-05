@@ -251,6 +251,7 @@ dependencies = [
     { name = "httpx" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.1", source = { registry = "https://pypi.tuna.tsinghua.edu.cn/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "pillow" },
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
@@ -267,7 +268,6 @@ rpc = [
 ]
 sim = [
     { name = "mujoco" },
-    { name = "pillow" },
 ]
 
 [package.metadata]
@@ -276,6 +276,7 @@ requires-dist = [
     { name = "anthropic", specifier = ">=0.39" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "numpy", specifier = ">=1.26" },
+    { name = "pillow", specifier = ">=10" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pyyaml", specifier = ">=6.0" },
 ]
@@ -290,10 +291,7 @@ rpc = [
     { name = "grpcio", specifier = ">=1.66" },
     { name = "grpcio-tools", specifier = ">=1.66" },
 ]
-sim = [
-    { name = "mujoco", specifier = ">=3.2" },
-    { name = "pillow", specifier = ">=10" },
-]
+sim = [{ name = "mujoco", specifier = ">=3.2" }]
 
 [[package]]
 name = "etils"
