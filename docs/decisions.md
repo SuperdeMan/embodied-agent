@@ -65,6 +65,18 @@
 **理由**：座舱的安全纪律在会动的机器人上只会更必要；这些红线在 car-agent 已被契约测试钉死，方法论成熟。
 **替代方案**：无。此条不设重估触发器，只加严不放松。
 
+## D014 · M2 数据管线：训练/部署依赖分离，转换按固定 fps 重采样，environment_state 作感知替换缝
+**日期**：2026-08-07 · **状态**：生效
+**决策**：
+1. **依赖分组**：新增 `learn` 组（lerobot，随带 torch）只服务训练与数据集转换；`policy` 组（onnxruntime）只服务部署推理。运行时核心（main dependencies）不引入任何学习框架；CI 不装 learn/policy，相关测试在依赖缺席时自动跳过（与 `rpc` 组同规，本地必跑）。
+2. **转换器 `to_lerobot()` 落地**（D012 触发器到期）：v0 episodes → LeRobotDataset v3。核心列沿用 `LEROBOT_FIELD_MAP`，另增 `observation.environment_state` = 按物体名字典序拼接的位姿向量（每物体 pos3+quat4，名单落入数据集 features.names）。这是**感知替换缝**：M2 感知 v1 上线后由感知输出填充同一向量，policy 输入契约不变（sim 真值 → 感知估计是数据源替换，不是接口变更）。
+3. **重采样**：v0 录制的 hook 节奏不均匀（50 Hz 命令间隔 + settle 段一次 `step(n)` 仅触发一次采样），时间戳为 sim time。转换时按声明 fps（默认 50）均匀网格重采样：action 零阶保持（位置目标本就是阶梯信号）、观测通道线性插值——满足 LeRobotDataset 的 fps/timestamp 容差契约。
+4. **技能边界入数据**：采集路径（`embodied collect`）在真实技能边界处发 `skill_start`/`skill_end` 事件并携带 `sim_t`，转换器支持按技能切分产出 per-skill 数据集，使学习策略可逐技能替换脚本实现（roadmap「manifest 不变、实现替换」的数据基础）。
+**理由**：训练/部署分离兑现架构 §7「PyTorch 训练 → ONNX Runtime 部署」承诺，部署面永不背 torch；environment_state 让首个策略无需相机帧即可训练（数据轻、CPU 可训、CI 可测），相机帧通道留作视觉策略开工时的增强。
+**放弃的替代方案**：v0 录制器直接录相机帧（重且慢，state-based 基线用不上）；转换时保留原始不均匀时间戳（违反 LeRobot fps 契约）；部署直接加载 torch checkpoint（部署面引入 GB 级依赖）。
+**重估触发器**：图像条件策略（视觉 ACT / VLA 微调）开工时，录制器增加相机帧通道并重估存储与 fps；lerobot 大版本升级仍按依赖红线先记录再动。
+**落地版本（2026-08-07）**：lerobot 0.4.4（LeRobotDataset v3.0，随带 torch 2.10.0 CPU）、onnx 1.20 系（导出期元数据写入）、onnxruntime 1.28.0。随行事实：①lerobot 装包把 protobuf 从 7.x 降至 6.x，gen/ 旧 stubs 失配，已修 `scripts/gen-proto.ps1`（绝对 `-I` 路径 + 失败即抛）并重新生成；②lerobot 的 `checkpoints/last` 符号链接在 Windows 无特权环境失败（WinError 1314），`scripts/_train_shim.py` 以目录 junction 兜底，不改 lerobot 源码。
+
 ## D013 · 三进程活性链：agent→guardian→control 单向监督，看门狗是唯一执法点
 **日期**：2026-08-05 · **状态**：生效
 **决策**：进程拆分的活性设计为单向链——agent-core 向 guardian 流式心跳（SafetyService.Heartbeat），guardian 向 realtime-control 持有 SupervisorLink；`--require-supervisor` 下链路缺失/过期即闩锁停机，仅显式 Reset 释放。halt 的执法权集中在**轮询看门狗循环**，绝不放在流断开的 teardown 里（gRPC 会取消 servicer 协程，`finally` 中的 await 送不出去——契约测试与真实进程冒烟各验证过一次）。附带：proto 生成物 python 根目录改为 `embodiedrpc/`（proto package 名保持 `embodied.<service>.v1` 约定），根治与真实 `embodied` 包的命名空间冲突。
