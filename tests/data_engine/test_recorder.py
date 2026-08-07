@@ -217,6 +217,8 @@ def test_start_writes_meta_stub_immediately(tmp_path):
     w.abort("cleanup")
 
 
-def test_to_lerobot_stub_raises(tmp_path):
-    with pytest.raises(NotImplementedError, match="D012"):
+def test_to_lerobot_delegates_to_converter(tmp_path):
+    # D012 stub era ended with D014: to_lerobot now routes into lerobot_convert.
+    # Path validation runs before any learn-group import, so this holds in CI too.
+    with pytest.raises(FileNotFoundError, match="no episodes"):
         to_lerobot(tmp_path, tmp_path / "out")

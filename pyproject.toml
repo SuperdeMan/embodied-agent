@@ -23,6 +23,11 @@ embodied = "embodied.cli:main"
 dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.6"]
 sim = ["mujoco>=3.2"]
 rpc = ["grpcio>=1.66", "grpcio-tools>=1.66"]
+# M2 learning loop (docs/decisions.md D014): training-side deps are heavy (torch) and
+# NEVER required at runtime — deployment uses the `policy` group (ONNX) only.
+# `onnx` rides in learn for export-time metadata stamping (scripts/export_onnx.py).
+learn = ["lerobot>=0.4", "onnx>=1.16"]
+policy = ["onnxruntime>=1.18"]
 
 [build-system]
 requires = ["hatchling"]

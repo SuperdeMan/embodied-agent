@@ -324,27 +324,14 @@ def load_episode(path: Path | str) -> Episode:
 # -- LeRobot conversion (M2) -------------------------------------------------------
 
 
-def to_lerobot(episodes_root: Path | str, out_dir: Path | str) -> None:
+def to_lerobot(episodes_root: Path | str, out_dir: Path | str, **kwargs: Any):
     """Convert v0 episodes under ``episodes_root`` into a LeRobotDataset at ``out_dir``.
 
-    NOT IMPLEMENTED in v0: the heavy ``lerobot``/``torch`` dependencies are deferred
-    to M2 (docs/decisions.md D012; the format-alignment decision itself is D003).
-    Field mapping the converter will apply (v0 name -> LeRobotDataset v3 name):
-
-    ==================  ==========================
-    v0 (this module)    LeRobotDataset v3
-    ==================  ==========================
-    observation.state   observation.state
-    action              action
-    timestamp           timestamp
-    meta.task           tasks (task index table)
-    ==================  ==========================
-
-    ``ee_pos`` and ``object/<name>`` arrays plus the rest of meta.json travel in the
-    versioned episode-metadata extension layer (D003), not in core LeRobot columns.
+    Thin delegate to :func:`embodied.data_engine.lerobot_convert.convert_episodes`
+    (docs/decisions.md D014); the lazy import keeps this module free of learn-group
+    dependencies. Field mapping: ``LEROBOT_FIELD_MAP`` plus
+    ``observation.environment_state`` built from the ``object/<name>`` arrays.
     """
-    raise NotImplementedError(
-        "to_lerobot lands in M2 with the lerobot/torch deps (docs/decisions.md D012). "
-        f"v0 episodes under {episodes_root!s} already use LeRobot-aligned field names "
-        f"(see LEROBOT_FIELD_MAP), so converting later into {out_dir!s} loses nothing."
-    )
+    from embodied.data_engine.lerobot_convert import convert_episodes
+
+    return convert_episodes(episodes_root, out_dir, **kwargs)

@@ -9,12 +9,11 @@ Handlers wrap blocking sim motion in asyncio.to_thread to keep the agent loop li
 from __future__ import annotations
 
 import asyncio
-import math
 from typing import Any
 
 import numpy as np
 
-from embodied.cognition.world_state import WorldSnapshot, object_in_region
+from embodied.cognition.world_state import WorldSnapshot, held_object, object_in_region
 from embodied.skills.manifest import ParamSpec, SkillManifest, TerminationSpec
 from embodied.skills.registry import SkillRegistry, SkillResult
 from embodied.skills.scripted import motions
@@ -30,8 +29,6 @@ OPEN_FOR_GRASP = 0.6  # full open swings the moving jaw low enough to strike the
 OPEN_FOR_RELEASE = 0.8
 HOVER_Z = 0.13
 DROP_Z = 0.09
-GRASP_HOLD_RADIUS = 0.06
-GRASP_MIN_Z = 0.055
 
 HOME = SkillManifest(
     name="skill.arm.home",
@@ -85,13 +82,6 @@ def _jaw_x_world(emb: Any) -> np.ndarray:
     return xa / n if n > 1e-6 else np.array([1.0, 0.0, 0.0])
 
 
-def _held_object(snap: WorldSnapshot) -> str | None:
-    for name, pose in snap.objects.items():
-        if pose.pos[2] > GRASP_MIN_Z and math.dist(pose.pos, snap.ee_pos) < GRASP_HOLD_RADIUS:
-            return name
-    return None
-
-
 def _pick_sync(emb: Any, obj: str) -> SkillResult:
     snap = _snap(emb)
     if obj not in snap.objects:
@@ -125,7 +115,7 @@ def _pick_sync(emb: Any, obj: str) -> SkillResult:
     if not motions.move_to_q(emb, pregrasp.qpos, seconds=0.9):
         return SkillResult(ok=False, detail="lift denied")
     after = _snap(emb)
-    held = _held_object(after)
+    held = held_object(after)
     if held != obj:
         return SkillResult(ok=False, detail=f"grasp verification failed (held={held})", data={"object": obj})
     return SkillResult(ok=True, detail=f"{obj} grasped and lifted", data={"object": obj})
@@ -135,7 +125,7 @@ def _place_sync(emb: Any, region: str) -> SkillResult:
     snap = _snap(emb)
     if region not in snap.regions:
         return SkillResult(ok=False, detail=f"unknown region {region!r}")
-    held = _held_object(snap)
+    held = held_object(snap)
     if held is None:
         return SkillResult(ok=False, detail="nothing grasped")
     cx, cy, _ = snap.regions[region].center
@@ -153,7 +143,11 @@ def _place_sync(emb: Any, region: str) -> SkillResult:
     return SkillResult(ok=True, detail=f"{held} placed in {region}", data={"object": held, "region": region})
 
 
-def register_sim_skills(registry: SkillRegistry, emb: Any) -> None:
+def register_sim_skills(registry: SkillRegistry, emb: Any, *, skip: tuple[str, ...] = ()) -> None:
+    """Register the scripted skills. ``skip`` names manifests to leave unregistered so a
+    learned implementation can claim them instead (skills.policies, same manifest —
+    architecture §4.3 impl swap; the registry rejects duplicates by design)."""
+
     async def home() -> SkillResult:
         ok = await asyncio.to_thread(motions.move_to_q, emb, emb.home_qpos(), seconds=1.5)
         return SkillResult(ok=ok, detail="arm homed" if ok else "guard denied motion")
@@ -164,6 +158,6 @@ def register_sim_skills(registry: SkillRegistry, emb: Any) -> None:
     async def place(region: str = "bin_region") -> SkillResult:
         return await asyncio.to_thread(_place_sync, emb, region)
 
-    registry.register(HOME, home)
-    registry.register(PICK, pick)
-    registry.register(PLACE, place)
+    for manifest, handler in ((HOME, home), (PICK, pick), (PLACE, place)):
+        if manifest.name not in skip:
+            registry.register(manifest, handler)

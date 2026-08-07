@@ -58,3 +58,29 @@ def object_near(snap: WorldSnapshot, obj: str, pos: Vec3, radius: float) -> bool
         return False
     p = snap.objects[obj].pos
     return math.dist(p, pos) <= radius
+
+
+# Grasp-hold thresholds calibrated on the sim gripper geometry (M1). Shared by the
+# scripted skills, the learned-skill runner and the declarative verifier defaults
+# (cognition/verify.py) — one judge, however the motion was produced.
+GRASP_MIN_Z = 0.055
+GRASP_HOLD_RADIUS = 0.06
+
+
+def held_object(
+    snap: WorldSnapshot, *, min_z: float = GRASP_MIN_Z, radius: float = GRASP_HOLD_RADIUS
+) -> str | None:
+    """Name of the object currently held (lifted and near the grasp point), else None."""
+    for name, pose in snap.objects.items():
+        if pose.pos[2] > min_z and math.dist(pose.pos, snap.ee_pos) < radius:
+            return name
+    return None
+
+
+def gripper_holding(
+    snap: WorldSnapshot, obj: str, *, min_z: float = GRASP_MIN_Z, radius: float = GRASP_HOLD_RADIUS
+) -> bool:
+    if obj not in snap.objects:
+        return False
+    p = snap.objects[obj].pos
+    return p[2] > min_z and math.dist(p, snap.ee_pos) < radius

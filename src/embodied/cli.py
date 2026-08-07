@@ -37,6 +37,36 @@ def main(argv: list[str] | None = None) -> int:
     sim.add_argument("--snapshot", default="", help="save a scene PNG to this path on exit")
     sim.add_argument("--remote", default="", metavar="ADDR", help="drive a serve-control process instead of a local sim")
     sim.add_argument("--guardian", default="", metavar="ADDR", help="stream agent heartbeats to this guardian (with --remote)")
+    sim.add_argument("--pick-policy", default="", metavar="ONNX",
+                     help="serve skill.manip.pick from this learned policy (same manifest, needs --group policy)")
+    sim.add_argument("--place-policy", default="", metavar="ONNX",
+                     help="serve skill.manip.place from this learned policy")
+
+    collect = sub.add_parser("collect", help="scripted-expert data collection: record randomized pick&place episodes")
+    collect.add_argument("--episodes", type=int, default=50)
+    collect.add_argument("--seed", type=int, default=0)
+    collect.add_argument("--object", default="obj_cube")
+    collect.add_argument("--region", default="bin_region")
+    collect.add_argument("--command", default="", help="task label for the dataset (defaults to the eval command)")
+    collect.add_argument("--out", default="", help="episodes root (default outputs/episodes, or EPISODES_DIR)")
+
+    tele = sub.add_parser("teleop", help="keyboard teleoperation of the tabletop sim (records episodes)")
+    tele.add_argument("--seed", type=int, default=0)
+    tele.add_argument("--step", type=float, default=0.01, metavar="M", help="cartesian jog step in meters")
+    tele.add_argument("--command", default="", help="task label for recorded episodes (defaults to the eval command)")
+    tele.add_argument("--out", default="", help="episodes root (default outputs/episodes, or EPISODES_DIR)")
+    tele.add_argument("--no-record", action="store_true")
+
+    conv = sub.add_parser("convert", help="convert recorded episodes into a LeRobotDataset (needs --group learn)")
+    conv.add_argument("--root", default="", help="episodes root (default outputs/episodes, or EPISODES_DIR)")
+    conv.add_argument("--out", required=True, help="dataset output directory (must not exist yet)")
+    conv.add_argument("--fps", type=int, default=50)
+    conv.add_argument("--segment", choices=["episode", "skill"], default="episode",
+                      help="one dataset episode per recording, or split at skill boundaries")
+    conv.add_argument("--skills", nargs="*", default=[],
+                      help="skill mode: keep only these skills' segments (per-skill policy datasets)")
+    conv.add_argument("--include-failures", action="store_true", help="also convert success=false episodes")
+    conv.add_argument("--repo-id", default="", help="dataset repo id (default local/<out dirname>)")
 
     console = sub.add_parser("console", help="web console: voice/text control of the tabletop sim")
     _add_common(console)
@@ -60,6 +90,12 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_chat(getattr(args, "provider", "auto"), bool(getattr(args, "yes", False))))
     if args.cmd == "sim":
         return asyncio.run(_sim(args))
+    if args.cmd == "collect":
+        return asyncio.run(_collect(args))
+    if args.cmd == "convert":
+        return _convert(args)
+    if args.cmd == "teleop":
+        return _teleop(args)
     if args.cmd == "console":
         return _console(args)
     if args.cmd == "serve-control":
@@ -239,22 +275,43 @@ async def _sim_remote(args: argparse.Namespace) -> int:
         await channel.close()
 
 
+def _register_skills(registry: Any, sim: Any, *, pick_policy: str = "", place_policy: str = "") -> None:
+    """Scripted skills, with learned implementations claiming their manifests when given
+    (architecture §4.3: same manifest, implementation swapped)."""
+    from embodied.skills.scripted.manip import register_sim_skills
+
+    pick = place = None
+    skip: list[str] = []
+    if pick_policy or place_policy:
+        from embodied.providers.policy import OnnxPolicy
+        from embodied.skills.policies import register_policy_sim_skills
+
+        if pick_policy:
+            pick = OnnxPolicy(pick_policy)
+            skip.append("skill.manip.pick")
+        if place_policy:
+            place = OnnxPolicy(place_policy)
+            skip.append("skill.manip.place")
+    register_sim_skills(registry, sim, skip=tuple(skip))
+    if pick or place:
+        register_policy_sim_skills(registry, sim, pick=pick, place=place)
+
+
 async def _sim(args: argparse.Namespace) -> int:
     from embodied.cognition.offline import SIM_PLAN_RULES
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.skills.registry import SkillRegistry
-    from embodied.skills.scripted.manip import register_sim_skills
 
     if args.remote:
         return await _sim_remote(args)
 
     sim = TabletopSim(seed=int(args.seed))
     registry = SkillRegistry()
-    register_sim_skills(registry, sim)
+    _register_skills(registry, sim, pick_policy=str(args.pick_policy), place_policy=str(args.place_policy))
 
     code: int
     if args.task:
-        code = await _sim_eval_task(str(args.task), record=bool(args.record))
+        code = await _sim_eval_task(args)
     elif args.eval > 0:
         code = await _sim_eval(sim, registry, n=int(args.eval), record=bool(args.record))
     else:
@@ -269,6 +326,125 @@ async def _sim(args: argparse.Namespace) -> int:
         Image.fromarray(sim.render("side")).save(args.snapshot)
         print(f"snapshot -> {args.snapshot}")
     return code
+
+
+async def _collect(args: argparse.Namespace) -> int:
+    """Scripted-expert rollouts (no planner) with recording on: the M2 data source."""
+    from embodied.cognition.world_state import object_in_region
+    from embodied.control.drivers.mujoco_sim import TabletopSim
+    from embodied.data_engine.collect import collect_episodes
+    from embodied.skills.registry import SkillRegistry
+    from embodied.skills.scripted.manip import register_sim_skills
+
+    sim = TabletopSim(seed=int(args.seed))
+    registry = SkillRegistry()
+    register_sim_skills(registry, sim)
+    obj, region = str(args.object), str(args.region)
+    report = await collect_episodes(
+        sim,
+        registry,
+        episodes=int(args.episodes),
+        command=str(args.command) or EVAL_COMMAND,
+        skill_sequence=(("skill.manip.pick", {"object": obj}), ("skill.manip.place", {"region": region})),
+        judge=lambda snap: object_in_region(snap, obj, region, margin=0.005),
+        root=(str(args.out) or None),
+        seed=int(args.seed),
+    )
+    print(f"\ncollected {len(report.episodes)} episodes, {report.successes} success ({report.rate:.0%})")
+    print("failures are kept and labeled (success=false in meta.json); the converter filters by default")
+    return 0
+
+
+TELEOP_KEYS = """teleop keys (letters only — no arrow keys, no numpad):
+  w/s forward/back (+x/-x) · a/d left/right (-y/+y) · r/f up/down (+z/-z)
+  space  toggle gripper open/close      0  home pose
+  enter  finish episode as SUCCESS and start the next
+  x      finish episode as FAIL and start the next
+  esc    quit (a half-done episode is kept, labeled failed)"""
+
+
+def _teleop(args: argparse.Namespace) -> int:
+    """Keyboard teleop: WASD-style jogging, human-judged episode marking."""
+    from embodied.control.drivers.mujoco_sim import TabletopSim
+    from embodied.control.teleop import TeleopSession
+
+    try:
+        import msvcrt
+
+        def read_key() -> str:
+            return msvcrt.getwch()
+    except ImportError:  # POSIX fallback
+        import termios
+        import tty
+
+        def read_key() -> str:
+            fd = sys.stdin.fileno()
+            old = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                return sys.stdin.read(1)
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old)
+
+    sim = TabletopSim(seed=int(args.seed))
+    session = TeleopSession(
+        sim,
+        task=str(args.command) or EVAL_COMMAND,
+        root=(str(args.out) or None),
+        record=not bool(args.no_record),
+    )
+    step = float(args.step)
+    jogs = {"w": (step, 0, 0), "s": (-step, 0, 0), "a": (0, -step, 0), "d": (0, step, 0),
+            "r": (0, 0, step), "f": (0, 0, -step)}
+    print(f"embodied teleop · {sim.spec().embodiment_id} · step={step * 1000:.0f}mm · "
+          f"record={'on' if session.recorder else 'off'}")
+    print(TELEOP_KEYS)
+    session.start_episode(randomize=True)
+    print(session.status(), end="\r", flush=True)
+    try:
+        while True:
+            ch = read_key()
+            note = ""
+            if ch == "\x1b":  # ESC
+                break
+            if ch in jogs:
+                result = session.jog(*jogs[ch])
+                note = "" if result.ok else f" !{result.reason}"
+            elif ch == " ":
+                session.toggle_gripper()
+            elif ch == "0":
+                session.home()
+            elif ch in ("\r", "\n"):
+                path = session.finish_episode(True)
+                print(f"\n[teleop] episode saved SUCCESS -> {path}")
+                session.start_episode(randomize=True)
+            elif ch in ("x", "X"):
+                path = session.finish_episode(False)
+                print(f"\n[teleop] episode saved FAIL -> {path}")
+                session.start_episode(randomize=True)
+            print(f"{session.status()}{note}   ", end="\r", flush=True)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        session.close()
+    print(f"\n[teleop] session over: {session.episodes} episode(s)")
+    return 0
+
+
+def _convert(args: argparse.Namespace) -> int:
+    from embodied.data_engine.lerobot_convert import convert_episodes
+
+    root = str(args.root) or os.environ.get("EPISODES_DIR") or "outputs/episodes"
+    convert_episodes(
+        root,
+        str(args.out),
+        fps=int(args.fps),
+        segment=str(args.segment),  # type: ignore[arg-type]
+        skills=tuple(args.skills) or None,
+        include_failures=bool(args.include_failures),
+        repo_id=str(args.repo_id) or None,
+    )
+    return 0
 
 
 def _console(args: argparse.Namespace) -> int:
@@ -300,27 +476,28 @@ def _console(args: argparse.Namespace) -> int:
     return 0
 
 
-async def _sim_eval_task(task_path: str, *, record: bool) -> int:
-    """Versioned eval: fresh sim per seed, fresh engine per episode, result JSON persisted."""
+async def _sim_eval_task(args: argparse.Namespace) -> int:
+    """Versioned eval: fresh sim per seed, fresh engine per episode, result JSON persisted.
+    --pick-policy/--place-policy swap in learned implementations — same task, same judge,
+    so scripted vs learned numbers are directly comparable (golden-gate discipline)."""
     from embodied.cognition.offline import SIM_PLAN_RULES, ScriptedPlanProvider
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.data_engine.evaluation import EvalTask, run_task
     from embodied.skills.registry import SkillRegistry
-    from embodied.skills.scripted.manip import register_sim_skills
 
-    task = EvalTask.load(task_path)
+    task = EvalTask.load(str(args.task))
 
     def make_sim(seed: int):
         sim = TabletopSim(seed=seed)
         registry = SkillRegistry()
-        register_sim_skills(registry, sim)
+        _register_skills(registry, sim, pick_policy=str(args.pick_policy), place_policy=str(args.place_policy))
         sim._eval_registry = registry  # paired at creation; engine factory reads it back
         return sim
 
     def make_engine(sim):
         return _make_sim_engine(sim, sim._eval_registry, ScriptedPlanProvider(SIM_PLAN_RULES), confirm=None)
 
-    report = await run_task(task, make_sim=make_sim, make_engine=make_engine, record=record)
+    report = await run_task(task, make_sim=make_sim, make_engine=make_engine, record=bool(args.record))
     print(f"\n[{report.task_id}] result: {report.wins}/{len(report.episodes)} "
           f"({report.rate:.0%}) -> {'PASS' if report.passed else 'FAIL'}")
     print(f"result file: {report.out_path}")
