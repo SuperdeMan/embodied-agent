@@ -1,0 +1,32 @@
+name: nightly-eval
+
+# Nightly success-rate report on the versioned eval task (roadmap M2 评测 harness).
+# The job fails when the task misses its pass threshold, so a red run IS the report;
+# the result JSON is archived as an artifact either way.
+on:
+  schedule:
+    - cron: "30 19 * * *" # 03:30 Beijing, daily
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Sync dependencies (sim group)
+        run: uv sync --group sim
+      - name: Fetch menagerie assets
+        run: uv run python scripts/fetch_assets.py
+      - name: Run versioned eval task
+        run: uv run embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml
+      - name: Upload result JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-${{ github.run_id }}
+          path: outputs/eval/*.json
+          retention-days: 90
