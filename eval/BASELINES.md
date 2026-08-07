@@ -5,3 +5,6 @@
 | 日期 | commit | 任务 | 结果 | 判定 | 备注 |
 |---|---|---|---|---|---|
 | 2026-08-05 | c368814 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 首条基线。脚本技能 + 真值感知 + 离线规划器；两段式下降修复后。运行方式：`uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml` |
+| 2026-08-07 | 3f67945 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | M2 管线合入后的回归确认（`held_object` 判定共享化重构涉及技能文件）。脚本技能路径无回退 |
+| 2026-08-07 | 3f67945 | tabletop_pick_place@v1 | 29/30 (97%) | PASS | **首个学习策略**：ACT pick（60 专家 demos 按技能切分 16.7k 帧、4000 步 CPU、loss 0.077）经 ONNX 替换脚本 pick，place 仍脚本。唯一失败局 seed=1 pos=(0.013,-0.248)（深位 pick 超时）。运行：`uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --pick-policy outputs/policies/pick-v1.onnx` |
+| 2026-08-07 | 3f67945 | tabletop_pick_place@v1 | 29/30 (97%) | PASS | 双学习：pick+place 均 ACT/ONNX（place 3000 步、loss 0.060）。学习 place 在送达的 29 局全成；失败局与上行同一局（pick 深位超时）。距「不劣于脚本 30/30」差 1 局，路径：失败位补采示教/加练——基线只能被数据推翻 |

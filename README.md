@@ -28,6 +28,26 @@
 - **数据默认落盘**：每次运行自动产出 episode（观测/动作/语言/成败/安全事件），字段名 1:1 对齐 LeRobotDataset，M2 直接进训练。
 - **离线可跑**：不配任何 API key 也能完整体验（确定性离线规划器 + mock 语音），配上 key（Anthropic/DeepSeek/Qwen/MiniMax + DashScope 语音）即切换真实模型，**换模型是配置不是重构**。
 
+## 学习闭环管线（M2 · 进行中）
+
+「采数据→转数据集→训练→部署回系统」全程命令化，学习技能与脚本技能**共用同一 manifest 与同一真值裁判**——替换实现对 planner 完全透明：
+
+```bash
+uv run --group sim embodied collect --episodes 60        # 脚本专家采集（录制默认开，含技能边界）
+uv run --group sim embodied teleop                       # 或：键盘遥操作人工示教（w/s/a/d/r/f + 空格）
+uv run embodied convert --root outputs/collect/... --out outputs/lerobot/pick-v1 \
+    --segment skill --skills skill.manip.pick            # → LeRobotDataset v3（社区工具即插即用）
+uv run --group learn python scripts/train.py --dataset outputs/lerobot/pick-v1   # 一条命令 ACT 训练
+uv run --group learn python scripts/export_onnx.py --checkpoint .../last/pretrained_model \
+    --out outputs/policies/pick-v1.onnx                  # checkpoint → 单文件 ONNX（归一化入图+数值校验）
+uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml \
+    --pick-policy outputs/policies/pick-v1.onnx          # 学习技能 vs 脚本技能：同任务同裁判对比
+```
+
+部署侧只需 onnxruntime（零 torch）；训练侧依赖隔离在 `learn` 组（lerobot/torch），CI 不受影响。设计与格式契约见 [decisions.md](docs/decisions.md) D014。
+
+**首个学习策略已出数**（2026-08-07，60 条专家示教、CPU 数小时训练）：同任务同裁判下脚本技能 30/30，学习 pick 29/30，双学习（pick+place 均为策略）29/30——策略替换对 planner 透明，成功与否仍由仿真真值独立裁判。全部数字只增写入 [eval/BASELINES.md](eval/BASELINES.md)。
+
 ## 快速开始
 
 需要 Python 3.11+ 与 [uv](https://docs.astral.sh/uv/)。
@@ -83,7 +103,7 @@ flowchart TB
 |---|---|---|---|
 | M0 | 规范与骨架 | ✅ 2026-08-04 | 文档规范齐备，car-agent 复用移植完成，CI 绿 |
 | M1 | 仿真闭环 | ✅ 2026-08-05 | 语音指令完成 pick&place 全链路，运行即产数据；版本化评测基线 30/30；三进程拆分 + 活性链（kill 任一上游进程即闩锁停机） |
-| M2 | 学习闭环 | ⏳ | 首个学习策略不劣于脚本技能，训练→部署一条命令 |
+| M2 | 学习闭环 | 🚧 管线已通 | 首个学习策略不劣于脚本技能，训练→部署一条命令；余感知 v1 + nightly 评测报告 |
 | M3 | 真机落地 | ⏳ | SO-101 真机复现仿真闭环，安全防线全部生效 |
 | M4 | VLA 与泛化 | ⏳ | 微调 VLA 接管 ≥2 个技能，未见任务组合可测泛化 |
 | M5 | 数据飞轮 | ⏳ | 周级「数据→训练→评测→部署」自动循环，第二本体接入 ≤2 周 |

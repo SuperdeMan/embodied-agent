@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-**M1 完成（2026-08-05），M2 准备中**。已通：sim driver + 脚本技能 + Safety Guard + episode 录制 + planner 引擎（plan-execute-verify + 有界循环）+ 控制台语音链路（`embodied console`，keyless 可跑）+ 版本化评测（`eval/tasks/`，基线 30/30 见 `eval/BASELINES.md`）+ 三进程拆分（serve-control/serve-guardian，活性链 D013）。唯一人工遗留：用户浏览器验证 `embodied console`。M2 任务见 `docs/roadmap.md` 近期行动清单；移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md`。**抓取/策略参数改动必须先跑 `uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml` 确认不回退，基线只能被数据推翻**。
+**M2 进行中（2026-08-07）**。M1 全量保留（sim driver + 脚本技能 + Safety Guard + planner 引擎 + `embodied console` 语音链路 + 版本化评测 + 三进程活性链 D013）。M2 已落地学习闭环管线（D014）：`embodied collect`（脚本专家采集，sim_t 技能边界）→ `embodied convert`（LeRobotDataset v3，可按技能切分）→ `scripts/train.py`（一条命令 ACT 训练）→ `scripts/export_onnx.py`（归一化入图 + 数值校验门）→ OnnxPolicy 学习技能以**同一 manifest** 接入（`embodied sim --pick-policy/--place-policy` 与脚本技能同任务同裁判对比）；另有 `embodied teleop` 键盘遥操作。**首个学习策略已出数：学习 pick 29/30（脚本基线 30/30，唯一失败为深位超时局），见 `eval/BASELINES.md`**。待办：学习 pick 补强至 30/30（失败位补数据）、感知 v1（Grounding DINO + SAM2，填 environment_state 替换缝）、nightly CI 报告（草案待用户批）、控制台人工浏览器验证（M1 遗留）。本地开发装全组：`uv sync --group sim --group rpc --group learn --group policy`。移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md`。**抓取/策略参数改动必须先跑 `uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml` 确认不回退，基线只能被数据推翻（学习策略结果同样只进不改 `eval/BASELINES.md`）**。
 
 ## 目录结构
 
@@ -32,6 +32,7 @@
 
 - 代码改动后必须绿：`uv run ruff check .` + `uv run pytest -q`。
 - 契约测试（确认门禁 `test_registry_contract`、术语纪律 `test_no_forbidden_terms`、技能扩展缝）不许跳过、注释或放宽断言。
+- learn/policy 组相关测试（LeRobot 转换器、ONNX 策略）在依赖缺席时自动跳过，CI 不覆盖——**本地装组后必跑**（与 tests/rpc 同规）。
 - proto 变更后运行 `scripts/gen-proto.ps1`（或 `.sh`）确认编译通过；生成物在 `gen/`（不进 git）。进程拆分相关改动加跑 `uv run --group rpc pytest tests/rpc`（无 stubs/grpc 时自动跳过，CI 不覆盖，本地必跑）。
 - 文档改动后自查相对链接有效、`roadmap.md` 阶段状态与实际一致。
 

@@ -33,6 +33,8 @@ def main() -> int:
                    help="override ACT preset lr (1e-5, tuned for image ACT; state-only trains fine at 1e-4)")
     p.add_argument("--seed", type=int, default=1000)
     p.add_argument("--log-freq", type=int, default=100)
+    p.add_argument("--save-freq", type=int, default=0,
+                   help="checkpoint every N steps (default: final step only); intermediate saves survive kills")
     p.add_argument("--resume", action="store_true", help="resume from <out>/checkpoints/last")
     args = p.parse_args()
 
@@ -57,7 +59,7 @@ def main() -> int:
         f"--batch_size={args.batch_size}",
         f"--seed={args.seed}",
         f"--log_freq={args.log_freq}",
-        f"--save_freq={args.steps}",  # final checkpoint only; intermediate ones add no value at this scale
+        f"--save_freq={args.save_freq if args.save_freq > 0 else args.steps}",
         "--num_workers=0",  # Windows: spawn-based dataloader workers cost more than they give here
     ]
     if args.device:
