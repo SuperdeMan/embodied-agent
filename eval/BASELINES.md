@@ -10,3 +10,5 @@
 | 2026-08-07 | 3f67945 | tabletop_pick_place@v1 | 29/30 (97%) | PASS | 双学习：pick+place 均 ACT/ONNX（place 3000 步、loss 0.060）。学习 place 在送达的 29 局全成；失败局与上行同一局（pick 深位超时）。距「不劣于脚本 30/30」差 1 局，路径：失败位补采示教/加练——基线只能被数据推翻 |
 | 2026-08-08 | 2882181 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | **感知驱动闭环**（D015）：agent 只见 ColorBlob+深度反投影的感知物体（多相机后备+可见度门+运动学附着信念，估计误差 ~2mm），裁判仍读真值。脚本技能 + 感知输入与真值基线打平。运行：`uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --perception color` |
 | 2026-08-08 | 2882181 | tabletop_pick_place@v1 | 29/30 (97%) | PASS | **全 AI 输入链**：感知物体（color）× 学习 pick（ACT/ONNX）+ 脚本 place。感知 ~2mm 噪声与 identity quat 未劣化策略表现（与真值输入 29/30 同分同失败局：seed=1 深位）。运行：追加 `--perception color --pick-policy outputs/policies/pick-v1.onnx` |
+| 2026-08-08 | 6722ec9 | tabletop_pick_place@v1 | 17/30 (57%) | FAIL | **pick-v2 实验失败（负结果如实入账）**：120 episodes 含 33% 深位过采样、6000 步（5.7 epochs），loss 0.066 更低但失败集中于 r≈0.18-0.23 浅中区——深位过采样稀释常见区分布。教训：补弱区数据须保持整体配比。pick-v1 仍为部署策略 |
+| 2026-08-08 | 6722ec9 | tabletop_pick_place@v1 | 21/30 (70%) | FAIL | pick-v2 × 感知输入（同上模型）。失败区与真值输入一致，佐证是策略问题非感知问题 |
