@@ -72,7 +72,7 @@
 - [ ] 评测 harness：版本化任务集（位置随机化）、nightly CI 出成功率报告、golden-gate 纪律生效（版本化任务集与 append-only 账本 M1 已生效并用于本阶段脚本/策略对比；余 nightly CI 报告）
 - [ ] 失败案例自动归档与标记（v0 已有：采集失败 episode 保留并标 success=false，转换默认过滤；自动归档规则与失败挖掘未做）
 
-**阶段进展（2026-08-08 第二批）**：感知 v1 落地并过评测——`--perception color` 下 agent 全程只见感知物体（真值仅供裁判），版本化任务 **30/30** 与真值基线打平；估计器标定至 ~2mm；nightly CI 评测 workflow 上线（用户批准）；深位补采 60 episodes（合计 120）并启动 pick-v2 重训（数字待补）。
+**阶段进展（2026-08-08 第二批）**：感知 v1 落地并过评测——`--perception color` 下 agent 全程只见感知物体（真值仅供裁判），版本化任务 **30/30** 与真值基线打平；全 AI 输入链（感知 × 学习 pick-v1）**29/30**；估计器标定至 ~2mm；nightly CI 评测 workflow 上线（用户批准）。学习 pick 补强两轮均负（v2 17/30、v3 20/30，取证排除数据污染，系小数据 ACT 方差/组合敏感——负结果全部入账本，评测纪律照设计拦截了回退），v1 保持部署，方法级对策见近期行动清单。
 
 **阶段进展（2026-08-07 第一批）**：学习闭环管线全线打通并首次出数——`embodied collect`（专家 60/60）→ `embodied convert`（pick/place 按技能切分 16.7k/10.4k 帧 @50fps）→ `scripts/train.py`（ACT state+environment_state，CPU 小时级，pick loss 0.077 / place 0.060）→ `scripts/export_onnx.py`（归一化入图，torch/ORT 数值差 <1e-6）→ OnnxPolicy 同 manifest 替换。同任务同裁判：脚本 30/30；**学习 pick + 脚本 place 29/30；双学习 29/30**（两配置失败为同一深位 pick 超时局；学习 place 29/29）。「训练→评测→部署一条命令」成立；「不劣于脚本」差 1 局，路径明确（失败位补采/加练）。账本见 `eval/BASELINES.md`。
 
@@ -143,7 +143,6 @@
 
 学习闭环与感知闭环均已过版本化评测（脚本 30/30 · 学习 pick 29/30 · 感知驱动 30/30，账本见 `eval/BASELINES.md`）。收尾项：
 
-1. pick-v2 重训收尾（120 episodes 含深位补采，训练中）：评测若 30/30 即达成「学习策略不劣于脚本」DoD，数字入账本
+1. 学习 pick「不劣于脚本」DoD 改走方法路线（两轮数据补强均负：v2 17/30、v3 20/30，取证排除数据污染，系小数据 ACT 训练方差/组合敏感，负结果均入账本）：①固定 pick-v1 数据多种子重训测方差下限；②部署侧接 ACT temporal ensembling（lerobot 原生支持，OnnxPolicy 需带状态推理）；③方差压不住再上数据量（200+ episodes）。v1（29/30）保持部署
 2. Grounding DINO 场景鲁棒化（高置信误检抑制：提示词/跨相机一致性/NMS）或维持 color 作默认感知 provider 进 M3
-3. 感知 × 学习策略组合评测（`--perception color --pick-policy ...`）：全 AI 输入链的成功率摸底
-4. （视带宽）`embodied teleop` 实采人工示教验证同管线；失败案例自动归档规则化；nightly CI 首晚结果核对
+3. （视带宽）`embodied teleop` 实采人工示教验证同管线；失败案例自动归档规则化；nightly CI 首晚结果核对

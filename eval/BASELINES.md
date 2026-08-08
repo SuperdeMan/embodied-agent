@@ -12,3 +12,5 @@
 | 2026-08-08 | 2882181 | tabletop_pick_place@v1 | 29/30 (97%) | PASS | **全 AI 输入链**：感知物体（color）× 学习 pick（ACT/ONNX）+ 脚本 place。感知 ~2mm 噪声与 identity quat 未劣化策略表现（与真值输入 29/30 同分同失败局：seed=1 深位）。运行：追加 `--perception color --pick-policy outputs/policies/pick-v1.onnx` |
 | 2026-08-08 | 6722ec9 | tabletop_pick_place@v1 | 17/30 (57%) | FAIL | **pick-v2 实验失败（负结果如实入账）**：120 episodes 含 33% 深位过采样、6000 步（5.7 epochs），loss 0.066 更低但失败集中于 r≈0.18-0.23 浅中区——深位过采样稀释常见区分布。教训：补弱区数据须保持整体配比。pick-v1 仍为部署策略 |
 | 2026-08-08 | 6722ec9 | tabletop_pick_place@v1 | 21/30 (70%) | FAIL | pick-v2 × 感知输入（同上模型）。失败区与真值输入一致，佐证是策略问题非感知问题 |
+| 2026-08-08 | 111463f | tabletop_pick_place@v1 | 20/30 (67%) | FAIL | **pick-v3 亦负**：平衡 100 eps（60 旧 + 20 新常规 + 20 深位）、8000 步/9.2 epochs、loss 0.061。数据取证：新旧 episode 组统计同分布（步数/采样节奏/技能时长/动作幅度全同）→ 排除数据污染，指向小数据 ACT 的**训练方差/数据组合敏感**。pick-v1（29/30）保持部署；方法级下一步见 roadmap（固定数据多种子方差研究、部署侧 temporal ensembling） |
+| 2026-08-08 | 111463f | tabletop_pick_place@v1 | 24/30 (80%) | PASS* | pick-v3 × 感知输入（同上模型，压线过阈值）。*模型未达部署标准，仅作方差参考记录 |
