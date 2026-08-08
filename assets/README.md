@@ -6,4 +6,4 @@
 |---|---|---|
 | `menagerie/<model>/` | `uv run python scripts/fetch_assets.py` | [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie)（SO-ARM101 优先，回退 SO-ARM100；版本记录在 `<model>/.source`） |
 
-自建 MJCF 场景（M1 起）直接放本目录并进 git。
+自建 MJCF 场景放 `sim/`（进 git，见 `docs/architecture.md` §10）；本目录只放外部模型资产与来源指针。

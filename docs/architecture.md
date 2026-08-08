@@ -294,7 +294,7 @@ flowchart LR
 
 ## 10. 目录结构规划
 
-以下结构在 M0 代码落地时创建（当前仓库为文档阶段），此处为规范定义，CLAUDE.md 引用本节：
+本节为规范定义（M0 起已落地），CLAUDE.md 引用本节；新增顶层目录属于架构变更，走文档先行流程：
 
 ```
 embodied-agent/
@@ -306,6 +306,7 @@ embodied-agent/
 │   ├── decisions.md         # 技术决策记录（只增不改）
 │   └── reuse-from-car-agent.md
 ├── proto/                   # 进程间契约，proto 先行（M0）
+├── gen/                     # proto 生成物（scripts/gen-proto.* 产出，不进 git，D011/D013）
 ├── src/embodied/            # 单包多子模块，不搞微服务仓库
 │   ├── hri/                 # L4：语音服务端、控制台后端
 │   ├── cognition/           # L3：planner/memory/world_state/perception/tools

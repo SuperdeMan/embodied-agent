@@ -42,6 +42,8 @@ uv run --group learn python scripts/export_onnx.py --checkpoint .../last/pretrai
     --out outputs/policies/pick-v1.onnx                  # checkpoint → 单文件 ONNX（归一化入图+数值校验）
 uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml \
     --pick-policy outputs/policies/pick-v1.onnx          # 学习技能 vs 脚本技能：同任务同裁判对比
+uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml \
+    --perception color                                   # 感知驱动闭环：agent 只见感知，裁判读真值
 ```
 
 部署侧只需 onnxruntime（零 torch）；训练侧依赖隔离在 `learn` 组（lerobot/torch），CI 不受影响。设计与格式契约见 [decisions.md](docs/decisions.md) D014。
@@ -105,7 +107,7 @@ flowchart TB
 |---|---|---|---|
 | M0 | 规范与骨架 | ✅ 2026-08-04 | 文档规范齐备，car-agent 复用移植完成，CI 绿 |
 | M1 | 仿真闭环 | ✅ 2026-08-05 | 语音指令完成 pick&place 全链路，运行即产数据；版本化评测基线 30/30；三进程拆分 + 活性链（kill 任一上游进程即闩锁停机） |
-| M2 | 学习闭环 | 🚧 管线已通 | 首个学习策略不劣于脚本技能，训练→部署一条命令；余感知 v1 + nightly 评测报告 |
+| M2 | 学习闭环 | 🚧 主体已通 | 训练→部署一条命令 ✓、感知驱动闭环 30/30 ✓、nightly 评测报告 ✓；余「学习策略不劣于脚本」最后一局（29/30，方差攻坚中） |
 | M3 | 真机落地 | ⏳ | SO-101 真机复现仿真闭环，安全防线全部生效 |
 | M4 | VLA 与泛化 | ⏳ | 微调 VLA 接管 ≥2 个技能，未见任务组合可测泛化 |
 | M5 | 数据飞轮 | ⏳ | 周级「数据→训练→评测→部署」自动循环，第二本体接入 ≤2 周 |

@@ -69,7 +69,7 @@
 - [x] LeRobot ACT 基线训练管线：`scripts/train.py` 一条命令从数据集到 checkpoint（2026-08-07：`embodied convert` 实现 D012 转换器并经 LeRobotDataset v3 loader 回读验证互操作（D014：fps 重采样、environment_state、按技能切分）；训练走 lerobot 0.4.4，Windows checkpoint 符号链接以 junction 兜底）
 - [x] PolicyProvider：checkpoint → ONNX → 学习技能接入 SkillRegistry（manifest 不变，实现替换）（2026-08-07：`scripts/export_onnx.py` 把归一化烘进图并做 torch/ORT 数值校验门；OnnxPolicy 部署侧零 torch；学习技能与脚本技能共用 manifest 对象与真值裁判，`embodied sim --pick-policy/--place-policy` 在同一版本化任务上对比）
 - [x] 感知 v1：Grounding DINO + SAM2 + 深度 → 物体注册表（替换仿真真值，sim 内先验证感知链路）（2026-08-08：PerceptionPipeline（2D 检测 → 深度反投影 → 物体注册表：多相机后备/可见度门/运动学附着信念）+ PerceivedSim（agent 只见感知，裁判只见真值，D015）；ColorBlob 链路过版本化评测 **30/30** 与真值基线打平；Grounding DINO 接通但标实验性（本场景误检抑制与时延留后续）；SAM2 mask 细化按 D015 触发器推迟）
-- [ ] 评测 harness：版本化任务集（位置随机化）、nightly CI 出成功率报告、golden-gate 纪律生效（版本化任务集与 append-only 账本 M1 已生效并用于本阶段脚本/策略对比；余 nightly CI 报告）
+- [x] 评测 harness：版本化任务集（位置随机化）、nightly CI 出成功率报告、golden-gate 纪律生效（版本化任务集与 append-only 账本 M1 生效；nightly workflow 2026-08-08 上线（用户批准，`.github/workflows/nightly-eval.yml`，每晚 03:30 北京时间 + 手动触发，低于阈值即红、结果 JSON 留档 90 天）；golden-gate 已实战拦截 pick-v2/v3 两次回退）
 - [ ] 失败案例自动归档与标记（v0 已有：采集失败 episode 保留并标 success=false，转换默认过滤；自动归档规则与失败挖掘未做）
 
 **阶段进展（2026-08-08 第二批）**：感知 v1 落地并过评测——`--perception color` 下 agent 全程只见感知物体（真值仅供裁判），版本化任务 **30/30** 与真值基线打平；全 AI 输入链（感知 × 学习 pick-v1）**29/30**；估计器标定至 ~2mm；nightly CI 评测 workflow 上线（用户批准）。学习 pick 补强两轮均负（v2 17/30、v3 20/30，取证排除数据污染，系小数据 ACT 方差/组合敏感——负结果全部入账本，评测纪律照设计拦截了回退），v1 保持部署，方法级对策见近期行动清单。
