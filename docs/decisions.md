@@ -65,6 +65,19 @@
 **理由**：座舱的安全纪律在会动的机器人上只会更必要；这些红线在 car-agent 已被契约测试钉死，方法论成熟。
 **替代方案**：无。此条不设重估触发器，只加严不放松。
 
+## D015 · 感知 v1：provider 化开放词汇感知链，真值只留给裁判
+**日期**：2026-08-08 · **状态**：生效
+**决策**：
+1. **PerceptionProvider 族**（`providers/perception.py`）：接口 `detect(rgb, prompts) -> [Detection(bbox/score/mask?)]`，只管 2D 检测；3D 位姿由感知管线（`cognition/perception.py`）组合深度图反投影完成，产出与 `Observation.objects` 同构的 `{name: Pose}`——填的正是 D014 的 environment_state 替换缝，policy/技能/规划输入契约零改动。
+2. **双 provider 起步**：`GroundingDinoProvider`（transformers，开放词汇，`perceive` 依赖组）+ `ColorBlobProvider`（纯 numpy HSV 色块，零依赖、离线与 CI 可测）。SAM/SAM2 mask 细化是 detector 的后处理挂点：v1 用 bbox 中心区深度中值 + 视线方向半尺寸补偿已到 cm 级，SAM2 包装稳定后再接。
+3. **深度与相机模型**：MuJoCo Renderer depth pass + `cam_fovy` 推内参、`cam_xpos/xmat` 外参反投影；真机（M3）换 RGB-D 相机实现同一 `CameraModel` 接口。
+4. **裁判永远吃真值**：`PerceivedSim` 包装器只替换 agent 可见的 `Observation.objects`（本体感受 qpos/ee 保持编码器真值），并暴露 `read_truth()` 给评测裁判——感知误差如实反映在成功率里，但测量本身不被感知污染。技能内部的效果自检（held/region）走感知视角：agent 只能用自己的眼睛证明自己。
+5. **v1 已知限制（如实声明）**：单视角无姿态（quat 置 identity，主轴 yaw 留升级位）；感知按 sim 时间节流（默认 0.25s 缓存，检测器越重节流越粗）；bin 等区域是工作区标定物不是感知目标（v1 继续读场景标注）。
+**理由**：与 D007/D014 的 provider 纪律一致；色块兜底使链路在无权重/无网环境可完整验证（仿真先行 + CI 友好）；裁判/感知分离延续 D009「验证不依赖 AI 输出」精神。
+**放弃的替代方案**：感知同时喂裁判（自我证明，直接违反评测纪律）；等 SAM2 生态稳定再开工（链路验证被无限期推迟）；直接上真机 RGB-D SDK（违背仿真先行）。
+**重估触发器**：SAM2 官方 PyPI 包稳定后接 mask 细化；M3 手眼标定引入后重审相机模型与多视角。
+**落地记录（2026-08-08）**：ColorBlob 链路以 `--perception color` 过版本化评测 **30/30**（位姿估计 ~2mm：逐像素反投影 + 中位深度内点滤波（剔除臂色渗入）+ 每相机 push 标定 top 0.45 / side 0.3）。遮挡三防线各自挡下过实测故障：多相机后备（home 臂影遮扇区中部）、面积上下限门 0.35/4.0×（悬停夹爪致偏心月牙 0.06×、开放词汇误检超尺寸）、运动学附着信念（举升后目标不可见时随手移动，误抓由再见即纠）。GroundingDino provider 已接通（权重直连可下，干净帧 2mm/score 0.92）但本场景高置信误检与 CPU 时延未解，标**实验性**，鲁棒化（提示词/跨相机一致性）留后续。随行工程事实：MuJoCo Renderer 的 GL 上下文线程绑定——渲染器缓存按（线程,尺寸,种类）隔离，感知渲染汇聚专属单线程并在该线程 close()（跨线程析构段错误，实测两次）。
+
 ## D014 · M2 数据管线：训练/部署依赖分离，转换按固定 fps 重采样，environment_state 作感知替换缝
 **日期**：2026-08-07 · **状态**：生效
 **决策**：

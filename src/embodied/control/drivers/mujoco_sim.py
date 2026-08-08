@@ -8,6 +8,7 @@ which is exactly the seam the real-hardware driver (M3) will preserve.
 from __future__ import annotations
 
 import math
+import threading
 from typing import Any, Callable
 
 import mujoco
@@ -48,6 +49,8 @@ class TabletopSim:
         seed: int = 0,
         on_step: StepHook | None = None,
         on_guard_event: Callable[[GuardEvent], None] | None = None,
+        spawn_radial: tuple[float, float] = (0.18, 0.27),
+        spawn_angle_deg: tuple[float, float] = (230.0, 310.0),
     ) -> None:
         scene = stage_tabletop()
         self.model = mujoco.MjModel.from_xml_path(str(scene))
@@ -55,6 +58,11 @@ class TabletopSim:
         self._rng = np.random.default_rng(seed)
         self._on_step = on_step
         self._last_cmd: ActionCommand | None = None
+        # The DEFAULTS are part of eval task semantics (tabletop_pick_place@v1 documents
+        # them) — never change them without a new task version. Overrides exist for
+        # targeted data collection (e.g. oversampling a failure zone).
+        self._spawn_radial = (float(spawn_radial[0]), float(spawn_radial[1]))
+        self._spawn_angle_deg = (float(spawn_angle_deg[0]), float(spawn_angle_deg[1]))
 
         m = self.model
         self._jids = [self._name2id(mujoco.mjtObj.mjOBJ_JOINT, n) for n in ARM_JOINTS]
@@ -212,11 +220,40 @@ class TabletopSim:
             out[name] = {"center": center, "half": half}
         return out
 
+    def _renderer_for(self, width: int, height: int, *, depth: bool) -> "mujoco.Renderer":
+        """Renderers are cached per (THREAD, size, kind).
+
+        Sized at construction: a cached 320x240 renderer silently serving a 640x480
+        request breaks camera geometry downstream. Thread-keyed: GL contexts bind to
+        the creating thread — sharing one renderer between the main thread and a
+        perception render thread yields stale/garbage frames (WGL make-current
+        failures), so each thread owns its instances outright."""
+        cache: dict[tuple[int, int, int, bool], mujoco.Renderer] = self.__dict__.setdefault("_renderers", {})
+        key = (threading.get_ident(), width, height, depth)
+        r = cache.get(key)
+        if r is None:
+            r = mujoco.Renderer(self.model, height=height, width=width)
+            if depth:
+                r.enable_depth_rendering()
+            cache[key] = r
+        return r
+
     def render(self, camera: str = "side", width: int = 640, height: int = 480) -> np.ndarray:
-        if not hasattr(self, "_renderer"):
-            self._renderer = mujoco.Renderer(self.model, height=height, width=width)
-        self._renderer.update_scene(self.data, camera=camera)
-        return self._renderer.render()
+        r = self._renderer_for(width, height, depth=False)
+        r.update_scene(self.data, camera=camera)
+        return r.render()
+
+    def render_rgbd(self, camera: str = "side", width: int = 640, height: int = 480):
+        """RGB frame + metric depth map (meters along the view axis) — perception input."""
+        rgb = self.render(camera, width, height)
+        d = self._renderer_for(width, height, depth=True)
+        d.update_scene(self.data, camera=camera)
+        return rgb, d.render()
+
+    def camera_model(self, camera: str = "side", width: int = 640, height: int = 480):
+        from embodied.control.camera import CameraModel
+
+        return CameraModel.from_mujoco(self.model, self.data, camera, width, height)
 
     # -- internals -------------------------------------------------------------
 
@@ -233,11 +270,13 @@ class TabletopSim:
         return Pose(pos=tuple(map(float, pos)), quat=tuple(map(float, quat)))
 
     def _randomize_objects(self) -> None:
-        """Uniform placement in the calibrated reachable sector, away from the bin."""
+        """Uniform placement in the (calibrated, or overridden) reachable sector, away from the bin."""
         for name, adr in self._object_qpos_adr.items():
             for _ in range(64):
-                r = self._rng.uniform(0.18, 0.27)
-                theta = self._rng.uniform(math.radians(230), math.radians(310))  # forward sector, calibrated
+                r = self._rng.uniform(*self._spawn_radial)
+                theta = self._rng.uniform(
+                    math.radians(self._spawn_angle_deg[0]), math.radians(self._spawn_angle_deg[1])
+                )
                 x, y = r * math.cos(theta), r * math.sin(theta)
                 if math.hypot(x - 0.16, y + 0.18) < 0.10:  # keep clear of the bin
                     continue

@@ -28,6 +28,9 @@ rpc = ["grpcio>=1.66", "grpcio-tools>=1.66"]
 # `onnx` rides in learn for export-time metadata stamping (scripts/export_onnx.py).
 learn = ["lerobot>=0.4", "onnx>=1.16"]
 policy = ["onnxruntime>=1.18"]
+# Perception v1 (D015): open-vocabulary detection. The color-blob fallback needs
+# nothing; this group only serves GroundingDinoProvider.
+perceive = ["transformers>=4.44", "torch>=2.4"]
 
 [build-system]
 requires = ["hatchling"]

@@ -70,6 +70,20 @@ class EvalTask:
         )
 
 
+def _truth_obs(sim):
+    """Judges read ground truth even when the agent runs on perception (D015):
+    a PerceivedSim exposes read_truth(); a bare sim IS the truth."""
+    return sim.read_truth() if hasattr(sim, "read_truth") else sim.read()
+
+
+def _close_sim(sim) -> None:
+    """Per-seed sims that own resources (perception render threads) must release
+    them deterministically; bare sims have no close() and skip as a no-op."""
+    fn = getattr(sim, "close", None)
+    if callable(fn):
+        fn()
+
+
 def _git_commit() -> str:
     try:
         out = subprocess.run(
@@ -124,8 +138,9 @@ async def run_task(
         sim = make_sim(seed)
         for k in range(task.per_seed):
             idx += 1
-            obs = sim.reset(randomize=True)
-            start_pos = tuple(round(v, 4) for v in obs.objects[task.judge.get("object", "obj_cube")].pos)
+            sim.reset(randomize=True)
+            truth0 = _truth_obs(sim)
+            start_pos = tuple(round(v, 4) for v in truth0.objects[task.judge.get("object", "obj_cube")].pos)
             engine = make_engine(sim)
             writer = None
             if recorder is not None:
@@ -140,7 +155,7 @@ async def run_task(
             episode_dir = ""
             try:
                 turn = await engine.turn(task.command)
-                snap = WorldSnapshot.from_observation(sim.read())
+                snap = WorldSnapshot.from_observation(_truth_obs(sim))
                 success = task.judge_success(snap)
                 if writer:
                     for r in turn.results:
@@ -165,6 +180,7 @@ async def run_task(
             summary = " ".join(f"{s['id']}={s['status']}" for s in steps) or "no-steps"
             progress(f"[{task.task_id}] episode {idx:>3}: seed={seed} pos={start_pos[:2]} "
                      f"{summary} -> {'SUCCESS' if success else 'FAIL'}")
+        _close_sim(sim)
 
     report = EvalReport(task_id=task.task_id, episodes=episodes, passed=False, out_path=None)
     report.passed = report.rate >= task.pass_threshold

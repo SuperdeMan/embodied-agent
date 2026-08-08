@@ -41,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
                      help="serve skill.manip.pick from this learned policy (same manifest, needs --group policy)")
     sim.add_argument("--place-policy", default="", metavar="ONNX",
                      help="serve skill.manip.place from this learned policy")
+    sim.add_argument("--perception", choices=["off", "color", "dino"], default="off",
+                     help="agent sees objects through perception instead of sim ground truth (judge stays truth, D015)")
 
     collect = sub.add_parser("collect", help="scripted-expert data collection: record randomized pick&place episodes")
     collect.add_argument("--episodes", type=int, default=50)
@@ -49,6 +51,10 @@ def main(argv: list[str] | None = None) -> int:
     collect.add_argument("--region", default="bin_region")
     collect.add_argument("--command", default="", help="task label for the dataset (defaults to the eval command)")
     collect.add_argument("--out", default="", help="episodes root (default outputs/episodes, or EPISODES_DIR)")
+    collect.add_argument("--radial", nargs=2, type=float, metavar=("LO", "HI"),
+                         help="override spawn radius range (m) for targeted collection")
+    collect.add_argument("--angle", nargs=2, type=float, metavar=("LO", "HI"),
+                         help="override spawn angle range (deg)")
 
     tele = sub.add_parser("teleop", help="keyboard teleoperation of the tabletop sim (records episodes)")
     tele.add_argument("--seed", type=int, default=0)
@@ -275,6 +281,25 @@ async def _sim_remote(args: argparse.Namespace) -> int:
         await channel.close()
 
 
+def _wrap_perception(sim: Any, kind: str) -> Any:
+    """Wrap the sim so the AGENT sees perceived objects; judges keep read_truth() (D015)."""
+    if kind in ("", "off"):
+        return sim
+    from embodied.cognition.perception import (
+        DINO_TABLETOP_OBJECTS,
+        TABLETOP_OBJECTS,
+        PerceivedSim,
+        PerceptionPipeline,
+    )
+    from embodied.providers.perception import build_perception_provider
+
+    provider = build_perception_provider(kind)
+    objects = DINO_TABLETOP_OBJECTS if kind == "dino" else TABLETOP_OBJECTS
+    # Heavier detectors perceive less often; the cache is keyed on sim time.
+    interval = 1.0 if kind == "dino" else 0.25
+    return PerceivedSim(sim, PerceptionPipeline(provider, objects), min_interval_s=interval)
+
+
 def _register_skills(registry: Any, sim: Any, *, pick_policy: str = "", place_policy: str = "") -> None:
     """Scripted skills, with learned implementations claiming their manifests when given
     (architecture §4.3: same manifest, implementation swapped)."""
@@ -305,26 +330,32 @@ async def _sim(args: argparse.Namespace) -> int:
     if args.remote:
         return await _sim_remote(args)
 
-    sim = TabletopSim(seed=int(args.seed))
+    sim = _wrap_perception(TabletopSim(seed=int(args.seed)), str(args.perception))
     registry = SkillRegistry()
     _register_skills(registry, sim, pick_policy=str(args.pick_policy), place_policy=str(args.place_policy))
 
     code: int
-    if args.task:
-        code = await _sim_eval_task(args)
-    elif args.eval > 0:
-        code = await _sim_eval(sim, registry, n=int(args.eval), record=bool(args.record))
-    else:
-        provider, pname = _build_provider(args.provider, plan_rules=SIM_PLAN_RULES)
-        engine = _make_sim_engine(sim, registry, provider, _make_confirm(bool(args.yes)))
-        code = await _repl(
-            engine, registry, f"embodied sim · provider={pname} · {sim.spec().embodiment_id} · skills={len(registry.catalog())}"
-        )
-    if args.snapshot:
-        from PIL import Image
+    try:
+        if args.task:
+            code = await _sim_eval_task(args)
+        elif args.eval > 0:
+            code = await _sim_eval(sim, registry, n=int(args.eval), record=bool(args.record))
+        else:
+            provider, pname = _build_provider(args.provider, plan_rules=SIM_PLAN_RULES)
+            engine = _make_sim_engine(sim, registry, provider, _make_confirm(bool(args.yes)))
+            code = await _repl(
+                engine, registry,
+                f"embodied sim · provider={pname} · {sim.spec().embodiment_id} · skills={len(registry.catalog())}",
+            )
+        if args.snapshot:
+            from PIL import Image
 
-        Image.fromarray(sim.render("side")).save(args.snapshot)
-        print(f"snapshot -> {args.snapshot}")
+            Image.fromarray(sim.render("side")).save(args.snapshot)
+            print(f"snapshot -> {args.snapshot}")
+    finally:
+        close = getattr(sim, "close", None)
+        if callable(close):
+            close()
     return code
 
 
@@ -336,7 +367,12 @@ async def _collect(args: argparse.Namespace) -> int:
     from embodied.skills.registry import SkillRegistry
     from embodied.skills.scripted.manip import register_sim_skills
 
-    sim = TabletopSim(seed=int(args.seed))
+    spawn: dict[str, Any] = {}
+    if args.radial:
+        spawn["spawn_radial"] = (float(args.radial[0]), float(args.radial[1]))
+    if args.angle:
+        spawn["spawn_angle_deg"] = (float(args.angle[0]), float(args.angle[1]))
+    sim = TabletopSim(seed=int(args.seed), **spawn)
     registry = SkillRegistry()
     register_sim_skills(registry, sim)
     obj, region = str(args.object), str(args.region)
@@ -488,7 +524,7 @@ async def _sim_eval_task(args: argparse.Namespace) -> int:
     task = EvalTask.load(str(args.task))
 
     def make_sim(seed: int):
-        sim = TabletopSim(seed=seed)
+        sim = _wrap_perception(TabletopSim(seed=seed), str(args.perception))
         registry = SkillRegistry()
         _register_skills(registry, sim, pick_policy=str(args.pick_policy), place_policy=str(args.place_policy))
         sim._eval_registry = registry  # paired at creation; engine factory reads it back
@@ -520,10 +556,13 @@ async def _sim_eval(sim: Any, registry: Any, *, n: int, record: bool) -> int:
 
         recorder = EpisodeRecorder()
 
+    def truth_obs():
+        return sim.read_truth() if hasattr(sim, "read_truth") else sim.read()
+
     wins = 0
     for i in range(n):
-        obs = sim.reset(randomize=True)
-        cube = tuple(round(v, 3) for v in obs.objects["obj_cube"].pos)
+        sim.reset(randomize=True)
+        cube = tuple(round(v, 3) for v in truth_obs().objects["obj_cube"].pos)
         # Fresh engine per episode: no cross-episode history leakage in eval
         engine = _make_sim_engine(sim, registry, ScriptedPlanProvider(SIM_PLAN_RULES), confirm=None)
         writer = None
@@ -537,7 +576,7 @@ async def _sim_eval(sim: Any, registry: Any, *, n: int, record: bool) -> int:
             )
         try:
             turn = await engine.turn(EVAL_COMMAND)
-            snap = WorldSnapshot.from_observation(sim.read())
+            snap = WorldSnapshot.from_observation(truth_obs())
             success = object_in_region(snap, "obj_cube", "bin_region", margin=0.005)
             if writer:
                 for r in turn.results:

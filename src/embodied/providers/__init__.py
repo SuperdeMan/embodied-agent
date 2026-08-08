@@ -45,6 +45,13 @@ from .llm import (
     normalize_tool_calls,
     strip_think_block,
 )
+from .perception import (
+    BasePerceptionProvider,
+    ColorBlobProvider,
+    Detection,
+    GroundingDinoProvider,
+    build_perception_provider,
+)
 from .policy import (
     BasePolicyProvider,
     MockChunkPolicy,
@@ -58,6 +65,7 @@ from .runtime import LLMRuntime, get_runtime
 __all__ = [
     "AnthropicProvider",
     "BaseASRProvider",
+    "BasePerceptionProvider",
     "BasePolicyProvider",
     "BaseProvider",
     "BaseStreamingASRProvider",
@@ -65,8 +73,11 @@ __all__ = [
     "BaseTTSProvider",
     "DashScopeCosyVoiceProvider",
     "DashScopeInferenceASRProvider",
+    "ColorBlobProvider",
     "DashScopeQwenTTSProvider",
     "DashScopeRealtimeASRProvider",
+    "Detection",
+    "GroundingDinoProvider",
     "LLMCache",
     "LLMRuntime",
     "MiMoASRProvider",
@@ -91,6 +102,7 @@ __all__ = [
     "ThinkStreamStripper",
     "TokenBucket",
     "build_asr_provider",
+    "build_perception_provider",
     "build_policy_provider",
     "build_provider",
     "build_streaming_asr_provider",

@@ -48,6 +48,8 @@ uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_p
 
 **首个学习策略已出数**（2026-08-07，60 条专家示教、CPU 数小时训练）：同任务同裁判下脚本技能 30/30，学习 pick 29/30，双学习（pick+place 均为策略）29/30——策略替换对 planner 透明，成功与否仍由仿真真值独立裁判。全部数字只增写入 [eval/BASELINES.md](eval/BASELINES.md)。
 
+**感知 v1 已落地**（2026-08-08，[D015](docs/decisions.md)）：`--perception color` 下 agent 全程只见「检测 + 深度反投影」得到的感知物体（多相机后备、可见度门、运动学附着信念；估计误差 ~2mm），评测裁判仍读真值——感知驱动闭环 **30/30**，与真值基线打平。开放词汇检测（Grounding DINO）已接通、本场景鲁棒化进行中。
+
 ## 快速开始
 
 需要 Python 3.11+ 与 [uv](https://docs.astral.sh/uv/)。

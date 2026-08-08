@@ -68,9 +68,11 @@
 - [x] 仿真遥操作（键鼠/手柄 → 后续真机 leader 臂复用同一路径），采集 pick/place 50-100 episodes（2026-08-07：输入无关 `TeleopSession` + `embodied teleop` 键盘前端，围栏预检 fail-closed；专家数据由 `embodied collect` 以脚本技能直采 60/60，携带 sim_t 技能边界；人类示教与脚本示教走同一录制/转换管线）
 - [x] LeRobot ACT 基线训练管线：`scripts/train.py` 一条命令从数据集到 checkpoint（2026-08-07：`embodied convert` 实现 D012 转换器并经 LeRobotDataset v3 loader 回读验证互操作（D014：fps 重采样、environment_state、按技能切分）；训练走 lerobot 0.4.4，Windows checkpoint 符号链接以 junction 兜底）
 - [x] PolicyProvider：checkpoint → ONNX → 学习技能接入 SkillRegistry（manifest 不变，实现替换）（2026-08-07：`scripts/export_onnx.py` 把归一化烘进图并做 torch/ORT 数值校验门；OnnxPolicy 部署侧零 torch；学习技能与脚本技能共用 manifest 对象与真值裁判，`embodied sim --pick-policy/--place-policy` 在同一版本化任务上对比）
-- [ ] 感知 v1：Grounding DINO + SAM2 + 深度 → 物体注册表（替换仿真真值，sim 内先验证感知链路）
+- [x] 感知 v1：Grounding DINO + SAM2 + 深度 → 物体注册表（替换仿真真值，sim 内先验证感知链路）（2026-08-08：PerceptionPipeline（2D 检测 → 深度反投影 → 物体注册表：多相机后备/可见度门/运动学附着信念）+ PerceivedSim（agent 只见感知，裁判只见真值，D015）；ColorBlob 链路过版本化评测 **30/30** 与真值基线打平；Grounding DINO 接通但标实验性（本场景误检抑制与时延留后续）；SAM2 mask 细化按 D015 触发器推迟）
 - [ ] 评测 harness：版本化任务集（位置随机化）、nightly CI 出成功率报告、golden-gate 纪律生效（版本化任务集与 append-only 账本 M1 已生效并用于本阶段脚本/策略对比；余 nightly CI 报告）
 - [ ] 失败案例自动归档与标记（v0 已有：采集失败 episode 保留并标 success=false，转换默认过滤；自动归档规则与失败挖掘未做）
+
+**阶段进展（2026-08-08 第二批）**：感知 v1 落地并过评测——`--perception color` 下 agent 全程只见感知物体（真值仅供裁判），版本化任务 **30/30** 与真值基线打平；估计器标定至 ~2mm；nightly CI 评测 workflow 上线（用户批准）；深位补采 60 episodes（合计 120）并启动 pick-v2 重训（数字待补）。
 
 **阶段进展（2026-08-07 第一批）**：学习闭环管线全线打通并首次出数——`embodied collect`（专家 60/60）→ `embodied convert`（pick/place 按技能切分 16.7k/10.4k 帧 @50fps）→ `scripts/train.py`（ACT state+environment_state，CPU 小时级，pick loss 0.077 / place 0.060）→ `scripts/export_onnx.py`（归一化入图，torch/ORT 数值差 <1e-6）→ OnnxPolicy 同 manifest 替换。同任务同裁判：脚本 30/30；**学习 pick + 脚本 place 29/30；双学习 29/30**（两配置失败为同一深位 pick 超时局；学习 place 29/29）。「训练→评测→部署一条命令」成立；「不劣于脚本」差 1 局，路径明确（失败位补采/加练）。账本见 `eval/BASELINES.md`。
 
@@ -137,11 +139,11 @@
 2. **垂直场景产品**：桌面陪伴/效率/教育机器人（语音交互是现成强项），走「智能硬件 + 订阅」。
 3. **行业轻方案**：小商户/轻工业桌面级分拣整理 PoC，按项目收费验证付费意愿。
 
-## 近期行动清单（M2 中程，2026-08-07 更新）
+## 近期行动清单（M2 后程，2026-08-08 更新）
 
-采集→转换→训练→ONNX 部署→对比评测一条链已通（首个学习策略 29/30，账本见 `eval/BASELINES.md`）。接下来：
+学习闭环与感知闭环均已过版本化评测（脚本 30/30 · 学习 pick 29/30 · 感知驱动 30/30，账本见 `eval/BASELINES.md`）。收尾项：
 
-1. 学习 pick 补强至不劣于脚本（30/30）：对失败深位（seed=1 附近扇区深处）补采示教 / 扩数据随机化 / 加练步数，数字说话
-2. 感知 v1（Grounding DINO + SAM2 + 深度）：填充与真值同构的 `environment_state` 向量（D014 替换缝），sim 内跑通感知驱动闭环——这是 M2 DoD 的最后一块
-3. nightly CI 评测报告 workflow（草案已交用户，CI 配置属红线，批准后落地）
-4. （视带宽）`embodied teleop` 实采一批人工示教，验证人类数据走同一转换/训练管线；失败案例自动归档规则化
+1. pick-v2 重训收尾（120 episodes 含深位补采，训练中）：评测若 30/30 即达成「学习策略不劣于脚本」DoD，数字入账本
+2. Grounding DINO 场景鲁棒化（高置信误检抑制：提示词/跨相机一致性/NMS）或维持 color 作默认感知 provider 进 M3
+3. 感知 × 学习策略组合评测（`--perception color --pick-policy ...`）：全 AI 输入链的成功率摸底
+4. （视带宽）`embodied teleop` 实采人工示教验证同管线；失败案例自动归档规则化；nightly CI 首晚结果核对
