@@ -16,7 +16,7 @@ import grpc
 
 from embodied.runtime.rpcgen import import_control
 from embodied.skills.manifest import SkillManifest
-from embodied.skills.registry import ConfirmationRequired, SkillNotFound, SkillResult
+from embodied.skills.registry import ConfirmationRequired, SkillNotFound, SkillRegistry, SkillResult
 
 
 class RemoteSkillRegistry:
@@ -58,10 +58,11 @@ class RemoteSkillRegistry:
         manifest = self.get(name)
         if manifest.require_confirm and not confirmed:
             raise ConfirmationRequired(name)  # same local gate as the in-process registry
+        merged = SkillRegistry._validate_params(manifest, {} if params is None else params)
         cmd = self._pb2.SkillCommand(
             command_id=uuid.uuid4().hex[:12],
             skill=name,
-            params_json=json.dumps(params or {}, ensure_ascii=False, default=str),
+            params_json=json.dumps(merged, ensure_ascii=False, allow_nan=False),
             confirmed=confirmed,
         )
         terminal = {

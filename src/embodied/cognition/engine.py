@@ -106,7 +106,7 @@ class PlannerEngine:
         current: Plan | None = plan
 
         while current is not None:
-            async for sr in self.executor.run(current, ctx):
+            async for sr in self.executor.run(current, ctx, done={r.step_id: r for r in results}):
                 results.append(sr)
                 observations.append(summarize(sr))
                 observations = observations[-6:]
@@ -153,6 +153,9 @@ class PlannerEngine:
             v = (r.data or {}).get("_verify") or {}
             if v.get("verdict") == "unsat":
                 caveat = "（对账未通过：世界状态未见预期变化）"
+                all_ok = False
+            if v.get("verdict") == "unknown":
+                caveat = "（效果未知：缺少有效证据，依赖步骤未放行）"
                 all_ok = False
             if v.get("exec") == "uncertain_confirmed":
                 caveat = "（超时未收到结果，但世界状态显示可能已生效，未重复执行）"

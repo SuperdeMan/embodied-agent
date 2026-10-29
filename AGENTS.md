@@ -12,7 +12,7 @@
 ## 最低纪律（摘要，全文见 CLAUDE.md）
 
 - **验证**：任何代码改动后 `uv run ruff check .` + `uv run pytest -q` 必须绿；抓取/策略参数改动必须跑 `uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml` 确认基线不回退。
-- **语言**：文档中文；代码、标识符、注释、commit message 英文（Conventional Commits）。
+- **语言**：文档中文；代码、标识符和 commit message 英文（Conventional Commits）。**所有说明性代码注释及文档字符串使用中英双语**，源码、测试、脚本和已有注释均适用；保留原语义与来源，工具指令及生成代码例外，细则见 CLAUDE.md。
 - **安全红线**：LLM 只产出计划与技能调用，永不直接触达执行通道；Safety Guardian 不依赖任何 AI 输出；危险动作 `require_confirm`。契约测试不许跳过或放宽。
 - **密钥**：API key 不进代码/commit/日志；严禁复制 car-agent 的 `.env`。
 - **网络**：uv 拉包用每次命令的环境变量走镜像：`UV_DEFAULT_INDEX=https://pypi.tuna.tsinghua.edu.cn/simple`，不写入全局配置。

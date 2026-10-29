@@ -4,7 +4,9 @@
 
 ## 当前阶段
 
-**M2 进行中（2026-08-07）**。M1 全量保留（sim driver + 脚本技能 + Safety Guard + planner 引擎 + `embodied console` 语音链路 + 版本化评测 + 三进程活性链 D013）。M2 已落地学习闭环管线（D014）：`embodied collect`（脚本专家采集，sim_t 技能边界）→ `embodied convert`（LeRobotDataset v3，可按技能切分）→ `scripts/train.py`（一条命令 ACT 训练）→ `scripts/export_onnx.py`（归一化入图 + 数值校验门）→ OnnxPolicy 学习技能以**同一 manifest** 接入（`embodied sim --pick-policy/--place-policy` 与脚本技能同任务同裁判对比）；另有 `embodied teleop` 键盘遥操作。**首个学习策略已出数：学习 pick 29/30（脚本基线 30/30）**；**感知 v1 已落地（D015）：`--perception color` 感知驱动闭环过评测 30/30**（agent 只见感知、裁判只见真值；Grounding DINO 接通但标实验性）；nightly CI 评测 workflow 已上线。全 AI 输入链（感知×学习 pick）29/30。学习 pick 两轮数据补强均负（方差敏感，负结果在账本），改走方法路线（多种子方差研究 + temporal ensembling，见 roadmap）。待办：上述方法路线、DINO 场景鲁棒化、控制台人工浏览器验证（M1 遗留）。本地开发装全组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。移植 car-agent 代码前先读 `docs/reuse-from-car-agent.md`。**抓取/策略参数改动必须先跑 `uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml` 确认不回退，基线只能被数据推翻（学习策略结果同样只进不改 `eval/BASELINES.md`）**。
+**平台升级 P0/P1 进行中（2026-10-29）**。按用户指定完整方案原仓演进，先补可信执行，再做真机、本体和算力扩展。当前优先级与批次状态见 `docs/platform-upgrade.md` 和 `docs/roadmap.md`；历史 M0–M2 进展见 `docs/roadmap-milestones.md`。脚本/感知/ACT、评测任务及历史负结果保留；旧学习策略 29/30 尚未完成“不劣于脚本”目标。硬件、模型、RPC 结果必须绑定实际运行配置与提交，不跨版本借用证据。
+
+本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。新 SQLite schema、CI/CD 与生产发布仍按红线单独确认；本轮 commit/push 已获用户授权。
 
 ## 目录结构
 
@@ -24,8 +26,9 @@
 
 ## 语言与风格
 
-- 文档中文；代码、标识符、注释、commit message 英文；commit 用 Conventional Commits（`feat:`/`fix:`/`docs:`/`refactor:`/`test:`/`chore:`）。
-- **例外**：从 car-agent 移植的文件保留原有中文注释（它们承载事故复盘与设计动机，且保持与源文件可对照）；移植文件中新增/改写的注释与全部新写代码一律英文。
+- 文档中文；代码、标识符和 commit message 英文；commit 用 Conventional Commits（`feat:`/`fix:`/`docs:`/`refactor:`/`test:`/`chore:`）。
+- **代码注释统一中英双语**：源码、测试、脚本和文档字符串中的说明性注释必须同时提供中文与英文，表达同一含义；短注释可同行，长说明可相邻分段。已有单语注释逐项补齐，保留原有设计动机、事故说明与来源信息，不用无关套话凑双语。
+- shebang、编码声明、lint/type/coverage 指令、协议保留字及自动生成代码不翻译或改写；必要说明另加双语注释。移植代码保留原注释并补对应译文，来源头的路径、SHA 与来源名称保持原样。
 - 术语纪律：vehicle/cockpit/座舱等 car-agent 领域词不得出现在本仓库代码中。
 
 ## 验证

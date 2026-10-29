@@ -10,11 +10,20 @@ trajectory cannot "recover on its own" and keep moving.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from math import isfinite
+from numbers import Real
 from typing import Callable
 
 from embodied.control.hal import ActionCommand, Observation, WriteResult
 
 Vec3 = tuple[float, float, float]
+
+
+def _finite(values) -> bool:
+    try:
+        return all(isinstance(v, Real) and not isinstance(v, bool) and isfinite(v) for v in values)
+    except (TypeError, ValueError, OverflowError):
+        return False
 
 
 @dataclass(frozen=True)
@@ -25,6 +34,20 @@ class GuardLimits:
     ee_fence_min: Vec3 = (-0.45, -0.45, -0.005)
     ee_fence_max: Vec3 = (0.45, 0.45, 0.60)
     allowed_sources: frozenset[str] = frozenset({"skill", "teleop", "reset"})
+
+    def __post_init__(self) -> None:
+        if len(self.joint_lower) != len(self.joint_upper):
+            raise ValueError("joint limits must have equal length")
+        if not _finite((*self.joint_lower, *self.joint_upper, self.max_delta_per_write)):
+            raise ValueError("joint limits must be finite numbers")
+        if self.max_delta_per_write <= 0 or any(lo > hi for lo, hi in zip(self.joint_lower, self.joint_upper)):
+            raise ValueError("invalid joint range or write delta")
+        if len(self.ee_fence_min) != 3 or len(self.ee_fence_max) != 3:
+            raise ValueError("fence must have three axes")
+        if not _finite((*self.ee_fence_min, *self.ee_fence_max)):
+            raise ValueError("fence must be finite")
+        if any(lo > hi for lo, hi in zip(self.ee_fence_min, self.ee_fence_max)):
+            raise ValueError("invalid fence range")
 
 
 @dataclass
@@ -64,10 +87,21 @@ class Guard:
         lim = self.limits
         if self.halted:
             return None, self._deny(f"halted:{self.halt_reason}")
-        if cmd.source not in lim.allowed_sources:
+        if not isinstance(cmd.source, str) or cmd.source not in lim.allowed_sources:
             return None, self._deny(f"source_not_whitelisted:{cmd.source}")
+        if not isinstance(cmd.joint_targets, (tuple, list)):
+            return None, self._deny("bad_command_shape")
         if len(cmd.joint_targets) != len(lim.joint_lower):
             return None, self._deny(f"bad_command_shape:{len(cmd.joint_targets)}")
+        if not _finite(cmd.joint_targets) or (cmd.gripper is not None and not _finite((cmd.gripper,))):
+            return None, self._deny("invalid_command_value")
+        if (
+            len(obs.qpos) != len(lim.joint_lower) or len(obs.qvel) != len(lim.joint_lower)
+            or len(obs.ee_pose.pos) != 3 or len(obs.ee_pose.quat) != 4
+            or not _finite((*obs.qpos, *obs.qvel, *obs.ee_pose.pos, *obs.ee_pose.quat, obs.t, obs.gripper_opening))
+        ):
+            self._latch("invalid_observation", kind="halted")
+            return None, self._deny("invalid_observation")
 
         # Fence check on the CURRENT end-effector: breach latches halt.
         px, py, pz = obs.ee_pose.pos
@@ -82,6 +116,11 @@ class Guard:
             t2 = min(max(t, lim.joint_lower[i]), lim.joint_upper[i])
             cur = obs.qpos[i]
             lo, hi = cur - lim.max_delta_per_write, cur + lim.max_delta_per_write
+            # The rate window must not push a bounded target outside joint limits.
+            lo, hi = max(lo, lim.joint_lower[i]), min(hi, lim.joint_upper[i])
+            if lo > hi:
+                self._latch("joint_outside_recovery_window", kind="halted")
+                return None, self._deny("joint_outside_recovery_window")
             t3 = min(max(t2, lo), hi)
             clamped = clamped or (t3 != t)
             targets.append(t3)
@@ -98,7 +137,7 @@ class Guard:
     def check_target(self, pos: Vec3) -> bool:
         """Advisory pre-check for planned cartesian targets (skills call this before moving)."""
         fmin, fmax = self.limits.ee_fence_min, self.limits.ee_fence_max
-        return all(fmin[i] <= pos[i] <= fmax[i] for i in range(3))
+        return len(pos) == 3 and _finite(pos) and all(fmin[i] <= pos[i] <= fmax[i] for i in range(3))
 
     # -- internals -------------------------------------------------------------
 

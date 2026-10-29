@@ -167,12 +167,12 @@ class DagExecutor:
             result = retried
             verdict = await self._evaluate(step, result)
 
-        if verdict == _verify.UNSAT:
+        if verdict in (_verify.UNSAT, _verify.UNKNOWN):
             result.data["_verify"] = {
-                "verdict": _verify.UNSAT, "mode": verification.get("mode", ""), "attempts": attempts,
+                "verdict": verdict, "mode": verification.get("mode", ""), "attempts": attempts,
             }
-            # Honest reporting without flipping status is an aggregator concern in origin;
-            # here the deterministic composer reads _verify and words the caveat.
+            # Keep the legacy call status separate from effect evidence. Dependencies
+            # and the composer must both consult this evidence before claiming success.
         return result
 
     async def _verify_uncertain(self, step: Step, result: StepResult) -> StepResult:
@@ -235,9 +235,9 @@ class DagExecutor:
         )
         if timed_out:
             return StepResult(
-                step_id=step.id, status=StepStatus.OK,
+                step_id=step.id, status=StepStatus.FAILED, error="step_timeout",
                 detail="prior identical action timed out; NOT re-executed — verify state before retrying",
-                fingerprint=prior.fingerprint,
+                fingerprint=prior.fingerprint, data=dict(prior.data or {}),
             )
         return StepResult(
             step_id=step.id, status=StepStatus.OK, detail=prior.detail,
@@ -314,9 +314,14 @@ class DagExecutor:
     def _should_run(step: Step, done: dict) -> bool:
         for dep_id in step.depends_on:
             dep = done.get(dep_id)
-            if not dep or dep.status != StepStatus.OK:
+            if not dep or not DagExecutor._effect_allows_dependents(dep):
                 return False
         return True
+
+    @staticmethod
+    def _effect_allows_dependents(result: StepResult) -> bool:
+        verdict = (result.data.get("_verify") or {}).get("verdict")
+        return result.status == StepStatus.OK and verdict not in (_verify.UNSAT, _verify.UNKNOWN)
 
     @staticmethod
     def _mark_skipped(steps: list[Step], done: dict) -> None:
@@ -325,9 +330,7 @@ class DagExecutor:
                 continue
             for dep_id in s.depends_on:
                 dep = done.get(dep_id)
-                if dep and dep.status in (
-                    StepStatus.FAILED, StepStatus.SKIPPED, StepStatus.NEED_CONFIRM
-                ):
+                if dep and not DagExecutor._effect_allows_dependents(dep):
                     done[s.id] = StepResult(
                         step_id=s.id, status=StepStatus.SKIPPED,
                         error=f"dependency {dep_id} {dep.status.value}",

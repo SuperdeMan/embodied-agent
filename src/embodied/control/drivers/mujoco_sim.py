@@ -24,6 +24,7 @@ from embodied.control.hal import (
     WriteResult,
 )
 from embodied.control.simassets import stage_tabletop
+from embodied.runtime.invocation import invocation_access
 from embodied.safety.guard import Guard, GuardEvent, GuardLimits
 
 ARM_JOINTS = ("Rotation", "Pitch", "Elbow", "Wrist_Pitch", "Wrist_Roll")
@@ -137,18 +138,24 @@ class TabletopSim:
         )
 
     def write(self, cmd: ActionCommand) -> WriteResult:
-        applied, result = self.guard.gate(cmd, self.read())
-        if applied is None:
+        with invocation_access() as allowed:
+            if not allowed:
+                return WriteResult(applied=False, reason="invocation_revoked_or_expired")
+            applied, result = self.guard.gate(cmd, self.read())
+            if applied is None:
+                return result
+            self.data.ctrl[self._act_ids] = np.asarray(applied.joint_targets)
+            if applied.gripper is not None:
+                self.data.ctrl[self._jaw_act] = JAW_CLOSED_Q + applied.gripper * (JAW_OPEN_Q - JAW_CLOSED_Q)
+            self._last_cmd = applied
             return result
-        self.data.ctrl[self._act_ids] = np.asarray(applied.joint_targets)
-        if applied.gripper is not None:
-            self.data.ctrl[self._jaw_act] = JAW_CLOSED_Q + applied.gripper * (JAW_OPEN_Q - JAW_CLOSED_Q)
-        self._last_cmd = applied
-        return result
 
     def step(self, n: int = 1) -> None:
         for _ in range(n):
-            mujoco.mj_step(self.model, self.data)
+            with invocation_access() as allowed:
+                if not allowed:
+                    return
+                mujoco.mj_step(self.model, self.data)
         if self._on_step is not None:
             self._on_step(self.read(), self._last_cmd)
 

@@ -13,6 +13,7 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 
+from embodied.runtime.invocation import CURRENT_INVOCATION, InvocationPermit
 from embodied.skills.manifest import SkillManifest
 
 
@@ -51,6 +52,7 @@ SkillHandler = Callable[..., Awaitable[SkillResult]]
 class SkillRegistry:
     def __init__(self) -> None:
         self._skills: dict[str, tuple[SkillManifest, SkillHandler]] = {}
+        self._retiring: set[asyncio.Task] = set()
 
     def register(self, manifest: SkillManifest, handler: SkillHandler) -> None:
         if manifest.name in self._skills:
@@ -84,18 +86,43 @@ class SkillRegistry:
             raise SkillNotFound(name) from None
         if manifest.require_confirm and not confirmed:
             raise ConfirmationRequired(name)
-        merged = self._validate_params(manifest, params or {})
+        merged = self._validate_params(manifest, {} if params is None else params)
+        permit = InvocationPermit(manifest.termination.timeout_s)
+        binding = CURRENT_INVOCATION.set(permit)
+        task = None
         try:
-            return await asyncio.wait_for(handler(**merged), timeout=manifest.termination.timeout_s)
-        except asyncio.TimeoutError:
-            return SkillResult(ok=False, detail=f"timeout after {manifest.termination.timeout_s}s")
+            task = asyncio.create_task(handler(**merged))
+            done, _ = await asyncio.wait({task}, timeout=manifest.termination.timeout_s)
+            with permit.access() as allowed:
+                timed_out = not done or not allowed
+            if timed_out:
+                return SkillResult(
+                    ok=False, detail=f"timeout after {manifest.termination.timeout_s}s",
+                    data={"_execution": {"outcome": "OUTCOME_UNKNOWN", "stop_state": "STOP_UNCONFIRMED"}},
+                )
+            return task.result()
         except SkillError:
             raise
         except Exception as e:  # handler faults are operational failures, not crashes
             return SkillResult(ok=False, detail=f"{type(e).__name__}: {e}")
+        finally:
+            # Revoke BEFORE coroutine cancellation; to_thread work may continue running.
+            permit.revoke()
+            CURRENT_INVOCATION.reset(binding)
+            if task is not None and not task.done():
+                task.cancel()
+                self._retiring.add(task)
+                task.add_done_callback(self._retired)
+
+    def _retired(self, task: asyncio.Task) -> None:
+        self._retiring.discard(task)
+        if not task.cancelled():
+            task.exception()  # consume late handler faults without reviving the invocation
 
     @staticmethod
     def _validate_params(manifest: SkillManifest, params: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(params, dict) or not all(isinstance(key, str) for key in params):
+            raise InvalidParams(f"{manifest.name}: params must be an object with string keys")
         unknown = set(params) - set(manifest.params)
         if unknown:
             raise InvalidParams(f"{manifest.name}: unknown params {sorted(unknown)}")
@@ -107,4 +134,9 @@ class SkillRegistry:
                 merged[pname] = spec.default
             elif spec.required:
                 raise InvalidParams(f"{manifest.name}: missing required param {pname!r}")
+            if pname in merged:
+                try:
+                    spec.validate_value(merged[pname])
+                except (ValueError, TypeError, RecursionError) as exc:
+                    raise InvalidParams(f"{manifest.name}: invalid param {pname!r}: {exc}") from exc
         return merged
