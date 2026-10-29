@@ -109,7 +109,7 @@ def normalize_tool_calls(raw_calls) -> list[dict]:
     **丢弃该条**（warning 计数），刻意不做字符串抢救：tool-calling 的价值就是服务端
     约束，畸形=协议失败，诚实回退让调用方走 JSON 抢救/重试路径（RFC §8-3）。
     个别服务商直接给 object 的宽容接收。
-    
+
 
     Normalize tool calls to object arguments. Drop malformed arguments rather than inventing repairs; callers may then use their explicit JSON recovery path. Direct object arguments are accepted.
     """
@@ -143,7 +143,7 @@ class BaseProvider:
 
         thinking: None=用服务商默认（env LLM_DISABLE_THINKING）；True=本次开思考；
         False=本次关思考。复杂任务（行程/调研）由编排层经 meta 动态传 True。
-        
+
 
         Return content, actual model, finish reason and usage; thinking is a per-call override, with None preserving provider defaults.
         """
@@ -158,7 +158,7 @@ class BaseProvider:
         默认实现回落纯文本 ``complete`` + 空 tool_calls（Mock/未覆盖 provider fail-open：
         调用方按无工具调用处理，走既有 JSON 抢救/回退路径）。刻意不改 ``complete``
         四元组契约——仓内 fake/测试按其实现，独立方法存量零波及（RFC §8-1）。
-        
+
 
         Tool completion adds normalized tool calls without changing the legacy four-field completion contract. The default delegates to text completion with no tool calls.
         """
@@ -332,7 +332,7 @@ class ThinkStreamStripper:
 
     probe：缓冲首若干字符判定是否 `<think>` 前缀（判定窗 ≤ len("<think>")+前导空白，
     普通回复只延迟一个包级别）；drop：吞到 `</think>` 后把余下正文放流；pass：透传。
-    
+
 
     Streaming think filtering buffers a possible prefix, drops through the closing tag, then passes content; chunk boundaries do not change semantics.
     """
@@ -390,7 +390,7 @@ class OpenAICompatibleProvider(BaseProvider):
     - LLM_DISABLE_THINKING：``true``（默认，MiMo 推理模型须关思考保结构化输出）| ``false``
 
     MiMo docs: https://platform.xiaomimimo.com/docs/zh-CN/quick-start/first-api-call
-    
+
 
     OpenAI-compatible chat providers configure endpoint, authentication and thinking behavior through environment, allowing vendor changes without core edits.
     """
@@ -613,7 +613,7 @@ def build_provider() -> BaseProvider:
       qwen/自建…）一律走 OpenAI 兼容 HTTP provider，端点/鉴权/思考开关见下。
     - LLM_API_KEY / LLM_BASE_URL / LLM_AUTH_STYLE / LLM_DISABLE_THINKING
     无 key → MockProvider（PoC 可离线跑通）。
-    
+
 
     Build Anthropic through its SDK or other vendors through the compatible HTTP adapter; missing keys select mock unless strict mode rejects it.
     """

@@ -35,7 +35,7 @@ class GuardedProvider:
     The ported LLMCache stores (content, model_used) and reconstructs the rest — it cannot
     faithfully represent a complete_tools 5-tuple (tool_calls would be silently dropped),
     so planning calls are rate-limited but never cached. Streaming passes through untouched.
-    
+
 
     普通补全使用令牌桶和 TTL 缓存，工具补全仅限流：旧缓存不能保留工具调用五元组。流式调用透传。
     """

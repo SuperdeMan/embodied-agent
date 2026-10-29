@@ -58,7 +58,7 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> None:
     """配置结构化日志：stdout JSON 恒开；文件 handler 可选。
 
     log_file 参数缺省时读 env ``LOG_FILE``（非空即追加一个同格式的文件 handler）。
-    
+
 
     Always enable JSON stdout logging and optionally add a matching file handler from argument or environment.
     """

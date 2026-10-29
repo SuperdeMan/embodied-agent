@@ -65,7 +65,7 @@ class JsonlSink:
 
     ``OBS_DIR`` defaults to ``outputs/obs`` (relative to cwd); the directory
     is auto-created on first write.
-    
+
 
     事件按 JSON Lines 追加到配置目录，首次写入创建目录。
     """
@@ -216,7 +216,7 @@ class EventEmitter:
 
         内容字段（user_text/speech）经 OBS_CONTENT_CAPTURE 门控 + 统一脱敏；
         error 恒脱敏（异常串可能夹带敏感参数）。ts 传请求开始时刻（缺省=发射时刻）。
-        
+
 
         Emit one event per request turn; content capture is gated and redacted, errors always redacted, and timestamp defaults to emission time.
         """

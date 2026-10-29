@@ -77,7 +77,7 @@ def _fill_nan_columns(arr: np.ndarray) -> np.ndarray:
 
     Returns a copy; raises if any column is entirely NaN (object never observed —
     that episode cannot supply a dense environment_state).
-    
+
 
     逐列前向再后向填充缺测；整列全 NaN 时拒绝，因为无法提供稠密环境状态。
     """
@@ -152,7 +152,7 @@ def convert_episodes(
     immutable artifacts, re-convert to a fresh directory instead of appending.
     ``skills`` (skill mode only) keeps just the named skills' segments — vanilla ACT
     is not task-conditioned, so per-skill policies train on per-skill datasets.
-    
+
 
     转换一个根目录下的所有记录；默认排除失败局，目标目录必须不存在，数据集不可变。技能模式可筛选指定技能，为非任务条件 ACT 提供单技能数据。
     """

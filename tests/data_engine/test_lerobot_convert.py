@@ -35,7 +35,7 @@ def write_episode(root, *, success: bool = True, boundaries: bool = True, task: 
     joint0 ramps linearly with sim time (lerp-checkable); actions are the staircase
     of written targets (zoh-checkable). The settle gap (0.54 -> 1.0) mimics a single
     step(n) call producing one late sample.
-    
+
 
     合成抓取、稳定间隙和放置片段；关节线性变化便于验证插值，阶梯动作便于验证零阶保持，间隙模拟多步推进只采一帧。
     """

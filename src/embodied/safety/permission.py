@@ -76,7 +76,7 @@ def check_permission(*, agent_id: str, trust_level: str,
     注：这里用扁平 granted + 父子覆盖，**不**做 trust_level cap 交集——运行时授予的
     可能是父 scope（如 arm），而 cap 只含子 scope，直接交集会误伤。cap 强上限属目标态，
     待真实 token scope 落地时随 caps 父子感知化再接（见 PermissionEngine.effective_scopes）。
-    
+
 
     The single runtime decision denies all actuation to third-party and tool callers regardless of grants, then checks hierarchical scope coverage. Trust-cap intersection remains a separate future integration because flat sets mishandle parent grants.
     """
@@ -114,7 +114,7 @@ class PermissionEngine:
         父子覆盖判定（见模块函数 check_permission）。此处 `cap & granted` 是扁平集合交集、
         不做父子覆盖（授予父 arm 时会与只含子 scope 的 cap 交空），待真实
         token_scopes/user_grants 落地、并把 TRUST_LEVEL_CAPS 改为父子感知后再接入决策。
-        
+
 
         Compute target-state effective scopes from trust caps and grants; this flat intersection is not yet the runtime authority path and needs hierarchy-aware integration.
         """
@@ -143,7 +143,7 @@ class PermissionEngine:
 
         auth 的 token_scopes 与该调用方的 user_grants 取并集作为 granted；
         trust_level/agent_id 取自 manifest。
-        
+
 
         Check manifest permissions using the shared decision; combine session token and user grants and use manifest identity and trust level.
         """

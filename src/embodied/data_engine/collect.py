@@ -55,7 +55,7 @@ async def collect_episodes(
     A failed skill aborts the remaining sequence but the episode is still finalized
     (success=False) — partial trajectories train recovery behaviors later. ``judge``
     runs on a fresh ground-truth snapshot only when every skill reported ok.
-    
+
 
     运行指定次数的专家序列；失败即中止后续技能但仍保存失败轨迹，全部技能成功后才对新真值快照判定。
     """

@@ -56,7 +56,7 @@ class DagExecutor:
         confirm:  user confirmation channel; None = headless → dangerous steps DENIED
                   (fail-closed, never fail-open).
         world_fn: () -> WorldSnapshot for state_predicate verification; None → UNKNOWN.
-        
+
 
         registry 在执行器之下再次强制确认和超时；无确认回调时危险动作拒绝；world_fn 提供验证快照，缺失则 UNKNOWN。
         """

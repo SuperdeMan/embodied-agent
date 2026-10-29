@@ -134,7 +134,7 @@ async def run_task(
 
     Fresh sim AND fresh engine per seed group / episode keep episodes independent;
     success is judged from ground truth, never from the agent's report.
-    
+
 
     每个种子新建仿真、每局新建引擎以保持独立，结果由真值判断。
     """

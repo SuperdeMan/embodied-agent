@@ -126,7 +126,7 @@ class TeleopSession:
 
         Fails closed without any motion when the target leaves the safety fence or
         IK cannot reach it within tolerance.
-        
+
 
         保持俯向抓取姿态微调末端；越界或逆解误差超限时不产生运动。
         """

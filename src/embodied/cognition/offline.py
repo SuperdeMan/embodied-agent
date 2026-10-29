@@ -105,7 +105,7 @@ class ScriptedToolProvider:
     Sequences are drained one call per round: the planner executes a call, feeds the
     result back, and the next round pops the next call — same cadence a real LLM
     produces, so the planner code path is identical. Fully deterministic.
-    
+
 
     关键词规则映射为单次或连续工具调用；每轮执行一个调用再反馈结果，复现真实模型节奏，其余输入回显，行为完全确定。
     """
@@ -153,7 +153,7 @@ class ScriptedPlanProvider:
     Deterministic twin of a planning LLM: build prompts get a matched plan (or empty
     steps → chat path), replan prompts get empty steps (done — scripted plans are
     single-shot). complete() answers chat turns with a recognizable offline echo.
-    
+
 
     离线规划器按关键词生成 submit_plan；重规划返回空步骤表示完成，对话用可识别的离线回显。
     """

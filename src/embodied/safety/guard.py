@@ -89,7 +89,7 @@ class Guard:
         """Validate/clamp a command against the current observation.
 
         Returns (command_to_apply, result); command is None when denied.
-        
+
 
         根据当前观测校验并夹限命令；拒绝时返回空命令和原因。
         """

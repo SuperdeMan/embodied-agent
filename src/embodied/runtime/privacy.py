@@ -49,7 +49,7 @@ def strip_sensitive(prefs: Mapping | None,
 
     context_scopes 非 None 时：未声明 location/robot_state/vision 的调用方
     收不到对应敏感键；非敏感键始终保留。None = 不过滤（保持既有行为）。
-    
+
 
     Return a filtered copy without mutating input; undeclared sensitive scopes are removed while nonsensitive keys remain. None preserves legacy behavior.
     """

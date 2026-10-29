@@ -89,7 +89,7 @@ class Duplicate:
     """幂等命中：同一 (user_id, kind, 归一化 goal) 已有在跑任务。
 
     供上层出「已经在干了，大概还要 N 分钟」话术——防连说两遍/重试风暴双跑。
-    
+
 
     An active task with the same user, kind and normalized goal returns a duplicate marker to prevent repeated execution.
     """
@@ -122,7 +122,7 @@ def budget_exhausted(budget: dict | None, now: float | None = None) -> str:
     - `deadline_ts`（epoch 秒）过期 → `deadline`
     - `llm_calls_used >= llm_calls_max` / `ext_calls_used >= ext_calls_max` → `budget`
     上限缺省/非数 = 不限（弱声明不制造误截停）。
-    
+
 
     Return deadline or budget stop reasons; missing or nonnumeric limits remain unbounded rather than causing false cancellation.
     """
@@ -169,7 +169,7 @@ def is_orphaned(status: str, heartbeat_at: float, created_at: float,
 
     从未心跳过（accepted 刚开单就崩）时以 created_at 为参照。判定只在**读**的时候做
     （query_active/get），不额外起扫描进程。
-    
+
 
     Mark active tasks orphaned lazily on reads after heartbeat expiry, using creation time if no heartbeat exists; no scanning process is required.
     """
@@ -205,7 +205,7 @@ class TaskLedger:
 
     单进程单事件循环下，每个方法体内无 await 打断，check-then-write 天然原子——
     origin 用 INSERT ... ON CONFLICT 交给数据库裁决的并发窗在这里不存在。
-    
+
 
     In-memory async API: method bodies contain no awaits, making check-and-write atomic within one event loop; this is not cross-process durability.
     """
@@ -245,7 +245,7 @@ class TaskLedger:
         idempotency_goal：幂等指纹的来源文本（缺省用 goal）。规划槽位会波动，
         用用户原话作指纹可保证同一句话命中同一任务。
         返回 None 仅保留给「存储不可用」的降级语义（持久后端接入后生效）。
-        
+
 
         Accept a task unless an active duplicate exists; stale orphans do not block retries. Idempotency may use original user text instead of unstable planned slots; None is reserved for future unavailable storage.
         """
@@ -291,7 +291,7 @@ class TaskLedger:
         - **迟到心跳复活**：被惰性判定成 orphaned 的任务若又打上心跳，说明它其实活着
           → 拉回 running。orphaned 是判定不是结局，误判不该变成假的中断报告。
         - 行不存在（被清理/从没开成）→ 返回 `cancelled`，后台任务据此收尾不空转。
-        
+
 
         Heartbeat returns current status, enforces budgets and cancellation, revives falsely orphaned live tasks, and tells missing-record workers to stop.
         """
@@ -382,7 +382,7 @@ class TaskLedger:
         """最近任务（含终态），供「刚才那个任务怎么样了」在无 active 时回答。
 
         孤儿保留但改标 orphaned——要能答出「干到一半中断了」。
-        
+
 
         Return recent tasks including terminal and orphaned records so interrupted work remains explainable.
         """

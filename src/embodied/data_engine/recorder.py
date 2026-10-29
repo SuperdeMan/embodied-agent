@@ -83,7 +83,7 @@ class EpisodeRecorder:
     Root resolution order: explicit ``root`` argument > ``EPISODES_DIR`` env var >
     ``outputs/episodes`` (relative to cwd; ``outputs/`` is gitignored). Directories
     are created lazily on the first ``start()``.
-    
+
 
     会话工厂按显式根目录、环境变量、默认 outputs 路径顺序解析，首次开始时才创建目录。
     """
@@ -105,7 +105,7 @@ class EpisodeRecorder:
         The 3-digit sequence increments while the candidate directory exists, so
         several episodes started within the same wall-clock second never collide
         (``mkdir(exist_ok=False)`` makes the claim atomic).
-        
+
 
         创建时间戳加序号的唯一目录；以原子 mkdir 避免同秒多局碰撞。
         """
@@ -128,7 +128,7 @@ class EpisodeWriter:
     Created via ``EpisodeRecorder.start()``. After ``finish()``/``abort()`` the writer
     is closed: ``on_step``/``on_event``/``finish`` raise; ``abort`` stays a safe no-op
     so it can live in ``except``/``finally`` blocks without guards.
-    
+
 
     步骤缓存在内存，事件逐条落盘；结束后写操作报错，但 abort 保持幂等以便异常清理。
     """
@@ -173,7 +173,7 @@ class EpisodeWriter:
         before the first); a ``None`` gripper ("hold" in HAL semantics) carries the
         previous gripper target forward. End-effector position and object poses
         (pos + wxyz quat) ride along as extra arrays.
-        
+
 
         缓冲一个控制周期：状态为关节加夹爪，动作为空沿用上一行，夹爪空值沿用目标；首动作前为零，同时存末端及物体位姿。
         """
@@ -223,7 +223,7 @@ class EpisodeWriter:
         ``kind`` must be one of ``EVENT_KINDS``. Each line carries ``t`` (wall clock,
         epoch seconds) and, when the payload provides it, ``sim_t`` promoted to the
         top level; the remaining payload nests under ``payload``.
-        
+
 
         立即追加事件，包含墙钟、可选顶层仿真时间和载荷；事件类型必须在许可集合中。
         """
@@ -256,7 +256,7 @@ class EpisodeWriter:
 
         Safe to call unconditionally from ``except``/``finally`` — a no-op returning
         the episode dir when the writer is already closed.
-        
+
 
         异常路径保留全部缓冲步骤并标失败；重复中止安全返回原目录。
         """
@@ -386,7 +386,7 @@ def to_lerobot(episodes_root: Path | str, out_dir: Path | str, **kwargs: Any):
     (docs/decisions.md D014); the lazy import keeps this module free of learn-group
     dependencies. Field mapping: ``LEROBOT_FIELD_MAP`` plus
     ``observation.environment_state`` built from the ``object/<name>`` arrays.
-    
+
 
     延迟委托 LeRobot 转换器，避免默认导入学习依赖；物体数组额外组成环境状态向量。
     """

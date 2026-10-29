@@ -124,7 +124,7 @@ class StreamBridgeASRProvider(BaseASRProvider):
     存在意义：批处理面此前硬绑 MiMo——chat 换家（LLM_PROVIDER≠mimo 系）即静默降级
     Mock。经此桥接，批处理可跟随 dashscope 等流式引擎：WAV→裸 PCM→按帧喂流式引擎→
     取定稿文本。model 参数忽略（引擎模型由 ASR_STREAM_MODEL 控制）。
-    
+
 
     Bridge streaming ASR to batch APIs: unwrap WAV, feed PCM frames and return final text. Engine selection follows configuration; the batch model argument is ignored.
     """
@@ -630,7 +630,7 @@ class StreamBridgeTTSProvider(BaseTTSProvider):
     整段文本一次流入 → 聚齐 PCM → 封 WAV 返回。调用方传入的 model/voice 若不属于该
     引擎（如 HMI 旧默认「冰糖」打到 cosyvoice），忽略并用引擎目录默认，避免跨引擎
     音色 4xx（与 HMI settings 的同名回落逻辑对称，双侧防御）。
-    
+
 
     Bridge streaming TTS to batch WAV synthesis; incompatible model or voice selections fall back to that engine's catalog defaults.
     """

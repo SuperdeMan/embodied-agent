@@ -61,7 +61,7 @@ def is_scope_covered(required: str, effective: set[str]) -> bool:
 
     拥有 arm 覆盖 arm.move；
     拥有 gripper.open 不覆盖 gripper.close。
-    
+
 
     Check hierarchical coverage: arm covers arm.move, while gripper.open does not cover gripper.close.
     """

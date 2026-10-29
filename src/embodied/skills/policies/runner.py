@@ -80,7 +80,7 @@ class PolicyRunner:
 
         Returns (ok, reason); a guard-denied write aborts immediately — the guard
         has latched and fighting it is never correct (same rule as motions.py).
-        
+
 
         在动作块间检查完成或时域上限；Guard 拒绝立即终止，不对抗闩锁。
         """
@@ -152,7 +152,7 @@ def register_policy_sim_skills(
 
     Callers must leave the matching names out of ``register_sim_skills`` (its
     ``skip`` parameter) — the registry rejects duplicates by design.
-    
+
 
     注册学习实现时跳过同名脚本技能，Registry 禁止重复注册。
     """

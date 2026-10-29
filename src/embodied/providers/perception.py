@@ -85,7 +85,7 @@ class ColorBlobProvider(BasePerceptionProvider):
     One detection per prompt (this scene has one object per color); the "blob" is
     simply every pixel passing the HSV gate — connected-component analysis would
     need scipy and buys nothing on a clean tabletop.
-    
+
 
     每个颜色提示返回一个色块；干净桌面直接使用所有通过 HSV 门的像素，不增加连通域依赖。
     """

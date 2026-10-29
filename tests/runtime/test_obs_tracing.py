@@ -95,7 +95,7 @@ def test_setup_tracing_with_endpoint_but_no_otel_sdk(monkeypatch):
     """OTel 不是硬依赖：设了 endpoint 但没装 SDK → 降级简化版，不抛。
 
     本仓库刻意不装 opentelemetry（optional-guarded only），此测试同时钉住这一点。
-    
+
 
     OTel is optional: a configured endpoint without the SDK must degrade cleanly, not require installation.
     """

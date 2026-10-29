@@ -294,7 +294,7 @@ class LLMRuntime:
         零行为变化；只有在 `_PROVIDER_SPECS` 里显式声明 False 的档才短路。
 
         **每次请求现读**：provider 可热切，缓存下来就会在切换后沿用旧能力。
-        
+
 
         Read tool-calling capability on every request because providers can switch; default true preserves existing behavior, explicit false short-circuits unsupported calls.
         """

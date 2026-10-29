@@ -91,7 +91,7 @@ class PerceptionPipeline:
         different depth and are dropped), pushed ``push_frac * size`` along the view
         ray toward the object interior. Undetected objects are simply absent —
         downstream already treats objects as a sparse dict.
-        
+
 
         将检测转换为世界位姿；对深度中位数附近内点逐像素反投影求可见表面质心，再沿视线向内部补偿。未检测物体保持缺席，沿用稀疏字典语义。
         """
@@ -170,7 +170,7 @@ class PerceivedSim:
       known pose, the unseen object is believed to move WITH the hand (updated from
       encoder proprioception, no ground truth involved) until the gripper opens or
       a fresh sighting contradicts the belief (slipped grasp -> detach, honest fail).
-    
+
 
     包装器只替换物体表，不改变关节、夹爪与末端反馈；按仿真时间节流。遮挡时依次尝试相机、保留最后位姿、根据闭合夹爪建立运动学附着信念；重新看到矛盾位置或张开夹爪时解除，重置清空注册表，时效标记留后续。
     """

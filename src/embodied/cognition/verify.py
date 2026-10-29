@@ -178,7 +178,7 @@ async def evaluate(
 
     `state_predicate` polls until `timeout_ms` — physical effects settle over sim/real
     time (a released object needs a moment to land), asserting instantly would misfire.
-    
+
 
     按声明模式验证，未知模式返回 UNKNOWN；状态谓词轮询至期限，给物理效果稳定留时间。
     """

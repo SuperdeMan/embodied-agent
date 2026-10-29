@@ -23,7 +23,7 @@ class TokenBucket:
         """
         rate: 每秒补充的令牌数
         capacity: 桶容量（允许的突发量）
-        
+
 
         Rate is tokens replenished per second; capacity defines permitted bursts.
         """
