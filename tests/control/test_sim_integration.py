@@ -1,6 +1,9 @@
 """Sim driver + skills integration tests. Auto-skip when mujoco or the fetched
 assets are absent (CI runs without the sim group; run locally via
-`uv run --group sim pytest tests/control`)."""
+`uv run --group sim pytest tests/control`).
+
+驱动与技能集成测试，缺仿真组或资产时跳过；本地安装后必须运行。
+"""
 
 from __future__ import annotations
 
@@ -46,6 +49,7 @@ def test_randomize_within_sector(sim):
         x, y, _ = obs.objects["obj_cube"].pos
         r = (x * x + y * y) ** 0.5
         assert 0.15 <= r <= 0.30
+        # 前方扇区。
         assert y < 0  # forward sector
 
 
@@ -66,7 +70,10 @@ def test_ik_reaches_object(sim):
 
 async def test_pick_place_end_to_end(sim):
     """The M1 vertical slice in one test: fixed layout pick&place through the
-    skill registry, with effect verification against world state."""
+    skill registry, with effect verification against world state.
+
+    固定布局抓放经 Registry 完成并核对世界状态。
+    """
     from embodied.skills.registry import SkillRegistry
     from embodied.skills.scripted.manip import register_sim_skills
 

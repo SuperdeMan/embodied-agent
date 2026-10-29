@@ -1,8 +1,12 @@
+# 保留来源；权限逻辑保留，硬拒绝改为执行器前缀，动作映射改为机器人范围，本体字段改为 robot_id。
 # Ported from car-agent security/permission.py @ f0b08f8, changes: engine logic unchanged (effective_scopes/check/check_action, trust levels); hard-deny rule retargeted from the origin control-scope parent to ACTUATION_PREFIXES (arm/gripper); check_action scope map rewritten for the robot catalog; AuthContext embodiment field renamed robot_id.
 """权限引擎：编排层 + 执行层共用。
 
 有效权限 = min(trust_level 上限, 用户授权, 会话 token scope)。
 third_party 额外剔除高危 scope。
+
+
+Shared planning and execution permission engine; effective grants respect trust, user authorization and token scopes, with extra dangerous-scope restrictions for third parties.
 """
 from __future__ import annotations
 
@@ -28,23 +32,34 @@ from .scopes import (
 
 @dataclass
 class AuthContext:
-    """一次调用的认证/授权上下文。"""
+    """一次调用的认证/授权上下文。
+
+    Authentication and authorization context for one call.
+    """
     user_id: str = ""
     robot_id: str = ""
+    # Scopes supplied by the session token.
     token_scopes: list[str] = field(default_factory=list)   # 来自会话 token
+    # Map caller IDs to granted scopes.
     user_grants: dict[str, list[str]] = field(default_factory=dict)  # agent_id -> scopes
 
 
 @dataclass
 class Decision:
-    """权限校验结果。"""
+    """权限校验结果。
+
+    Permission decision result.
+    """
     allowed: bool
     missing: list[str] = field(default_factory=list)
     reason: str = ""
 
 
 def _required_actuation(required) -> list[str]:
-    """列出 required 中命中执行器（actuation）的 scope（前缀本身或其子）。"""
+    """列出 required 中命中执行器（actuation）的 scope（前缀本身或其子）。
+
+    Find required actuation scopes, including prefix descendants.
+    """
     return [r for r in required
             if any(r == p or r.startswith(p + ".") for p in ACTUATION_PREFIXES)]
 
@@ -61,6 +76,9 @@ def check_permission(*, agent_id: str, trust_level: str,
     注：这里用扁平 granted + 父子覆盖，**不**做 trust_level cap 交集——运行时授予的
     可能是父 scope（如 arm），而 cap 只含子 scope，直接交集会误伤。cap 强上限属目标态，
     待真实 token scope 落地时随 caps 父子感知化再接（见 PermissionEngine.effective_scopes）。
+    
+
+    The single runtime decision denies all actuation to third-party and tool callers regardless of grants, then checks hierarchical scope coverage. Trust-cap intersection remains a separate future integration because flat sets mishandle parent grants.
     """
     required = list(required or [])
     if not required:
@@ -84,7 +102,10 @@ def check_permission(*, agent_id: str, trust_level: str,
 
 
 class PermissionEngine:
-    """统一权限引擎。编排层（Planner）和执行层共用。"""
+    """统一权限引擎。编排层（Planner）和执行层共用。
+
+    Shared permission engine for planning and execution.
+    """
 
     def effective_scopes(self, manifest, auth: AuthContext) -> set[str]:
         """计算某调用方在当前 auth 下的有效权限（trust-cap ∩ 授权，third_party 剔高危）。
@@ -93,17 +114,23 @@ class PermissionEngine:
         父子覆盖判定（见模块函数 check_permission）。此处 `cap & granted` 是扁平集合交集、
         不做父子覆盖（授予父 arm 时会与只含子 scope 的 cap 交空），待真实
         token_scopes/user_grants 落地、并把 TRUST_LEVEL_CAPS 改为父子感知后再接入决策。
+        
+
+        Compute target-state effective scopes from trust caps and grants; this flat intersection is not yet the runtime authority path and needs hierarchy-aware integration.
         """
         trust = manifest.trust_level if hasattr(manifest, "trust_level") else "first_party"
         cap = TRUST_LEVEL_CAPS.get(trust, set())
 
+        # Union user grants with token scopes.
         # 用户授权 + token scope 取并集
         agent_grants = set(auth.user_grants.get(manifest.agent_id, []))
         granted = set(auth.token_scopes) | agent_grants
 
+        # Intersect with the trust-level ceiling.
         # 与 trust 上限取交集
         scopes = cap & granted
 
+        # Remove prohibited high-risk scopes from third-party callers.
         # third_party 强制剔除高危
         if trust == "third_party":
             scopes = {s for s in scopes
@@ -116,6 +143,9 @@ class PermissionEngine:
 
         auth 的 token_scopes 与该调用方的 user_grants 取并集作为 granted；
         trust_level/agent_id 取自 manifest。
+        
+
+        Check manifest permissions using the shared decision; combine session token and user grants and use manifest identity and trust level.
         """
         granted = set(auth.token_scopes) | set(
             auth.user_grants.get(getattr(manifest, "agent_id", ""), []))
@@ -128,7 +158,10 @@ class PermissionEngine:
 
     def check_action(self, action_type: str, manifest, auth: AuthContext) -> Decision:
         """校验单个动作的权限（执行层用）。action_type 按 scope 名前缀匹配；
-        未命中映射的动作类型（纯 UI 类等）放行。"""
+        未命中映射的动作类型（纯 UI 类等）放行。
+
+        Check action permissions through scope-prefix mapping; unmapped UI actions are allowed.
+        """
         scope_map = {
             "arm.move": ARM_MOVE,
             "arm.home": ARM_HOME,

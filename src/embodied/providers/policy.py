@@ -7,6 +7,9 @@ its full IO contract (chunk size, control rate, dims, feature layout);
 ``scripts/export_onnx.py`` produces it from a lerobot ACT checkpoint with the
 normalization baked into the graph, so callers feed raw observations and receive
 absolute joint targets.
+
+
+训练与部署依赖隔离：torch 属学习组，运行时只用 ONNX Runtime。单文件模型元数据携带动作块、频率、维度和布局；归一化在图内，输入原始观测，输出绝对关节目标。
 """
 
 from __future__ import annotations
@@ -21,6 +24,7 @@ import numpy as np
 
 POLICY_ONNX_SCHEMA = "embodied.policy.onnx/v1"
 
+# 图输入输出名称与导出脚本共享；ONNX 使用下划线，数据集字段仍保留点号。
 # Graph IO names, shared with scripts/export_onnx.py (dots are not valid ONNX names,
 # hence underscores; the dataset-side names remain observation.state etc.).
 INPUT_STATE = "observation_state"
@@ -30,7 +34,10 @@ OUTPUT_CHUNK = "action_chunk"
 
 @dataclass(frozen=True)
 class PolicyMeta:
-    """IO contract of a policy artifact (parsed from ONNX embedded metadata)."""
+    """IO contract of a policy artifact (parsed from ONNX embedded metadata).
+
+    从 ONNX 元数据解析策略输入输出契约。
+    """
 
     chunk_size: int
     control_hz: float
@@ -40,27 +47,40 @@ class PolicyMeta:
     task: str = ""
     state_names: tuple[str, ...] = ()
     env_names: tuple[str, ...] = ()
+    # 来源信息为检查点路径或数据集 ID。
     source: str = ""  # provenance: checkpoint path / dataset id
 
 
 class BasePolicyProvider(ABC):
-    """A learned policy: observations in, an absolute-target action chunk out."""
+    """A learned policy: observations in, an absolute-target action chunk out.
+
+    学习策略接收观察，返回绝对目标动作块。
+    """
 
     @property
     @abstractmethod
     def meta(self) -> PolicyMeta: ...
 
     def reset(self) -> None:
-        """Clear per-rollout state (action queues, ensembling). Default: stateless."""
+        """Clear per-rollout state (action queues, ensembling). Default: stateless.
+
+        每局清除动作队列或融合状态；默认无状态。
+        """
         return None
 
     @abstractmethod
     def act(self, state: np.ndarray, env: np.ndarray) -> np.ndarray:
-        """``(state_dim,)``, ``(env_dim,)`` -> ``(chunk_size, action_dim)`` targets."""
+        """``(state_dim,)``, ``(env_dim,)`` -> ``(chunk_size, action_dim)`` targets.
+
+        状态和环境向量转换为动作块矩阵。
+        """
 
 
 class OnnxPolicy(BasePolicyProvider):
-    """ONNX Runtime inference over an exported policy artifact (CPU by default)."""
+    """ONNX Runtime inference over an exported policy artifact (CPU by default).
+
+    默认在 CPU 上执行已导出 ONNX 策略。
+    """
 
     def __init__(self, path: Path | str) -> None:
         try:
@@ -105,7 +125,10 @@ class OnnxPolicy(BasePolicyProvider):
 
 
 class MockChunkPolicy(BasePolicyProvider):
-    """Deterministic test double: ``fn(state, env) -> chunk`` with a declared meta."""
+    """Deterministic test double: ``fn(state, env) -> chunk`` with a declared meta.
+
+    带元数据的确定性策略测试替身。
+    """
 
     def __init__(self, meta: PolicyMeta, fn: Callable[[np.ndarray, np.ndarray], np.ndarray]) -> None:
         self._meta = meta
@@ -127,5 +150,8 @@ class MockChunkPolicy(BasePolicyProvider):
 
 
 def build_policy_provider(path: Path | str) -> BasePolicyProvider:
-    """Factory (mirrors build_provider/build_asr_provider): one artifact kind today."""
+    """Factory (mirrors build_provider/build_asr_provider): one artifact kind today.
+
+    策略工厂当前只支持一种模型产物类型。
+    """
     return OnnxPolicy(path)

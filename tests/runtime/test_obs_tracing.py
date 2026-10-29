@@ -1,5 +1,9 @@
+# 保留来源，未移植指标测试，新增会话标识与可选 OTel 回退覆盖。
 # Ported from car-agent observability/tests/test_otel.py @ f0b08f8, changes: MetricsCollector tests dropped (metrics module not ported); added session-id + optional-OTel-fallback coverage.
-"""tracing：trace/session contextvar、meta 注入、OTel 可选降级。"""
+"""tracing：trace/session contextvar、meta 注入、OTel 可选降级。
+
+Trace and session context propagation with optional OTel fallback.
+"""
 import asyncio
 
 import pytest
@@ -91,6 +95,9 @@ def test_setup_tracing_with_endpoint_but_no_otel_sdk(monkeypatch):
     """OTel 不是硬依赖：设了 endpoint 但没装 SDK → 降级简化版，不抛。
 
     本仓库刻意不装 opentelemetry（optional-guarded only），此测试同时钉住这一点。
+    
+
+    OTel is optional: a configured endpoint without the SDK must degrade cleanly, not require installation.
     """
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://127.0.0.1:4317")
     assert setup_tracing("test-svc") is True

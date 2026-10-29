@@ -3,6 +3,9 @@ judge against sim ground truth, persist a machine-readable result.
 
 Task files are immutable per version (eval/tasks/); results land in outputs/eval/
 (gitignored); the append-only human ledger is eval/BASELINES.md.
+
+
+版本化任务经完整引擎执行，真值裁判并落盘机器可读结果；任务版本不可变，人工基线账本只追加。
 """
 
 from __future__ import annotations
@@ -72,13 +75,19 @@ class EvalTask:
 
 def _truth_obs(sim):
     """Judges read ground truth even when the agent runs on perception (D015):
-    a PerceivedSim exposes read_truth(); a bare sim IS the truth."""
+    a PerceivedSim exposes read_truth(); a bare sim IS the truth.
+
+    感知模式下裁判仍调用 read_truth，裸仿真本身提供真值。
+    """
     return sim.read_truth() if hasattr(sim, "read_truth") else sim.read()
 
 
 def _close_sim(sim) -> None:
     """Per-seed sims that own resources (perception render threads) must release
-    them deterministically; bare sims have no close() and skip as a no-op."""
+    them deterministically; bare sims have no close() and skip as a no-op.
+
+    有渲染线程等资源的仿真须确定性关闭，裸仿真无 close 时跳过。
+    """
     fn = getattr(sim, "close", None)
     if callable(fn):
         fn()
@@ -125,6 +134,9 @@ async def run_task(
 
     Fresh sim AND fresh engine per seed group / episode keep episodes independent;
     success is judged from ground truth, never from the agent's report.
+    
+
+    每个种子新建仿真、每局新建引擎以保持独立，结果由真值判断。
     """
     recorder = None
     if record:

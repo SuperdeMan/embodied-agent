@@ -1,4 +1,7 @@
-"""DagExecutor contract tests: layering, refs, dedup, confirm gate (fail-closed), verify."""
+"""DagExecutor contract tests: layering, refs, dedup, confirm gate (fail-closed), verify.
+
+验证分层、引用、去重、拒绝式确认和效果校验契约。
+"""
 
 from __future__ import annotations
 
@@ -75,6 +78,7 @@ async def test_layering_and_parallelism():
     ])
     results = await collect(ex, plan)
     assert [r.status for r in results] == [StepStatus.OK] * 3
+    # 第三步严格在并行层之后。
     assert order.index("c") == 2  # c strictly after the parallel layer
     assert set(order[:2]) == {"a", "b"}
 
@@ -125,6 +129,7 @@ async def test_dependency_failure_skips_dependents():
     by_id = {r.step_id: r for r in results}
     assert by_id["s1"].status == StepStatus.FAILED
     assert by_id["s2"].status == StepStatus.SKIPPED
+    # 失败依赖后不调用第二步。
     assert [c[0] for c in calls] == ["skill.test.a"]  # b never invoked
 
 
@@ -153,6 +158,7 @@ async def test_dedup_suppresses_identical_side_effect():
     ])
     results = await collect(ex, plan)
     assert all(r.status == StepStatus.OK for r in results)
+    # 相同参数执行一次，不同参数另执行一次。
     assert len([c for c in calls if c[0] == "skill.test.a"]) == 2  # x=1 executed once, x=2 once
 
 
@@ -218,6 +224,7 @@ async def test_verify_unsat_report_annotates():
     ex = DagExecutor(registry)
     results = await collect(ex, Plan(steps=[step("s1", "skill.test.claim",
                                                  verification={"mode": "schema", "expect": {"data_keys": ["object"]}})]))
+    # 调用状态保留，效果通过证据注释如实表达。
     assert results[0].status == StepStatus.OK  # honesty via annotation, not status flip
     assert results[0].data["_verify"]["verdict"] == "unsat"
 
@@ -234,5 +241,6 @@ async def test_verify_unsat_retry_once_then_report():
     registry.register(SkillManifest(name="skill.test.flaky", description="f", verification=v), flaky)
     ex = DagExecutor(registry)
     results = await collect(ex, Plan(steps=[step("s1", "skill.test.flaky", verification=v)]))
+    # 仅重试一次。
     assert len(attempts) == 2  # one retry
     assert results[0].status == StepStatus.OK and "_verify" not in results[0].data

@@ -1,3 +1,5 @@
+// Web Audio 采集与播放沿用来源设计，16k 单声道 PCM16 上行、流式播放下行；
+// 控制台精简实现仅支持现代 AudioWorklet，不回退旧 ScriptProcessor。
 // PCM capture/playback over Web Audio, design carried from car-agent hmi/src/pcmRecorder.mjs
 // + pcmPlayer.mjs (16k mono s16le up, streaming playback down). Rewritten lean for the v0
 // console: AudioWorklet-free capture via ScriptProcessor fallback is deliberately avoided —
@@ -39,6 +41,7 @@ export class PcmRecorder {
   }
 
   _push(f32, srcRate) {
+    // 将源采样率线性重采样到 16k，适用于语音命令。
     // naive linear resample srcRate -> 16k, fine for command speech
     const ratio = srcRate / CAPTURE_RATE;
     const out = new Int16Array(Math.floor(f32.length / ratio));
@@ -86,6 +89,7 @@ export class PcmPlayer {
   }
 
   stop() {
+    // 打断支持随 VAD 引入，首版允许尾音播放完毕。
     // barge-in support arrives with VAD; v0 lets the tail play out
     this.playhead = 0;
   }

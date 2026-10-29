@@ -1,3 +1,4 @@
+# 保留来源，服务名称和描述去领域化，OTel 可选导入与回退逻辑不变。
 # Ported from car-agent observability/tracing.py @ f0b08f8, changes: default service name neutralized; docstring de-domained; logic unchanged (OTel already optional via in-function import + fallback).
 """Trace 贯通。trace_id 随每个请求生成并在进程内/跨进程透传。
 
@@ -13,12 +14,14 @@ import uuid
 
 logger = logging.getLogger("obs.tracing")
 
+# Fallback global trace context when OTel is unavailable.
 # 全局 trace 上下文（简化版，OTel SDK 未就绪时使用）
 _current_trace: contextvars.ContextVar[str] = contextvars.ContextVar(
     "current_trace_id",
     default="",
 )
 
+# Set session context once at request entry; events and logs attach it automatically.
 # 会话上下文：与 trace 同模式。请求入口 set 一次，
 # 观测事件（events._emit）与结构化日志自动携带——不必逐个 emit_span 调用点透传。
 _current_session: contextvars.ContextVar[str] = contextvars.ContextVar(
@@ -26,12 +29,16 @@ _current_session: contextvars.ContextVar[str] = contextvars.ContextVar(
     default="",
 )
 
+# Lazily initialized OTel SDK handles.
 # OTel SDK 句柄（延迟初始化）
 _tracer = None
 
 
 def setup_tracing(service_name: str = "embodied"):
-    """初始化 tracing。有 endpoint 且 OTel SDK 可用时接 OTel；否则简化版。"""
+    """初始化 tracing。有 endpoint 且 OTel SDK 可用时接 OTel；否则简化版。
+
+    Initialize OTel when an endpoint and SDK exist, otherwise use the lightweight fallback.
+    """
     global _tracer
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
 
@@ -104,9 +111,13 @@ def inject_trace_meta(meta: dict) -> dict:
 
 
 def start_span(name: str):
-    """创建 span（OTel SDK 可用时用真实 span，否则用 no-op）。"""
+    """创建 span（OTel SDK 可用时用真实 span，否则用 no-op）。
+
+    Create a real span when available, otherwise a no-op span.
+    """
     if _tracer:
         return _tracer.start_as_current_span(name)
+    # 无操作上下文管理器。
     # No-op context manager
     from contextlib import contextmanager
 

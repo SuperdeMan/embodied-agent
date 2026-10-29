@@ -1,3 +1,4 @@
+# 保留来源，脱敏逻辑原样移植，仅模块位置变化。
 # Ported from car-agent observability/redact.py @ f0b08f8, changes: verbatim port; module path only.
 """共享脱敏与内容采集门控。
 
@@ -5,6 +6,9 @@
 敏感字段规则——密钥/token/长数字不落任何观测面。内容级采集（用户原话/plan/LLM 输出）
 由 OBS_CONTENT_CAPTURE 门控：PoC 默认 on；量产必须 off，off 时
 只保留长度与哈希指纹，链路形状排查不受影响。
+
+
+Shared redaction protects logs and events. Capture gating either retains redacted bounded content or only lengths and hashes; production should disable content capture.
 """
 from __future__ import annotations
 
@@ -16,24 +20,34 @@ SENSITIVE_PATTERNS: list[tuple[re.Pattern, str]] = [
     (re.compile(r'password["\s:=]+\S+', re.IGNORECASE), 'password=***'),
     (re.compile(r'token["\s:=]+\S+', re.IGNORECASE), 'token=***'),
     (re.compile(r'api[_-]?key["\s:=]+\S+', re.IGNORECASE), 'api_key=***'),
+    # Redact long numbers such as phone numbers.
     (re.compile(r'\b\d{11,}\b'), '***'),  # 手机号等长数字
 ]
 
 
 def redact(text: str) -> str:
-    """对文本应用全部敏感字段脱敏规则。"""
+    """对文本应用全部敏感字段脱敏规则。
+
+    Apply every sensitive-text redaction rule.
+    """
     for pattern, replacement in SENSITIVE_PATTERNS:
         text = pattern.sub(replacement, text)
     return text
 
 
 def content_capture_enabled() -> bool:
-    """observability 是否采集内容级数据（默认 on；实时读 env，测试可 monkeypatch）。"""
+    """observability 是否采集内容级数据（默认 on；实时读 env，测试可 monkeypatch）。
+
+    Read content-capture configuration at runtime, defaulting on for the prototype.
+    """
     return os.getenv("OBS_CONTENT_CAPTURE", "on").lower() != "off"
 
 
 def gate_content(text: str, limit: int = 2000) -> str:
-    """内容采集门控：开→脱敏+截断；关→只留长度与哈希指纹（形状可查、内容不落盘）。"""
+    """内容采集门控：开→脱敏+截断；关→只留长度与哈希指纹（形状可查、内容不落盘）。
+
+    When capture is enabled redact and truncate; otherwise retain only length and hash.
+    """
     if not text:
         return ""
     if not content_capture_enabled():

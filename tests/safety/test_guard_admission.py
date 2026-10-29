@@ -1,4 +1,7 @@
-"""Numerical command, observation and trusted configuration admission."""
+"""Numerical command, observation and trusted configuration admission.
+
+验证命令、观测及受信配置的数值准入。
+"""
 
 from dataclasses import replace
 

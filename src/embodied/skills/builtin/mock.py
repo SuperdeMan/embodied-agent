@@ -1,6 +1,9 @@
 """Mock skills: prove the see-think-act loop end to end before any embodiment exists (M0 DoD).
 
 Replaced by sim-backed scripted skills in M1; the manifests' shape is the part that lasts.
+
+
+模拟技能用于无本体时验证端到端认知链；后续替换实现，保留 manifest 契约。
 """
 
 from __future__ import annotations
@@ -19,6 +22,7 @@ HOME = SkillManifest(
 
 
 async def _home() -> SkillResult:
+    # 真实运动的占位实现。
     await asyncio.sleep(0)  # placeholder for real motion
     return SkillResult(ok=True, detail="arm homed", data={"pose": "home"})
 

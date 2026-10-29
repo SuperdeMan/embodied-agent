@@ -1,4 +1,7 @@
-"""Invocation success cannot release effects that are false or unknown."""
+"""Invocation success cannot release effects that are false or unknown.
+
+调用成功不能放行效果为假或未知的依赖步骤。
+"""
 
 import pytest
 

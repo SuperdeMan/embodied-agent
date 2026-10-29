@@ -1,3 +1,4 @@
+# 保留来源：世界快照替换旧消息镜像，空间谓词声明式注册，新增谓词不改引擎；动态槽引用改为参数引用，保留结构化结果验证。
 # Ported from car-agent orchestrator/cloud/verify.py @ f0b08f8, changes: state source is a
 # WorldSnapshot callable instead of the NATS state mirror; expect keys become named spatial
 # predicates over the snapshot (declarative registry, no skill-name branches — the origin's
@@ -10,6 +11,9 @@ Three-state semantics, inherited verbatim in spirit:
 - UNSAT   HARD evidence of failure → on_fail (report honestly / retry once)
 - UNKNOWN observation missing (object/region not in snapshot) → never convict;
           "can't see it" is not "didn't happen".
+
+
+效果验证采用三态：SAT 证实期望，UNSAT 有失败证据，UNKNOWN 为观察缺失；看不到不能断言没有发生。
 """
 
 from __future__ import annotations
@@ -34,7 +38,10 @@ _PARAM_REF_PREFIX = "$param:"
 
 
 class _Unresolved:
-    """The declaration referenced a param this step doesn't have: can't evaluate ≠ failed."""
+    """The declaration referenced a param this step doesn't have: can't evaluate ≠ failed.
+
+    引用的参数不存在意味着不能判断，不等于失败。
+    """
 
     __slots__ = ()
 
@@ -48,7 +55,10 @@ UNRESOLVED = _Unresolved()
 def resolve_args(args: dict, params: dict) -> dict:
     """Replace `$param:<name>` values with this step's ACTUAL params (post ref-resolution).
     Whole-value references only — no string interpolation (same rationale as origin: never
-    grow an LLM-influenceable syntax surface inside the reconciliation layer)."""
+    grow an LLM-influenceable syntax surface inside the reconciliation layer).
+
+    以步骤实际参数解析整值引用，禁止字符串插值扩大模型可影响的语法面。
+    """
     if not isinstance(args, dict):
         return {}
     params = params if isinstance(params, dict) else {}
@@ -63,6 +73,7 @@ def resolve_args(args: dict, params: dict) -> dict:
     return out
 
 
+# 结构化结果验证器。
 # ── evaluator one: schema (query-ish skills — "we got real data back") ──────────
 
 def eval_schema(expect: dict, data: dict) -> str:
@@ -82,8 +93,10 @@ def eval_schema(expect: dict, data: dict) -> str:
     return SAT
 
 
+# 世界状态谓词验证器。
 # ── evaluator two: state predicates ("the world actually changed") ─────────────
 #
+# 谓词读取快照并返回三态；注册表是扩展边界，物体或区域缺失必须返回未知。
 # Predicates read a WorldSnapshot (embodied.cognition.world_state). Registry is the
 # extension seam: adding a predicate never touches the engine. Each returns SAT/UNSAT/
 # UNKNOWN; missing objects/regions are UNKNOWN by contract.
@@ -130,10 +143,14 @@ PREDICATES: dict[str, Callable[[Any, dict], str]] = {
 
 def eval_state_predicate(expect: dict, snapshot: Any | None, params: dict | None = None) -> str:
     """Evaluate the declared predicate against a world snapshot. No snapshot → UNKNOWN
-    ("I can't see" is not "it didn't happen"). Unresolved $param refs → UNKNOWN."""
+    ("I can't see" is not "it didn't happen"). Unresolved $param refs → UNKNOWN.
+
+    对快照求谓词；快照或参数引用缺失返回 UNKNOWN。
+    """
     name = str(expect.get("predicate", "") or "")
     fn = PREDICATES.get(name)
     if fn is None:
+        # 旧引擎遇到新谓词只报未知，不据此认定失败。
         return UNKNOWN  # forward-compatible: new predicate on an old engine never convicts
     if snapshot is None:
         return UNKNOWN
@@ -142,11 +159,13 @@ def eval_state_predicate(expect: dict, snapshot: Any | None, params: dict | None
         return UNKNOWN
     try:
         return fn(snapshot, args)
+    # 验证异常不使主链崩溃。
     except Exception as e:  # fail-open: verification must never take down the main chain
         logger.warning("predicate %s errored (ignored): %s", name, e)
         return UNKNOWN
 
 
+# 验证分派。
 # ── dispatch ───────────────────────────────────────────────────────────────────
 
 async def evaluate(
@@ -159,6 +178,9 @@ async def evaluate(
 
     `state_predicate` polls until `timeout_ms` — physical effects settle over sim/real
     time (a released object needs a moment to land), asserting instantly would misfire.
+    
+
+    按声明模式验证，未知模式返回 UNKNOWN；状态谓词轮询至期限，给物理效果稳定留时间。
     """
     mode = str(verification.get("mode") or "")
     expect = verification.get("expect") or {}
@@ -186,6 +208,7 @@ async def _eval_state_with_wait(
         if verdict == SAT:
             return SAT
         if asyncio.get_event_loop().time() >= deadline:
+            # 到期仍未满足则报告 UNSAT，未知仍不定罪。
             return verdict  # still unmet at deadline: UNSAT reports, UNKNOWN never convicts
         await asyncio.sleep(_POLL_INTERVAL_S)
 
@@ -196,7 +219,10 @@ def enabled() -> bool:
 
 def retry_allowed(verification: dict, require_confirm: bool, attempts: int) -> bool:
     """Side-effect-confirmed steps NEVER retry: replaying a confirmed action means executing
-    a side effect twice on a single user confirmation. Hard constraint, not configuration."""
+    a side effect twice on a single user confirmation. Hard constraint, not configuration.
+
+    经确认的副作用永不自动重试，避免一次确认执行两次；此为硬约束。
+    """
     if str(verification.get("on_fail") or ON_FAIL_REPORT) != ON_FAIL_RETRY:
         return False
     if require_confirm:

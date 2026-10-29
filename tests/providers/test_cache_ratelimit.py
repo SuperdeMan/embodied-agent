@@ -1,6 +1,10 @@
+# 保留来源，调整导入；未移植指标模块，因此不包含对应成本跟踪测试。
 # Ported from car-agent test/test_llm_cache.py @ f0b08f8, changes: imports adapted to
 # embodied.providers.*; CostTracker tests (2) omitted (metrics.py not ported, excluded in M0).
-"""LLM Gateway 缓存 + 限流测试。"""
+"""LLM Gateway 缓存 + 限流测试。
+
+LLM cache and rate-limiter tests.
+"""
 from __future__ import annotations
 
 import time
@@ -44,7 +48,9 @@ def test_cache_stats():
     c = LLMCache()
     msgs = [{"role": "user", "content": "q"}]
     c.put(msgs, "m", 0.7, "a", "m")
+    # 缓存命中。
     c.get(msgs, "m", 0.7)  # hit
+    # 缓存未命中。
     c.get([{"role": "user", "content": "z"}], "m", 0.7)  # miss
     stats = c.stats
     assert stats["hits"] == 1

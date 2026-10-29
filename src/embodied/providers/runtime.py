@@ -1,3 +1,4 @@
+# 保留来源：移除 Redis 持久化，活动提供方仅在内存并由环境初始化；适配导入，注册表、档位与切换逻辑不变。
 # Ported from car-agent llm-gateway/llm_runtime.py @ f0b08f8, changes: Redis persistence stripped
 # (_redis_client/_load_persisted/_persist_active removed — active selection is in-memory only,
 # initialized from env; dropped now-unused `import json`); imports adapted to embodied.providers.*;
@@ -35,6 +36,7 @@ from .llm import (
 
 logger = logging.getLogger("llm.runtime")
 
+# Static provider specs allow environment overrides for endpoints and models.
 # provider id → 静态配置。endpoint/model 均 env 可覆盖（*_env 键）；key 见 _provider_key。
 _PROVIDER_SPECS: dict[str, dict] = {
     "mimo": {
@@ -54,6 +56,7 @@ _PROVIDER_SPECS: dict[str, dict] = {
         "models": [("MiniMax-M3", "MiniMax-M3")],
     },
     "deepseek": {
+        # Verified DeepSeek reasoning models use MiMo-style thinking controls; disable thinking for structured output and allow it for complex tasks.
         # DeepSeek v4-pro/flash 是推理模型（reasoning_content 占 completion 预算）——真栈探测确认它
         # 与 MiMo/MiniMax 同样认 thinking:{type:disabled}（reasoning_effort/enable_thinking 均无效），
         # 故 thinking_style=mimo：结构化任务关思考拿干净 content（不被 reasoning 饿空），复杂任务开。
@@ -95,7 +98,11 @@ def _norm_id(pid: str) -> str:
 
 
 def _provider_key(pid: str, spec: dict) -> str:
-    """取该 provider 的 key。qwen 复用现有百炼 key（DASHSCOPE_ASR_KEY / LLM_EMBED_API_KEY，同一 DashScope 账号）。"""
+    """取该 provider 的 key。qwen 复用现有百炼 key（DASHSCOPE_ASR_KEY / LLM_EMBED_API_KEY，同一 DashScope 账号）。
+
+    Resolve provider credentials, reusing existing DashScope credentials for Qwen.
+    """
+    # Vision uses the same DashScope account credentials.
     if pid in ("qwen", "qwen-vl"):      # 同一个 DashScope 账号，视觉档不另配 key
         return (os.getenv("DASHSCOPE_LLM_KEY") or os.getenv("DASHSCOPE_ASR_KEY")
                 or os.getenv("LLM_EMBED_API_KEY", ""))
@@ -113,10 +120,12 @@ def _build_embed_provider() -> BaseProvider:
     的兜底，见 llm.MockProvider._mock_embed_one）。"""
     key = os.getenv("LLM_EMBED_API_KEY", "")
     if not key:
+        # Strict mode forbids mock embeddings that could otherwise match storage dimensions and contaminate retrieval.
         # 严格栈禁 embed mock：伪向量在 EMBED_DIM=384 时会撞维度混进召回（治理文档 §7 边缘）
         _strict_mock_gate("embed", "LLM_EMBED_API_KEY 未配置")
         return MockProvider()
     return OpenAICompatibleProvider(
+        # Only embedding settings are used; the chat endpoint is irrelevant here.
         key, base_url="",  # chat 端点不用，仅用 embed_*
         embed_url=os.getenv("LLM_EMBED_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings"),
         embed_model=os.getenv("LLM_EMBED_MODEL", "text-embedding-v4"),
@@ -128,15 +137,19 @@ def _build_embed_provider() -> BaseProvider:
 
 class LLMRuntime:
     def __init__(self):
+        # 提供方标识映射实例与配置。
         self._registry: dict[str, tuple[BaseProvider, dict]] = {}  # id -> (provider, cfg)
+        # List all entries, including unconfigured disabled ones, for the control UI.
         self._catalog: list[dict] = []      # 全部（含未配置置灰），供控制面列表
         self._active_id = "mock"
+        # Empty selection uses the active provider's primary model.
         self._active_model = ""             # 空 = 用 active 的 primary
         self._embed: BaseProvider = MockProvider()
         self._build()
 
     def _build(self):
         legacy = _norm_id(os.getenv("LLM_PROVIDER", "mimo"))
+        # Legacy Anthropic configuration treats the shared key as Anthropic and skips MiMo registration.
         # legacy anthropic 特例：LLM_API_KEY 是 anthropic key（非 mimo）——注册 anthropic、跳过 mimo。
         anthropic_key = os.getenv("LLM_API_KEY", "") if legacy == "anthropic" else ""
 
@@ -150,8 +163,10 @@ class LLMRuntime:
             cfg = {
                 "id": pid, "label": spec["label"], "available": bool(key),
                 "primary": primary, "fast": fast,
+                # Internal providers are request-pin only and excluded from the conversational provider switcher.
                 # internal=True 的档只供请求级 pin（如视觉），不进「AI 大脑」切换列表
                 "internal": bool(spec.get("internal")),
+                # Declare unsupported tool calling in provider specs to skip repeated failing upstream requests; adding a provider must not require branching core logic.
                 # M-D：**这一档支不支持 tool calling**。缺省 True（既有全部档位都支持，
                 # 保持零行为变化）；声明 False 的档，网关直接走纯文本、planner 也不
                 # 再试 toolcall——此前不支持的 provider 每轮要白打 2 次上游
@@ -164,6 +179,7 @@ class LLMRuntime:
             if key:
                 provider = OpenAICompatibleProvider(
                     key, base_url=base_url, auth_style=spec["auth_style"],
+                    # Thinking is globally off by default and can be enabled per complex request.
                     disable_thinking=True,  # 全局默认关；复杂任务经 meta thinking=on 动态开
                     token_param=spec["token_param"], thinking_style=spec["thinking_style"])
                 self._registry[pid] = (provider, cfg)
@@ -182,6 +198,7 @@ class LLMRuntime:
         elif self._registry:
             self._active_id = next(iter(self._registry))
         else:
+            # Strict mode prevents mock from becoming the active conversational provider.
             # 严格栈禁 mock 成为 active（LLM mock 话术最具欺骗性）
             _strict_mock_gate("llm", "无任何已配置的 chat 厂商 key")
             cfg = {"id": "mock", "label": "Mock（未配置 key）", "available": True,
@@ -195,6 +212,7 @@ class LLMRuntime:
         print(f"[llm-gateway] LLM runtime active={self._active_id} "
               f"available={[c['id'] for c in self._catalog if c['available']]}", flush=True)
 
+    # Serving interface.
     # ── 服务面 ──
     @property
     def active_id(self) -> str:
@@ -210,18 +228,27 @@ class LLMRuntime:
         return self._embed
 
     def resolve_models(self, requested: str) -> list[str]:
-        """档位/具体模型 → 待尝试模型列表（含降级）。见模块 docstring。"""
+        """档位/具体模型 → 待尝试模型列表（含降级）。见模块 docstring。
+
+        Resolve a tier or concrete model into an ordered fallback list.
+        """
         return self.resolve_models_for(self._active_id, requested)
 
     def provider_entry(self, pid: str):
-        """注册表查询（含别名归一）。返回 (norm_pid, provider) 或 None——供请求级 pin（D2）。"""
+        """注册表查询（含别名归一）。返回 (norm_pid, provider) 或 None——供请求级 pin（D2）。
+
+        Normalize aliases and query registered providers for request-level pinning.
+        """
         norm = _norm_id(pid)
         entry = self._registry.get(norm)
         return (norm, entry[0]) if entry else None
 
     def resolve_models_for(self, pid: str, requested: str, model_override: str = "") -> list[str]:
         """档位解析（指定 provider 版，运行时硬化 D2）。pid 须已在注册表（调用方先
-        fail-closed）；model_override=meta.llm_model，须在该厂商词表内否则忽略。"""
+        fail-closed）；model_override=meta.llm_model，须在该厂商词表内否则忽略。
+
+        Resolve tiers within a registered provider; ignore concrete model overrides outside its catalog.
+        """
         norm = _norm_id(pid)
         cfg = self._registry[norm][1]
         known = {m["id"] for m in cfg["models"]}
@@ -235,16 +262,22 @@ class LLMRuntime:
         elif r in ("@fast", "@fallback"):
             chosen = fast
         else:
+            # Unknown concrete models fall back to primary.
             chosen = r if r in known else primary  # 不认识的具体模型名 → 回落 primary
         out = [chosen]
         if fast and fast != chosen:
+            # Fallback from primary to fast after failure.
             out.append(fast)          # 降级链：primary 失败退 fast
         return out or ["mock"]
 
     def cache_scope(self) -> str:
-        """缓存命名空间：并入 active provider + 具体模型，避免切换后串味。"""
+        """缓存命名空间：并入 active provider + 具体模型，避免切换后串味。
+
+        Namespace cache entries by active provider and concrete model.
+        """
         return f"{self._active_id}:{self._active_model or self.active_config()['primary']}"
 
+    # Control interface.
     # ── 控制面 ──
     def set_active(self, provider: str, model: str = "") -> dict:
         pid = _norm_id(provider)
@@ -261,31 +294,43 @@ class LLMRuntime:
         零行为变化；只有在 `_PROVIDER_SPECS` 里显式声明 False 的档才短路。
 
         **每次请求现读**：provider 可热切，缓存下来就会在切换后沿用旧能力。
+        
+
+        Read tool-calling capability on every request because providers can switch; default true preserves existing behavior, explicit false short-circuits unsupported calls.
         """
         pid = (provider_id or self.active_id or "").strip().lower()
         for cfg in self._catalog:
             if cfg.get("id") == pid:
                 return bool(cfg.get("supports_toolcall", True))
+        # Unknown tier capabilities do not preemptively reject; use the existing fallback path.
         return True                     # 不认识的档不定罪：照旧尝试，失败走既有降级
 
     def status(self) -> dict:
         return {
             "active": {"provider": self._active_id,
                        "model": self._active_model or self.active_config()["primary"]},
+            # Internal vision providers are not conversational switch targets; inspect their availability separately.
             # internal 档（视觉）不出现在切换入口：它不是聊天大脑，切过去会让整条对话链路失聪。
             # 需要看它可用性的地方走 provider_available()。
             "providers": [dict(c) for c in self._catalog if not c.get("internal")],
+            # Availability means credentials exist; passive health reflects recent actual responses.
             # 被动健康（D5）：available=配了 key，health=最近真的答得上来（滚动窗口）
             "health": health_tracker.snapshot(),
         }
 
     def provider_available(self, pid: str) -> bool:
-        """含 internal 档的可用性查询（切换列表看不到它们，但 pin 得到）。"""
+        """含 internal 档的可用性查询（切换列表看不到它们，但 pin 得到）。
+
+        Query availability including internal-only providers that can be pinned.
+        """
         return _norm_id(pid) in self._registry
 
     async def probe(self, provider: str = "") -> dict:
         """按需体检（D5）：对指定（缺省=active）provider 的 primary 模型发一条小请求。
-        不改 active、不进缓存；结果记入 health。演示前手检用——刻意无周期探活。"""
+        不改 active、不进缓存；结果记入 health。演示前手检用——刻意无周期探活。
+
+        Run a small on-demand health probe without changing active selection or cache; record health and avoid periodic paid traffic.
+        """
         pid = _norm_id(provider) or self._active_id
         if pid not in self._registry:
             return {"ok": False, "provider": pid, "error": "provider 未配置或不可用"}

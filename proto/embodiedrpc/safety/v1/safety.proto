@@ -4,14 +4,18 @@ package embodied.safety.v1;
 
 import "embodiedrpc/common/v1/common.proto";
 
+// 确定性监督器在运动前校验、运动中监督活性，不依赖 AI 输出正确性。
 // safety-guardian (SG-2): deterministic supervisor, docs/architecture.md §4.5.
 // Validates intent BEFORE motion, watches liveness DURING motion.
 // It must never depend on any AI output being correct.
 service SafetyService {
+  // 运动前门禁契约覆盖围栏、速度与来源限制；强制能力以实际实现为准。
   // Pre-motion gate: workspace fence / velocity limits / command whitelist.
   rpc ValidateCommand(ValidateRequest) returns (ValidateReply);
+  // 双向活性监督，任一侧心跳丢失导致控制器停止。
   // Bidirectional liveness: lost heartbeat on either side → controller halts.
   rpc Heartbeat(stream HeartbeatPing) returns (stream HeartbeatPong);
+  // 软件急停；物理硬件急停保持独立。
   // Software e-stop (SG-0 hardware e-stop stays physical and independent).
   rpc EStop(EStopRequest) returns (EStopReply);
 }
@@ -25,7 +29,7 @@ message ValidateRequest {
 
 message ValidateReply {
   bool allowed = 1;
-  string reason = 2; // populated when denied: fence / velocity / whitelist / ...
+  string reason = 2; // 拒绝时填写围栏、速度或白名单等原因 / populated when denied: fence / velocity / whitelist / ...
 }
 
 message HeartbeatPing {

@@ -3,6 +3,9 @@
 Runs as a background task for the whole agent session. If this process dies or freezes,
 the guardian halts the control process — that is the point; there is deliberately no
 "pause heartbeats" API.
+
+
+Agent 会话后台持续发送心跳；进程死亡或冻结会触发 Guardian 停止控制，故不提供暂停心跳接口。
 """
 
 from __future__ import annotations

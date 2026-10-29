@@ -4,6 +4,9 @@ Two invariants are pinned by contract tests and must never regress:
 1. Adding a skill = register(manifest, handler); the core is never edited for it.
 2. require_confirm skills cannot execute without confirmed=True — the gate lives HERE,
    below the planner, so a planner bug cannot bypass it (SG-3, docs/architecture.md §4.5).
+
+
+Registry 保证新增技能只注册即可扩展，并在规划器下方强制危险技能确认；两项契约不可回退。
 """
 
 from __future__ import annotations
@@ -103,9 +106,11 @@ class SkillRegistry:
             return task.result()
         except SkillError:
             raise
+        # handler 异常视为操作失败，不使系统崩溃。
         except Exception as e:  # handler faults are operational failures, not crashes
             return SkillResult(ok=False, detail=f"{type(e).__name__}: {e}")
         finally:
+            # 先撤销许可再取消协程，因为线程任务可能仍在运行。
             # Revoke BEFORE coroutine cancellation; to_thread work may continue running.
             permit.revoke()
             CURRENT_INVOCATION.reset(binding)
@@ -117,6 +122,7 @@ class SkillRegistry:
     def _retired(self, task: asyncio.Task) -> None:
         self._retiring.discard(task)
         if not task.cancelled():
+            # 消费迟到异常，不恢复调用权限。
             task.exception()  # consume late handler faults without reviving the invocation
 
     @staticmethod

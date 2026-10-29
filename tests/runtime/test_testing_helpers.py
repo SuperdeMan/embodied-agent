@@ -1,5 +1,9 @@
+# 为移植的通用断言辅助增加直接测试，上游没有对应覆盖。
 # Fresh tests for embodied.runtime.testing (the origin agents/_sdk/testing.py shipped without direct tests; ported helpers get coverage here).
-"""testing helpers：manifest / result 形状断言（鸭子类型）。"""
+"""testing helpers：manifest / result 形状断言（鸭子类型）。
+
+Duck-typed manifest and result assertion helpers.
+"""
 from types import SimpleNamespace
 
 import pytest

@@ -2,6 +2,9 @@
 
 M1 shipped the episode recorder/loader; M2 adds scripted-expert collection and the
 LeRobot conversion path (docs/decisions.md D003, D012, D014).
+
+
+数据引擎连接录制、转换、训练和评测；M1 提供记录器，M2 增加专家采集与 LeRobot 转换。
 """
 
 from embodied.data_engine.collect import COLLECTOR_ID, CollectReport, collect_episodes

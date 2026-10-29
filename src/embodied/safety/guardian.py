@@ -8,6 +8,9 @@ realtime-control over SupervisorLink. Consequences (all fail-closed):
                                           keeps retrying so recovery is automatic
 ValidateCommand offers pre-motion geometric checks against the static fence config —
 independent of the in-driver Guard (defense in depth, not a replacement).
+
+
+Guardian 独立监督 Agent 心跳并连接控制进程；Agent 失联发停机，Guardian 死亡使控制闩锁，控制暂不可达时持续重连。静态几何预检是驱动 Guard 之外的纵深防线。
 """
 
 from __future__ import annotations
@@ -41,7 +44,10 @@ class GuardianState:
         """Single decision point, polled by the watchdog loop. Enforcement lives THERE and
         not in stream teardown: gRPC cancels the Heartbeat servicer coroutine when the
         client drops, so an `await send_halt()` in its finally block dies mid-flight —
-        the halt would be logged but never delivered (caught by the split contract test)."""
+        the halt would be logged but never delivered (caught by the split contract test).
+
+        停止决策由看门狗轮询执行；流清理协程可能已被取消，不能在 finally 中等待发送停机，否则可能只记日志而未送达。
+        """
         if self.halt_sent:
             return False, ""
         if self.agent_connected and (time.monotonic() - self.last_agent_beat) >= AGENT_STALE_S:
@@ -91,6 +97,7 @@ def build_servicer(state: GuardianState):
             state.agent_connected = True
             state.ever_connected = True
             state.last_agent_beat = time.monotonic()
+            # 活跃 Agent 开启新的监督窗口。
             state.halt_sent = False  # a live agent starts a fresh accountability window
             logger.info("agent heartbeat up")
             try:
@@ -98,6 +105,7 @@ def build_servicer(state: GuardianState):
                     state.last_agent_beat = time.monotonic()
                     yield s_pb2.HeartbeatPong(stamp=common.Timestamp(unix_ms=int(time.time() * 1000)))
             finally:
+                # 被取消的协程仅修改标志，停机发送交给看门狗。
                 # Flags only — no awaits here (this coroutine is being cancelled);
                 # the watchdog loop delivers the halt.
                 state.agent_connected = False
@@ -112,7 +120,10 @@ def build_servicer(state: GuardianState):
 
 async def agent_watchdog_loop(state: GuardianState, interval_s: float = 0.2) -> None:
     """Sole halt enforcement point: frozen agent (stream up, pings stopped) AND dropped
-    agent (stream down). Failed delivery retries next tick — control may blip."""
+    agent (stream down). Failed delivery retries next tick — control may blip.
+
+    看门狗是唯一发送停机命令的执法点，覆盖断流和冻结；发送失败下周期重试。
+    """
     while True:
         need, reason = state.should_halt()
         if need:
@@ -121,7 +132,10 @@ async def agent_watchdog_loop(state: GuardianState, interval_s: float = 0.2) -> 
 
 
 async def supervisor_link_loop(state: GuardianState) -> None:
-    """Hold SupervisorLink open to control; reconnect forever (control halts while we're gone)."""
+    """Hold SupervisorLink open to control; reconnect forever (control halts while we're gone).
+
+    持续维持监督链，断开时控制闩锁并不断重连。
+    """
     pb2, pb2_grpc = import_control()
     common = import_common()
     while True:

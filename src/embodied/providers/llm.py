@@ -1,3 +1,4 @@
+# 保留来源；仅移植 LLM 部分并去掉未使用导入，音频独立，逻辑保持。
 # Ported from car-agent llm-gateway/providers.py @ f0b08f8, changes: LLM section only (lines 1-553;
 # ASR/TTS/S2S providers dropped, out of scope for M1); removed unused `import re`. Logic unchanged.
 """LLM Provider 抽象与实现。**更换服务商优先改 env，无需改代码**。
@@ -20,11 +21,14 @@ import httpx
 
 logger = logging.getLogger("llm.providers")
 
+# Reuse outbound HTTP pools and bounded timeouts to avoid repeated TLS handshakes.
 # ── 出站 HTTP 连接池 + 超时（复用连接，免去每调用新建 client 的 TLS 握手开销）──
 _HTTP_LIMITS = httpx.Limits(max_connections=32, max_keepalive_connections=16,
                             keepalive_expiry=30.0)
 _HTTP_CONNECT_S = float(os.getenv("LLM_HTTP_CONNECT_S", "5") or 5)
+# Fallback upper bound for nonstreaming completion.
 _HTTP_READ_CAP_S = float(os.getenv("LLM_HTTP_READ_CAP_S", "75") or 75)   # complete 兜底上限
+# Maximum silence between streaming chunks.
 _STREAM_STALL_S = float(os.getenv("LLM_STREAM_STALL_S", "30") or 30)     # 流式 per-chunk 静默上限
 _EMBED_READ_CAP_S = float(os.getenv("LLM_EMBED_READ_CAP_S", "25") or 25)
 
@@ -32,7 +36,10 @@ _EMBED_READ_CAP_S = float(os.getenv("LLM_EMBED_READ_CAP_S", "25") or 25)
 def _read_budget(budget_s, cap_s: float) -> float:
     """上游 read 超时：有调用方 deadline（gRPC context.time_remaining）时取其 90% 收进
     窗口内——网关先于调用方失败、返回干净错误，而非被调用方中途取消（"无响应"）；
-    无 deadline 时用 cap 兜底。"""
+    无 deadline 时用 cap 兜底。
+
+    Bound upstream read timeout to 90 percent of the caller deadline so a clean error returns before cancellation; otherwise use the configured cap.
+    """
     try:
         b = float(budget_s) if budget_s is not None else 0.0
     except (TypeError, ValueError):
@@ -49,7 +56,10 @@ def _http_timeout(budget_s, read_cap: float) -> httpx.Timeout:
 
 def _strict_mock_gate(domain: str, why: str) -> None:
     """严格栈（REQUIRE_REAL_PROVIDERS=on，治理 P2）：mock 决议直接拒绝启动。
-    豁免 REQUIRE_REAL_EXEMPT。"""
+    豁免 REQUIRE_REAL_EXEMPT。
+
+    Strict real-provider mode rejects mock startup unless explicitly exempted.
+    """
     if os.getenv("REQUIRE_REAL_PROVIDERS", "off").strip().lower() not in ("on", "true", "1", "yes"):
         return
     exempt = {d.strip() for d in
@@ -64,7 +74,10 @@ def _strict_mock_gate(domain: str, why: str) -> None:
 class ProviderHTTPError(RuntimeError):
     """上游 HTTP 错误：状态码 + Retry-After 结构化（运行时硬化 D3，网关按语义分类映射——
     429→RESOURCE_EXHAUSTED、请求性 4xx→INVALID_ARGUMENT）；消息保持
-    `provider HTTP <code>: <body片段>` 格式，日志/obs.llm error 可诊断口径不变。"""
+    `provider HTTP <code>: <body片段>` 格式，日志/obs.llm error 可诊断口径不变。
+
+    Preserve HTTP status, Retry-After and a bounded response excerpt for structured error classification and diagnosis.
+    """
 
     def __init__(self, status_code: int, snippet: str, retry_after: float | None = None):
         super().__init__(f"provider HTTP {status_code}: {snippet}")
@@ -74,7 +87,10 @@ class ProviderHTTPError(RuntimeError):
 
 def _retry_after_s(resp) -> float | None:
     """解析 Retry-After 秒数（仅数字形式；HTTP-date 形式少见，按无处理）。
-    对无 headers 的测试桩防御（getattr）。"""
+    对无 headers 的测试桩防御（getattr）。
+
+    Parse numeric Retry-After values, ignore HTTP dates and tolerate test responses without headers.
+    """
     headers = getattr(resp, "headers", None) or {}
     v = (headers.get("retry-after") or "").strip()
     if not v:
@@ -93,6 +109,9 @@ def normalize_tool_calls(raw_calls) -> list[dict]:
     **丢弃该条**（warning 计数），刻意不做字符串抢救：tool-calling 的价值就是服务端
     约束，畸形=协议失败，诚实回退让调用方走 JSON 抢救/重试路径（RFC §8-3）。
     个别服务商直接给 object 的宽容接收。
+    
+
+    Normalize tool calls to object arguments. Drop malformed arguments rather than inventing repairs; callers may then use their explicit JSON recovery path. Direct object arguments are accepted.
     """
     out = []
     for tc in raw_calls or []:
@@ -124,6 +143,9 @@ class BaseProvider:
 
         thinking: None=用服务商默认（env LLM_DISABLE_THINKING）；True=本次开思考；
         False=本次关思考。复杂任务（行程/调研）由编排层经 meta 动态传 True。
+        
+
+        Return content, actual model, finish reason and usage; thinking is a per-call override, with None preserving provider defaults.
         """
         raise NotImplementedError
 
@@ -136,6 +158,9 @@ class BaseProvider:
         默认实现回落纯文本 ``complete`` + 空 tool_calls（Mock/未覆盖 provider fail-open：
         调用方按无工具调用处理，走既有 JSON 抢救/回退路径）。刻意不改 ``complete``
         四元组契约——仓内 fake/测试按其实现，独立方法存量零波及（RFC §8-1）。
+        
+
+        Tool completion adds normalized tool calls without changing the legacy four-field completion contract. The default delegates to text completion with no tool calls.
         """
         content, used, finish, usage = await self.complete(
             messages, model, temperature, max_tokens, thinking=thinking, timeout_s=timeout_s)
@@ -146,23 +171,34 @@ class BaseProvider:
         yield  # pragma: no cover
 
     async def embed(self, texts, model="", timeout_s=None):
-        """returns list[list[float]]（与 texts 一一对应）。默认未实现，由子类提供。"""
+        """returns list[list[float]]（与 texts 一一对应）。默认未实现，由子类提供。
+
+        Return one vector per input text; subclasses implement embeddings.
+        """
         raise NotImplementedError
 
 
+# Match the configured 384-dimensional embedding storage contract.
 _EMBED_DIM = 384  # 与 memory.memory_item.embedding vector(384) 对齐
 
 
 def _mock_embed_one(text: str) -> list[float]:
-    """确定性伪向量（非语义，仅供无 key/降级时打通 pgvector 链路与测试）。"""
+    """确定性伪向量（非语义，仅供无 key/降级时打通 pgvector 链路与测试）。
+
+    Deterministic nonsemantic vectors support offline plumbing and tests only.
+    """
     import hashlib
     h = hashlib.sha256((text or "").encode()).digest()
     return [(h[i % len(h)] / 128.0) - 1.0 for i in range(_EMBED_DIM)]
 
 
 class MockProvider(BaseProvider):
-    """无 API key 时的兜底，保证 PoC 可离线端到端跑通。"""
+    """无 API key 时的兜底，保证 PoC 可离线端到端跑通。
+
+    Missing-key fallback keeps the prototype runnable offline.
+    """
     async def complete(self, messages, model, temperature, max_tokens, thinking=None, timeout_s=None):
+        # Read mock delay at call time for deterministic timeout injection; default zero preserves behavior and streaming reuses the same hook.
         # T3.5 e2e_degrade.py 测试钩子：LLM_MOCK_DELAY_MS（默认 "0"，零行为变化）。调用时
         # （非构造时）读 env，供测试注入人为延迟，确定性触发 executor 层 step_timeout，
         # 刻画"LLM 超时"降级行为。stream() 内部调用本方法，无需重复加。
@@ -208,7 +244,10 @@ class AnthropicProvider(BaseProvider):
         """OpenAI 线格式 → Anthropic 专有形状（转换放最少数一侧，RFC §8-2）。
         tools: [{"type":"function","function":{name,description,parameters}}] →
         [{name, description, input_schema}]；tool_choice named→{"type":"tool"}、
-        "required"→{"type":"any"}、"none"→{"type":"none"}、其余缺省 auto。"""
+        "required"→{"type":"any"}、"none"→{"type":"none"}、其余缺省 auto。
+
+        Translate OpenAI function tools and tool choice into Anthropic input schemas and corresponding tool/any/none/auto choices.
+        """
         a_tools = []
         for t in tools or []:
             fn = (t or {}).get("function") or {}
@@ -242,6 +281,7 @@ class AnthropicProvider(BaseProvider):
             model=model, system=system, messages=msgs,
             temperature=temperature, max_tokens=max_tokens or 512, **kwargs)
         text = "".join(b.text for b in resp.content if b.type == "text")
+        # Anthropic tool input is already an object and can be normalized directly.
         # tool_use block 的 input 天生 object（与 OpenAI 的 JSON string 不同），直取归一化
         tool_calls = [
             {"id": getattr(b, "id", "") or "", "name": getattr(b, "name", "") or "",
@@ -260,6 +300,7 @@ class AnthropicProvider(BaseProvider):
                 yield text
 
 
+# Strip provider-inline reasoning at the common output boundary; internal reasoning must never reach planning, aggregation or user-facing callers.
 # ── 推理模型 <think> 内联剥离 ────────────────────────────────────────────────
 # MiniMax-M3 等推理模型**开思考**时把思考段内联在 content 头部（`<think>…</think>\n\n正文`），
 # 而非独立 reasoning_content 字段（后者 stream 分支早已丢弃）。真栈探针（2026-07-12，四家
@@ -272,7 +313,10 @@ _THINK_CLOSE = "</think>"
 def strip_think_block(text: str) -> str:
     """剥离**头部** <think>…</think> 块。只看头部（推理模型先思考后作答），正文中间出现的
     字面 <think> 不动（防误伤转述场景）。未闭合（被 max_tokens 截断在思考里）→ 无正文可用，
-    诚实返回空串（调用方按空响应既有兜底走重试/降级，绝不把半截思考当答案）。"""
+    诚实返回空串（调用方按空响应既有兜底走重试/降级，绝不把半截思考当答案）。
+
+    Strip only leading think blocks; preserve literal tags in the answer body. An unfinished leading block yields an empty answer rather than leaking partial reasoning.
+    """
     t = text or ""
     head = t.lstrip()
     if not head.startswith(_THINK_OPEN):
@@ -288,9 +332,13 @@ class ThinkStreamStripper:
 
     probe：缓冲首若干字符判定是否 `<think>` 前缀（判定窗 ≤ len("<think>")+前导空白，
     普通回复只延迟一个包级别）；drop：吞到 `</think>` 后把余下正文放流；pass：透传。
+    
+
+    Streaming think filtering buffers a possible prefix, drops through the closing tag, then passes content; chunk boundaries do not change semantics.
     """
 
     def __init__(self):
+        # 状态分别为探测前缀、丢弃思考和透传正文。
         self._mode = "probe"        # probe | drop | pass
         self._buf = ""
 
@@ -305,6 +353,7 @@ class ThinkStreamStripper:
             if probe.startswith(_THINK_OPEN):
                 self._mode = "drop"
             elif _THINK_OPEN.startswith(probe[:len(_THINK_OPEN)]):
+                # The buffer still matches a partial think prefix, so wait for more input.
                 return ""                       # 仍是 "<th" 类前缀，继续观望
             else:
                 self._mode = "pass"
@@ -322,7 +371,10 @@ class ThinkStreamStripper:
 
     def flush(self) -> str:
         """流结束收尾：probe 残留（极短回复恰似 "<th" 前缀）原样放出不丢字；
-        drop 未闭合＝整段思考被截断，丢弃（与 strip_think_block 一致）。"""
+        drop 未闭合＝整段思考被截断，丢弃（与 strip_think_block 一致）。
+
+        At stream end preserve an incomplete ordinary prefix, but discard an unfinished reasoning block.
+        """
         if self._mode == "probe":
             out, self._buf = self._buf, ""
             return out
@@ -338,6 +390,9 @@ class OpenAICompatibleProvider(BaseProvider):
     - LLM_DISABLE_THINKING：``true``（默认，MiMo 推理模型须关思考保结构化输出）| ``false``
 
     MiMo docs: https://platform.xiaomimimo.com/docs/zh-CN/quick-start/first-api-call
+    
+
+    OpenAI-compatible chat providers configure endpoint, authentication and thinking behavior through environment, allowing vendor changes without core edits.
     """
     _DEFAULT_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
 
@@ -350,6 +405,7 @@ class OpenAICompatibleProvider(BaseProvider):
         self.base_url = base_url or self._DEFAULT_BASE_URL
         self.auth_style = (auth_style or "api-key").lower()
         self.disable_thinking = disable_thinking
+        # Provider configuration selects token-limit field and thinking syntax: MiMo-style disabled object, Qwen boolean, or no thinking field.
         # per-provider 差异（多 LLM 源）：
         #   token_param   —— token 上限字段名：max_completion_tokens（MiMo/MiniMax）| max_tokens（DeepSeek/Qwen）
         #   thinking_style —— 关思考的方式：
@@ -358,6 +414,7 @@ class OpenAICompatibleProvider(BaseProvider):
         #     "none" → 不发任何思考键（DeepSeek 等默认非思考服务商）
         self.token_param = (token_param or "max_completion_tokens").strip()
         self.thinking_style = (thinking_style or "mimo").strip().lower()
+        # Embedding endpoint, credentials, dimensions and authentication are independent of chat, with explicit default fallbacks.
         # 向量化（embedding）端点/鉴权/维度独立于 chat——embedding 常用另一服务商（如百炼）。
         # 默认从 chat 端点推导；embed_api_key 缺省回退 chat key；auth 默认 bearer（OpenAI 风格）。
         self.embed_url = embed_url or self.base_url.replace("/chat/completions", "/embeddings")
@@ -365,6 +422,7 @@ class OpenAICompatibleProvider(BaseProvider):
         self.embed_api_key = embed_api_key or api_key
         self.embed_auth_style = (embed_auth_style or "bearer").lower()
         self.embed_dimensions = int(embed_dimensions or 0)
+        # Create the outbound pool lazily and bind it to the running loop.
         self._client: httpx.AsyncClient | None = None  # 复用的出站连接池（懒建，绑定运行 loop）
 
     def _get_client(self) -> httpx.AsyncClient:
@@ -384,17 +442,25 @@ class OpenAICompatibleProvider(BaseProvider):
         h = {"Content-Type": "application/json"}
         if self.auth_style == "bearer":
             h["Authorization"] = f"Bearer {self.api_key}"
+        # Default to MiMo-style thinking control.
         else:  # 默认 MiMo 风格
             h["api-key"] = self.api_key
         return h
 
     def _resolve_thinking(self, thinking) -> bool:
-        """本次调用是否关思考：thinking=None 用构造默认；True/False 覆盖本次。"""
+        """本次调用是否关思考：thinking=None 用构造默认；True/False 覆盖本次。
+
+        Resolve whether thinking is disabled from the per-call override or constructor default.
+        """
         return self.disable_thinking if thinking is None else (not thinking)
 
     def _build_body(self, messages, model, temperature, max_tokens, thinking, stream: bool) -> dict:
-        """按 per-provider 差异（token_param/thinking_style）构造 chat/completions 请求体。"""
+        """按 per-provider 差异（token_param/thinking_style）构造 chat/completions 请求体。
+
+        Build the request with provider-specific token and thinking fields.
+        """
         disable = self._resolve_thinking(thinking)
+        # Thinking consumes the token budget, so raise the minimum to 2048 to leave room for content.
         # 开思考时给足 token：reasoning 占预算，content 容易被饿空/截断；下限抬到 2048。
         max_out = (max_tokens or 512) if disable else max((max_tokens or 512), 2048)
         body = {
@@ -405,14 +471,17 @@ class OpenAICompatibleProvider(BaseProvider):
             "stream": stream,
         }
         if self.thinking_style == "mimo":
+            # Disable reasoning for structured tasks to avoid empty or truncated content; enabling thinking omits the disable field, while reasoning remains internal.
             # MiMo/MiniMax 等推理模型：默认把 token 预算几乎全花在 reasoning_content 上，导致
             # 结构化任务（Planner JSON、聚合改写、接地合成）的 content 被饿成空/截断——关思考拿干净、
             # 确定、低延迟 content。开思考时不发本键（回原生思考态），reasoning_content 留服务端不下发。
             if disable:
                 body["thinking"] = {"type": "disabled"}
         elif self.thinking_style == "qwen":
+            # Qwen compatibility mode controls thinking explicitly with enable_thinking.
             # DashScope 兼容模式 qwen3：思考经 enable_thinking 显式控制（结构化任务须置 false）。
             body["enable_thinking"] = not disable
+        # Providers using none receive no thinking field.
         # thinking_style == "none"（DeepSeek 等）：不发思考键，用服务商默认。
         return body
 
@@ -420,7 +489,10 @@ class OpenAICompatibleProvider(BaseProvider):
         """非流式 chat/completions POST + 错误结构化（complete/complete_tools 共用）。
         4xx/5xx 的真实拒因在响应体里（如 MiniMax 422 只有 body 说得清是参数还是内容问题），
         raise_for_status 的异常文本不含 body——截断入异常，网关日志/obs.llm error 直接可诊断
-        （badcase 6d29929e：422 秒拒两次，只留状态码，根因无从判定）。"""
+        （badcase 6d29929e：422 秒拒两次，只留状态码，根因无从判定）。
+
+        Shared nonstreaming request path preserves bounded error bodies because status codes alone cannot explain upstream rejection.
+        """
         resp = await self._get_client().post(
             self.base_url, headers=self._headers(), json=body,
             timeout=_http_timeout(timeout_s, _HTTP_READ_CAP_S))
@@ -448,7 +520,10 @@ class OpenAICompatibleProvider(BaseProvider):
 
         finish_reason 只透传不判断：qwen（DashScope 兼容模式）出 tool_calls 时
         finish_reason 仍是 "stop" 而非 "tool_calls"（2026-07-24 真栈探针实测，
-        其余三家标准）——是否工具调用一律按 tool_calls 置位判断，勿按 finish 分支。"""
+        其余三家标准）——是否工具调用一律按 tool_calls 置位判断，勿按 finish 分支。
+
+        Forward tool definitions, normalize returned arguments and keep content beside tool calls. Detect calls from the actual list, not finish_reason, since providers may return stop.
+        """
         if not tools:
             return await super().complete_tools(
                 messages, model, temperature, max_tokens,
@@ -471,12 +546,15 @@ class OpenAICompatibleProvider(BaseProvider):
 
     async def stream(self, messages, model, temperature, max_tokens, thinking=None, timeout_s=None):
         body = self._build_body(messages, model, temperature, max_tokens, thinking, stream=True)
+        # Use read timeout as per-chunk stall detection so an unresponsive upstream cannot hang the whole chain.
         # 流式：read 超时作 per-chunk stall 检测（无新 chunk 超时即中止），不让上游卡死吊死整链。
         stall = _read_budget(timeout_s, _STREAM_STALL_S)
+        # Strip leading inline think content.
         stripper = ThinkStreamStripper()   # 头部 <think> 内联剥离（MiniMax 开思考泄漏，见下方注释）
         async with self._get_client().stream(
                 "POST", self.base_url, headers=self._headers(), json=body,
                 timeout=httpx.Timeout(stall, connect=_HTTP_CONNECT_S, pool=5.0)) as resp:
+            # Include the bounded response body in errors for diagnosis.
             if resp.status_code >= 400:   # 同 complete()：把响应体带进异常，拒因可诊断
                 raw = await resp.aread()
                 snippet = raw[:300].decode("utf-8", "replace").replace("\n", " ")
@@ -490,6 +568,7 @@ class OpenAICompatibleProvider(BaseProvider):
                 try:
                     chunk = json.loads(payload)
                     delta = chunk["choices"][0].get("delta", {})
+                    # Forward content only; deliberately discard reasoning deltas.
                     # 只取 content；reasoning_content（思考增量）刻意丢弃，不下发给用户。
                     text = delta.get("content", "")
                     if text:
@@ -503,9 +582,13 @@ class OpenAICompatibleProvider(BaseProvider):
             yield tail
 
     async def embed(self, texts, model="", timeout_s=None):
-        """OpenAI 兼容 /embeddings（百炼 text-embedding-v4 等）。返回 list[list[float]]。"""
+        """OpenAI 兼容 /embeddings（百炼 text-embedding-v4 等）。返回 list[list[float]]。
+
+        Compatible embeddings endpoint returns a list of float vectors.
+        """
         body = {"model": model or self.embed_model or "text-embedding-v4",
                 "input": list(texts)}
+        # Requested embedding dimensions must match the storage configuration.
         if self.embed_dimensions:  # v3/v4 支持指定输出维度（须与 memory EMBED_DIM 一致）
             body["dimensions"] = self.embed_dimensions
             body["encoding_format"] = "float"
@@ -518,6 +601,7 @@ class OpenAICompatibleProvider(BaseProvider):
         return [list(d["embedding"]) for d in items]
 
 
+# Preserve the historical provider class alias.
 # 向后兼容别名（历史代码/测试可能引用 MiMoProvider）
 MiMoProvider = OpenAICompatibleProvider
 
@@ -529,6 +613,9 @@ def build_provider() -> BaseProvider:
       qwen/自建…）一律走 OpenAI 兼容 HTTP provider，端点/鉴权/思考开关见下。
     - LLM_API_KEY / LLM_BASE_URL / LLM_AUTH_STYLE / LLM_DISABLE_THINKING
     无 key → MockProvider（PoC 可离线跑通）。
+    
+
+    Build Anthropic through its SDK or other vendors through the compatible HTTP adapter; missing keys select mock unless strict mode rejects it.
     """
     provider = os.getenv("LLM_PROVIDER", "xiaomimimo").lower()
     api_key = os.getenv("LLM_API_KEY", "")
@@ -540,6 +627,7 @@ def build_provider() -> BaseProvider:
     if provider == "anthropic":
         return AnthropicProvider(api_key)
 
+    # Other vendors use the configurable OpenAI-compatible endpoint and authentication path.
     # 其余一律 OpenAI 兼容：端点/鉴权/思考开关经 env 注入，新增服务商无需改代码
     return OpenAICompatibleProvider(
         api_key,

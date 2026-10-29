@@ -1,4 +1,7 @@
-"""Scripted-expert collection — hermetic (fake sim, real registry, tmp dirs)."""
+"""Scripted-expert collection — hermetic (fake sim, real registry, tmp dirs).
+
+模拟仿真、真实注册表与临时目录上的隔离专家采集测试。
+"""
 
 from __future__ import annotations
 
@@ -20,7 +23,10 @@ def obs(t: float, cube=(0.16, -0.18, 0.02)) -> Observation:
 
 
 class FakeSim:
-    """Sim time advances on every read() so boundary sim_t values are distinguishable."""
+    """Sim time advances on every read() so boundary sim_t values are distinguishable.
+
+    每次读取推进仿真时间，使技能边界可区分。
+    """
 
     def __init__(self):
         self.t = 0.0
@@ -84,6 +90,7 @@ async def test_happy_path_records_boundaries_and_judges(tmp_path):
         ("skill_start", "skill.fake.pick"), ("skill_end", "skill.fake.pick"),
         ("skill_start", "skill.fake.place"), ("skill_end", "skill.fake.place"),
     ]
+    # 仿真时间提升为事件顶层字段，边界间严格递增。
     # sim_t is promoted to the top level and strictly increases across boundaries
     sim_ts = [e["sim_t"] for e in events]
     assert all(isinstance(t, float) for t in sim_ts)
@@ -106,10 +113,12 @@ async def test_failed_skill_aborts_sequence_but_keeps_episode(tmp_path):
         skill_sequence=(("skill.fake.pick", {}), ("skill.fake.place", {})),
         judge=lambda snap: True, root=tmp_path, progress=lambda s: None,
     )
+    # 抓取失败后不调用放置。
     assert calls == ["skill.fake.pick"]  # place never invoked after pick failed
     ep = report.episodes[0]
     assert ep["success"] is False and "skill.fake.pick" in ep["detail"]
     meta = read_meta(ep["path"])
+    # 保留并标记失败，而非丢弃记录。
     assert meta["success"] is False and meta["aborted"] is False  # kept, labeled, not aborted
     end = [e for e in read_events(ep["path"]) if e["kind"] == "skill_end"]
     assert len(end) == 1 and end[0]["payload"]["ok"] is False
@@ -118,6 +127,7 @@ async def test_failed_skill_aborts_sequence_but_keeps_episode(tmp_path):
 async def test_judge_overrules_skill_self_report(tmp_path):
     calls: list[str] = []
     registry = SkillRegistry()
+    # 技能报告调用成功。
     registry.register(*make_skill("skill.fake.pick", calls))  # reports ok=True
     report = await collect_episodes(
         FakeSim(), registry, episodes=1, command="c",
@@ -138,6 +148,7 @@ async def test_hooks_detached_after_each_episode(tmp_path):
         skill_sequence=(("skill.fake.pick", {}),),
         judge=lambda snap: True, root=tmp_path, progress=lambda s: None,
     )
+    # 逐局挂接和解除，解除必须清空两个钩子。
     # attach, detach, attach, detach — and every detach clears both hooks
     assert len(sim.hooks) == 4
     assert sim.hooks[1] == (None, None) and sim.hooks[3] == (None, None)

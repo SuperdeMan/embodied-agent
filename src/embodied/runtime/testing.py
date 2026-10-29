@@ -1,3 +1,4 @@
+# 保留来源，保留通用鸭子类型断言，删除依赖未移植服务端上下文的测试运行辅助。
 # Ported from car-agent agents/_sdk/testing.py @ f0b08f8, changes: kept the generic duck-typed assert helpers (assert_manifest_consistent / assert_result_valid); dropped agent-server-bound make_context / run_handle / run_handle_stream (they require the gRPC agent SDK's Context/IntentView types, not ported).
 """契约测试夹具：不起服务进程，直接对 manifest / result 形状做黄金用例断言。
 
@@ -9,12 +10,18 @@
         assert assert_manifest_consistent(MySkill()) is True
 
 两个 helper 都是鸭子类型：只要求对象带同名属性，不绑定具体 manifest/result 类。
+
+
+Offline contract helpers validate manifest and result shapes without service processes; they use duck typing rather than concrete classes.
 """
 from __future__ import annotations
 
 
 def assert_manifest_consistent(agent) -> bool:
-    """校验 manifest 一致性：agent_id 存在、有 capabilities、category 合法。"""
+    """校验 manifest 一致性：agent_id 存在、有 capabilities、category 合法。
+
+    Validate identity, capabilities and category consistency.
+    """
     m = agent.manifest
     assert m.agent_id, "manifest.agent_id is empty"
     assert m.version, f"{m.agent_id}: manifest.version is empty"
@@ -30,7 +37,10 @@ def assert_manifest_consistent(agent) -> bool:
 
 
 def assert_result_valid(res, expected_status: str | None = None):
-    """校验 result 结构合法性（speech 非空、status 匹配、action 带 type）。"""
+    """校验 result 结构合法性（speech 非空、status 匹配、action 带 type）。
+
+    Validate speech, status and typed action structure.
+    """
     assert res.speech, "speech is empty"
     if expected_status:
         assert res.status == expected_status, f"status={res.status}, expected={expected_status}"

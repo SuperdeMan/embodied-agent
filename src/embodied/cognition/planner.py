@@ -10,6 +10,9 @@ text mode, with the two safety behaviors that must exist from day one:
 Tool results are fed back as one plain user message rather than provider-native
 tool-role messages, so the loop works with every BaseProvider implementation
 regardless of multi-round tool support; M1's engine port upgrades this.
+
+
+M0 最小认知工具循环验证文本到技能契约：危险动作明确确认，模型必须依据工具结果汇报。结果作为普通用户消息反馈以兼容各提供方；完整 DAG 路径由 M1 引擎承担。
 """
 
 from __future__ import annotations
@@ -33,7 +36,9 @@ SYSTEM_PROMPT = (
 class SkillCallRecord:
     skill: str
     params: dict[str, Any]
+    # 空值表示未执行。
     result: SkillResult | None  # None → not executed (see note)
+    # 技能不存在、拒绝或运行错误原因。
     note: str = ""  # not_found / denied:* / error:*
 
 
@@ -45,10 +50,13 @@ class PlannerTurn:
 
 @dataclass
 class PlannerConfig:
+    # 空模型名由提供方解析默认模型。
     model: str = ""  # "" → provider-side default model resolution
     temperature: float = 0.2
     max_tokens: int = 1024
+    # 每轮模型调用次数有上界。
     max_rounds: int = 4  # LLM calls per user turn (bounded loop, car-agent LoopController spirit)
+    # 每轮技能调用次数。
     max_calls: int = 8  # skill invocations per user turn
 
 
@@ -64,6 +72,7 @@ class TextPlanner:
         self.registry = registry
         self.config = config or PlannerConfig()
         self._confirm = confirm
+        # 仅使用普通用户和助手消息。
         self.history: list[dict[str, str]] = []  # plain user/assistant messages only
 
     async def turn(self, user_text: str) -> PlannerTurn:
@@ -129,6 +138,7 @@ class TextPlanner:
         try:
             result = await self.registry.invoke(skill, args, confirmed=confirmed)
         except ConfirmationRequired:
+            # 正常流程不可达的兜底分支；真正确认门仍在 Registry。
             # unreachable when the flow above is intact; kept as belt-and-braces (SG-3 gate is in the registry)
             return SkillCallRecord(skill=skill, params=args, result=None, note="denied:registry")
         except Exception as e:

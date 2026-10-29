@@ -1,10 +1,17 @@
+# 保留来源，测试独立过滤器，状态范围改为机器人字段，并补视觉范围覆盖。
 # Ported from car-agent orchestrator/cloud/tests/test_context_scopes.py @ f0b08f8, changes: dispatcher passthrough test dropped (dispatcher not ported); filter tests retargeted to standalone strip_sensitive; origin embodiment-state scope key renamed robot_state (battery context key now robot_battery); vision scope coverage added.
-"""敏感上下文按 context_scopes 声明最小化下发（strip 机制）。"""
+"""敏感上下文按 context_scopes 声明最小化下发（strip 机制）。
+
+Minimize sensitive context according to declared scopes.
+"""
 from embodied.runtime.privacy import CONTEXT_SCOPES, SENSITIVE_SCOPE, strip_sensitive
 
 
 def test_no_filter_when_scopes_none():
-    """context_scopes=None（legacy/本地路径）→ 不过滤，保持既有行为。"""
+    """context_scopes=None（legacy/本地路径）→ 不过滤，保持既有行为。
+
+    None scopes preserve legacy unfiltered behavior.
+    """
     prefs = {"current_lat": "39.9", "robot_battery": "80", "answer_length": "short"}
     out = strip_sensitive(prefs, None)
     assert out["current_lat"] == "39.9"
@@ -13,7 +20,10 @@ def test_no_filter_when_scopes_none():
 
 
 def test_drops_sensitive_when_no_scope_declared():
-    """声明为空（未声明任何敏感 scope）→ 精确位置/电量/视觉引用全部剔除；非敏感偏好保留。"""
+    """声明为空（未声明任何敏感 scope）→ 精确位置/电量/视觉引用全部剔除；非敏感偏好保留。
+
+    Explicit empty scopes remove precise location, internal state and image references while retaining nonsensitive preferences.
+    """
     prefs = {"current_lat": "39.9", "current_lng": "116.4",
              "current_accuracy_m": "10", "robot_battery": "80",
              "vision_frame_id": "f-1",
@@ -24,6 +34,7 @@ def test_drops_sensitive_when_no_scope_declared():
     assert "current_accuracy_m" not in out
     assert "robot_battery" not in out
     assert "vision_frame_id" not in out
+    # Retain nonsensitive fields.
     assert out["answer_length"] == "short"   # 非敏感保留
     assert out["model_pref"] == "fast"
 
@@ -33,12 +44,14 @@ def test_keeps_location_when_declared():
     out = strip_sensitive(prefs, ["location"])
     assert out["current_lat"] == "39.9"
     assert out["current_lng"] == "116.4"
+    # Robot-state scope was not declared.
     assert "robot_battery" not in out        # 未声明 robot_state
 
 
 def test_keeps_battery_when_robot_state_declared():
     prefs = {"current_lat": "39.9", "robot_battery": "80"}
     out = strip_sensitive(prefs, ["robot_state"])
+    # Location scope was not declared.
     assert "current_lat" not in out          # 未声明 location
     assert out["robot_battery"] == "80"
 

@@ -1,5 +1,8 @@
 """HRI console server contract tests over the hri.v0 WS protocol — a scripted client
-plays the browser role; sim/engine/audio are fakes (hermetic, no mujoco, no network)."""
+plays the browser role; sim/engine/audio are fakes (hermetic, no mujoco, no network).
+
+脚本客户端模拟浏览器验证 WebSocket 契约，仿真、引擎和音频均为替身，无网络依赖。
+"""
 
 from __future__ import annotations
 
@@ -29,7 +32,10 @@ class FakeSim:
 
 
 class FakeASR:
-    """Mirrors the real BaseASRProvider contract: 5-tuple return, WAV input."""
+    """Mirrors the real BaseASRProvider contract: 5-tuple return, WAV input.
+
+    批量识别替身遵守 WAV 输入与五元组输出契约。
+    """
 
     def __init__(self, text="把红色方块放进盒子"):
         self.text = text
@@ -41,7 +47,10 @@ class FakeASR:
 
 
 class FakeTTS:
-    """Mirrors the real BaseStreamingTTSProvider contract: meta dict first, then PCM."""
+    """Mirrors the real BaseStreamingTTSProvider contract: meta dict first, then PCM.
+
+    流式语音替身先发元数据再发 PCM。
+    """
 
     async def stream(self, text_deltas, *, sample_rate=24000, **kw):
         async for _ in text_deltas:
@@ -91,7 +100,10 @@ async def client(request):
 
 
 async def recv_json(ws, want_type=None, *, max_frames=20):
-    """Read frames until the next JSON text frame (optionally of a given type)."""
+    """Read frames until the next JSON text frame (optionally of a given type).
+
+    读取到下一条指定或任意类型 JSON 文本帧。
+    """
     for _ in range(max_frames):
         msg = await asyncio.wait_for(ws.receive(), timeout=5)
         if msg.type.name == "TEXT":
@@ -116,6 +128,7 @@ async def test_hello_and_text_turn(client):
         reply = await recv_json(ws, "reply")
         assert reply["text"] == "echo: 你好机器人"
         tts = await recv_json(ws, "tts_start")
+        # 提供方元数据优先于配置默认值。
         assert tts["sample_rate"] == 22050  # provider meta wins over configured default
         pcm = bytearray()
         while True:
@@ -124,6 +137,7 @@ async def test_hello_and_text_turn(client):
                 pcm.extend(msg.data)
             elif msg.type.name == "TEXT" and json.loads(msg.data).get("type") == "tts_end":
                 break
+        # 两个音频块均已到达。
         assert len(pcm) == 2 * 320  # both fake chunks arrived
 
 
@@ -144,6 +158,7 @@ async def test_voice_turn_streams_pcm_to_asr():
             assert asr_frame["text"] == "回零" and asr_frame["final"] is True
             reply = await recv_json(ws, "reply")
             assert reply["text"] == "echo: 回零"
+        # 完整音频块封装 44 字节 WAV 头后交给提供方。
         # both chunks reached the provider intact, wrapped in a 44-byte WAV header
         assert len(asr.audio_seen) == 44 + 2 * 1600
         assert asr.audio_seen[:4] == b"RIFF"
@@ -152,7 +167,10 @@ async def test_voice_turn_streams_pcm_to_asr():
 
 
 async def test_confirm_bridge_roundtrip():
-    """Danger gate reaches the browser and the reply resolves the engine's future."""
+    """Danger gate reaches the browser and the reply resolves the engine's future.
+
+    确认门抵达浏览器，回复解除引擎等待。
+    """
     outcomes = []
 
     class ConfirmingEngine:
@@ -189,6 +207,7 @@ async def test_scene_endpoint_serves_jpeg(client):
     assert resp.status == 200
     assert resp.content_type == "image/jpeg"
     body = await resp.read()
+    # JPEG 文件起始标记。
     assert body[:2] == b"\xff\xd8"  # JPEG SOI
 
 

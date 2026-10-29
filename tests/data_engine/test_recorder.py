@@ -1,4 +1,7 @@
-"""Recorder v0 contract: every run lands on disk complete, LeRobot-aligned, crash-safe."""
+"""Recorder v0 contract: every run lands on disk complete, LeRobot-aligned, crash-safe.
+
+录制契约验证落盘完整性、字段对齐和异常路径。
+"""
 
 from __future__ import annotations
 
@@ -82,9 +85,12 @@ def test_start_step_finish_roundtrip(tmp_path):
 
 def test_action_carry_forward(tmp_path):
     w = EpisodeRecorder(tmp_path).start("t", "sim.test")
+    # 首次动作前用零填充。
     w.on_step(_obs(t=0.0), None)  # before any action -> zeros
     w.on_step(_obs(t=0.1), ActionCommand(joint_targets=(1.0, 2.0, 3.0), gripper=0.7))
+    # 空动作沿用上一整行。
     w.on_step(_obs(t=0.2), None)  # None action -> carry full previous row
+    # 空夹爪目标沿用上一目标。
     w.on_step(_obs(t=0.3), ActionCommand(joint_targets=(4.0, 5.0, 6.0)))  # gripper None -> carry gripper
     path = w.finish(False)
 
@@ -106,6 +112,7 @@ def test_events_stream_as_json_lines(tmp_path):
     w = EpisodeRecorder(tmp_path).start("t", "sim.test")
     w.on_event("skill_start", {"skill": "skill.arm.reach", "sim_t": 1.25})
     w.on_event("safety", {"reason": "workspace_limit"})
+    # 非 ASCII 载荷必须经 UTF-8 完整保存。
     w.on_event("note", {"text": "操作员备注"})  # non-ASCII payload must survive utf-8
 
     lines = (w.path / "events.jsonl").read_text(encoding="utf-8").splitlines()
@@ -139,8 +146,10 @@ def test_abort_preserves_episode(tmp_path):
     assert meta["success"] is False
     assert meta["aborted"] is True
     assert "sim exploded" in meta["detail"]
+    # 缓冲步骤不丢失。
     assert load_episode(path).state.shape == (1, 4)  # buffered steps not lost
 
+    # 关闭后仍可安全调用异常收尾。
     assert w.abort("again") == path  # crash path stays callable after close
     with pytest.raises(RuntimeError):
         w.finish(True)
@@ -193,6 +202,7 @@ def test_object_appearing_late_is_nan_padded(tmp_path):
     w = EpisodeRecorder(tmp_path).start("t", "sim.test")
     w.on_step(_obs(t=0.0), None)
     w.on_step(_obs(t=0.1, objects={"cube": Pose(pos=(1.0, 2.0, 3.0))}), None)
+    # 方块再次消失。
     w.on_step(_obs(t=0.2), None)  # cube gone again
 
     cube = load_episode(w.finish(True)).objects["cube"]
@@ -209,7 +219,10 @@ def test_empty_episode_finishes(tmp_path):
 
 
 def test_start_writes_meta_stub_immediately(tmp_path):
-    """Hard-kill durability: task identity is on disk before the first step."""
+    """Hard-kill durability: task identity is on disk before the first step.
+
+    首步骤前任务身份已落盘，强杀仍可识别。
+    """
     w = EpisodeRecorder(tmp_path).start("t", "sim.test", seed=1)
     meta = json.loads((w.path / "meta.json").read_text(encoding="utf-8"))
     assert meta["success"] is None and meta["finished_at"] is None
@@ -218,6 +231,7 @@ def test_start_writes_meta_stub_immediately(tmp_path):
 
 
 def test_to_lerobot_delegates_to_converter(tmp_path):
+    # 转换入口已从占位变为真实委托；路径检查在重型导入前，轻量 CI 也可验证。
     # D012 stub era ended with D014: to_lerobot now routes into lerobot_convert.
     # Path validation runs before any learn-group import, so this holds in CI too.
     with pytest.raises(FileNotFoundError, match="no episodes"):

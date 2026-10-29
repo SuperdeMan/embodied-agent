@@ -1,3 +1,4 @@
+# 保留来源：执行目标改为 Registry，超时由其负责；确认改为轮内回调且缺失时拒绝。参数保留 JSON 类型，验证改读世界状态；移除旧补槽和流式快捷路径。
 # Ported from car-agent orchestrator/cloud/executor.py @ f0b08f8, changes: dispatch target is
 # SkillRegistry.invoke instead of agent gRPC endpoints (timeout lives in the registry, not
 # re-imposed here); confirm suspension (NEED_CONFIRM + Redis session) becomes a synchronous
@@ -7,6 +8,9 @@
 """DagExecutor: Kahn topo layers → per-layer asyncio.gather → serial between layers.
 
 Chain per step: resolve refs → dedup fingerprint → confirm gate → invoke → verify.
+
+
+Kahn 拓扑分层，同层并行、层间串行；每步解析引用、去重、确认、调用并验证。
 """
 
 from __future__ import annotations
@@ -28,6 +32,7 @@ logger = logging.getLogger("cognition.executor")
 
 ConfirmCallback = Callable[[str, dict], Awaitable[bool]]
 
+# 未收到回执不等于动作未发生；仅传输不确定可补查世界状态，不能用状态推翻明确技能失败。
 # Transport-uncertain failures: the response didn't come back, which is NOT the same as
 # "it didn't happen". Only this family may be re-examined against world state; an explicit
 # skill failure is a definite failure and must never be overturned by state evidence.
@@ -51,6 +56,9 @@ class DagExecutor:
         confirm:  user confirmation channel; None = headless → dangerous steps DENIED
                   (fail-closed, never fail-open).
         world_fn: () -> WorldSnapshot for state_predicate verification; None → UNKNOWN.
+        
+
+        registry 在执行器之下再次强制确认和超时；无确认回调时危险动作拒绝；world_fn 提供验证快照，缺失则 UNKNOWN。
         """
         self._registry = registry
         self._confirm = confirm
@@ -74,6 +82,7 @@ class DagExecutor:
                 results = await asyncio.gather(
                     *(self._exec_step(s, done, ctx) for s in runnable), return_exceptions=True
                 )
+            # 按步骤与结果配对，异常分支也保留步骤身份。
             # zip(runnable, results) so an exception branch can never lose its step identity
             for step, res in zip(runnable, results):
                 if isinstance(res, Exception):
@@ -84,6 +93,7 @@ class DagExecutor:
                     )
                 done[res.step_id] = res
                 yield res
+            # 显式呈现跳过步骤，确保汇报涵盖每一步的去向。
             # Unlike origin (skipped steps vanished silently into `done`), surface them:
             # the deterministic composer must narrate every planned step's fate.
             before = set(done)
@@ -99,6 +109,7 @@ class DagExecutor:
         if prior is not None:
             return self._replay_prior(step, prior)
 
+        # 确认权威来自 manifest；Registry 再次独立校验，避免执行器缺陷绕过确认。
         # Confirm gate (SG-3). Authority is the manifest-populated step field; the registry
         # below re-checks independently (ConfirmationRequired) so an executor bug cannot
         # bypass it either.
@@ -122,6 +133,7 @@ class DagExecutor:
         if result.status == StepStatus.OK:
             result.fingerprint = fingerprint
         elif result.status == StepStatus.FAILED and result.error == "step_timeout":
+            # 超时也保留指纹，因为动作可能已发生；重规划不得盲目重复执行。
             # Timeout also fingerprints: the motion may have completed with the response lost;
             # a replan re-issuing the same action must not re-execute it blindly.
             result.fingerprint = fingerprint
@@ -139,6 +151,7 @@ class DagExecutor:
             step_id=step.id, status=StepStatus.FAILED, detail=r.detail, data=dict(r.data), error=error
         )
 
+    # 效果验证。
     # -- verification ----------------------------------------------------------
 
     async def _verify_outcome(self, step: Step, result: StepResult) -> StepResult:
@@ -146,7 +159,10 @@ class DagExecutor:
         step.verification (manifest authority). UNSAT+retry re-executes once (never for
         require_confirm steps); UNSAT+report keeps OK but records data['_verify'] so the
         composer can be honest. Transport-uncertain failures get one state re-examination
-        that may annotate (never flip) the result."""
+        that may annotate (never flip) the result.
+
+        成功调用按 manifest 期望验证；允许时对 UNSAT 重试一次，需确认动作永不重试。报告模式保留调用状态并附效果证据；传输不确定只补充状态证据，不翻转调用结果。
+        """
         verification = step.verification or {}
         if not verification.get("mode") or not _verify.enabled():
             return result
@@ -163,6 +179,7 @@ class DagExecutor:
             logger.info("step %s(%s): verify unsat, retrying (%d)", step.id, step.skill, attempts)
             retried = await self._invoke_once(step, confirmed=False)
             if retried.status != StepStatus.OK:
+                # 重试本身失败，回到正常失败结果通道。
                 return retried  # the retry itself failed: back to the normal failure channel
             result = retried
             verdict = await self._evaluate(step, result)
@@ -171,6 +188,7 @@ class DagExecutor:
             result.data["_verify"] = {
                 "verdict": verdict, "mode": verification.get("mode", ""), "attempts": attempts,
             }
+            # 调用状态与效果证据分离；依赖调度和汇报均需查证据才能认定成功。
             # Keep the legacy call status separate from effect evidence. Dependencies
             # and the composer must both consult this evidence before claiming success.
         return result
@@ -182,6 +200,7 @@ class DagExecutor:
             return result
         verdict = await self._evaluate(step, result)
         if verdict == _verify.SAT:
+            # 状态只能证明效果发生，不能证明本次调用成功；仅补充注释证据。
             # State proves "it happened"; it cannot prove "this step succeeded". Annotate only.
             result.data["_verify"] = {
                 "verdict": _verify.SAT, "mode": _verify.MODE_STATE, "exec": "uncertain_confirmed",
@@ -194,10 +213,12 @@ class DagExecutor:
                 step.verification or {}, result.data or {},
                 world_fn=self._world_fn, params=dict(step.params or {}),
             )
+        # 验证异常返回未知，不使主执行链崩溃。
         except Exception as e:  # fail-open: reconciliation never takes down the main chain
             logger.warning("step %s verify errored (ignored): %s", step.id, e)
             return _verify.UNKNOWN
 
+    # 副作用去重。
     # -- dedup -----------------------------------------------------------------
 
     @staticmethod
@@ -214,7 +235,10 @@ class DagExecutor:
         """Same (skill, params) already executed this turn → suppress the duplicate. OK
         results replay; timeout results also hit (the side effect may have happened). An
         explicit failure never hits — it must be allowed to re-run, else a failure gets
-        'reused' into a fake success."""
+        'reused' into a fake success.
+
+        同轮相同技能参数的成功或超时调用抑制重复；明确失败允许按恢复规则重试，不能回放为成功。
+        """
         if not fingerprint or not _dedup_enabled():
             return None
         for prior in done.values():
@@ -244,6 +268,7 @@ class DagExecutor:
             data=dict(prior.data or {}), fingerprint=prior.fingerprint,
         )
 
+    # 参数引用解析。
     # -- param refs ------------------------------------------------------------
 
     _REF_RE = re.compile(r"^\$\{([^{}]+)\}$")
@@ -251,7 +276,10 @@ class DagExecutor:
 
     def _resolve_param_refs(self, step: Step, done: dict) -> None:
         """Three wire forms, most-explicit first (all ported): `${s1.data.x}` placeholders in
-        params, the explicit param_refs map, then `$ref.alias` intra-step aliases."""
+        params, the explicit param_refs map, then `$ref.alias` intra-step aliases.
+
+        依次解析参数中的步骤占位符、显式 param_refs 和步骤内别名。
+        """
         for name, raw in list(step.params.items()):
             if not isinstance(raw, str):
                 continue
@@ -266,6 +294,7 @@ class DagExecutor:
 
         for name, ref_path in step.param_refs.items():
             existing = step.params.get(name)
+            # 现有值优先，除非该值只是重复填写的引用路径。
             # "Existing value wins" — unless the value IS the ref path written twice.
             if name in step.params and str(existing).strip() != str(ref_path).strip():
                 continue
@@ -308,6 +337,7 @@ class DagExecutor:
                 return None
         return obj
 
+    # DAG 辅助逻辑。
     # -- dag helpers -----------------------------------------------------------
 
     @staticmethod
@@ -349,6 +379,7 @@ class DagExecutor:
                     in_degree[s.id] += 1
                     children[dep].append(s.id)
                 elif dep not in completed_ids:
+                    # 未知依赖保持阻断，按拒绝放行处理。
                     in_degree[s.id] += 1  # unknown dependency stays blocked: fail closed
 
         layers: list[list[Step]] = []

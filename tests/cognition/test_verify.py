@@ -1,5 +1,8 @@
 """Three-state verifier contract tests. UNKNOWN-never-convicts and confirm-never-retries
-are load-bearing safety semantics — fix code, not tests."""
+are load-bearing safety semantics — fix code, not tests.
+
+三态验证与确认后不重试是安全承重契约；失败时修实现，不放宽测试。
+"""
 
 from __future__ import annotations
 
@@ -53,6 +56,7 @@ def test_schema_mode():
     assert verify.eval_schema({"data_keys": ["object"]}, {"object": "obj_cube"}) == verify.SAT
     assert verify.eval_schema({"data_keys": ["object"]}, {}) == verify.UNSAT
     assert verify.eval_schema({"data_keys": ["items"]}, {"items": []}) == verify.UNSAT
+    # 零和假都是有效值。
     assert verify.eval_schema({"data_keys": ["n"]}, {"n": 0}) == verify.SAT  # 0/False are values
     assert verify.eval_schema({}, {"x": 1}) == verify.UNKNOWN
 
@@ -69,6 +73,7 @@ async def test_evaluate_dispatch_and_timeout():
 def test_retry_never_for_confirmed_side_effects():
     v = {"on_fail": "retry", "max_attempts": 3}
     assert verify.retry_allowed(v, require_confirm=False, attempts=0)
+    # 硬性约束。
     assert not verify.retry_allowed(v, require_confirm=True, attempts=0)  # hard constraint
     assert not verify.retry_allowed({"on_fail": "report"}, require_confirm=False, attempts=0)
     assert not verify.retry_allowed(v, require_confirm=False, attempts=3)

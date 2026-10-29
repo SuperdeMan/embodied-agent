@@ -1,3 +1,4 @@
+# 保留来源：移植分档预算、重规划及观察截断，改为单轮引擎；确定性汇报只描述实际 StepResult，不编造状态。确认回调在轮内完成，不携带原会话挂起存储。
 # Ported from car-agent orchestrator/cloud/loop.py (tier budgets, bounded replan loop,
 # observation clipping) + the engine/aggregator seam @ f0b08f8, changes: single-turn engine
 # instead of a streaming service; the aggregator LLM call becomes a DETERMINISTIC composer
@@ -9,6 +10,9 @@
 This replaces the M0 reactive tool loop (cognition/planner.py) as the primary System-2
 path. The M0 loop stays as the degraded fallback for providers that cannot drive the
 submit_plan protocol.
+
+
+主规划链依次构建计划、执行 DAG、验证、有界重规划及基于结果汇报；M0 工具循环保留为不支持 submit_plan 的降级路径。
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from embodied.skills.registry import SkillRegistry
 
 logger = logging.getLogger("cognition.engine")
 
+# 按复杂度映射最大重规划次数和毫秒时间预算。
 # T2 tier budgets (origin loop.py): complexity → (max replans, wall budget ms).
 _TIERS = {"simple": (2, 8000), "adaptive": (3, 20000)}
 _DEFAULT_TIER = "simple"
@@ -48,7 +53,10 @@ def _env_int(name: str, default: int) -> int:
 
 
 def summarize(result: StepResult) -> dict:
-    """Bounded, decision-relevant observation for the replanner."""
+    """Bounded, decision-relevant observation for the replanner.
+
+    为重规划提供有界且与决策相关的观察。
+    """
     data = dict(result.data or {})
     if len(data) > 12:
         data = dict(list(data.items())[:12])
@@ -112,6 +120,7 @@ class PlannerEngine:
                 observations = observations[-6:]
             current = None
             if any(r.status == StepStatus.NEED_CONFIRM for r in results):
+                # 用户拒绝确认即结束本轮，不用重规划推翻拒绝。
                 break  # denied confirmation ends the turn honestly; no replan second-guessing
             if plan.complexity != "adaptive":
                 break
@@ -120,6 +129,7 @@ class PlannerEngine:
             nxt = await self.builder.replan(plan.goal or user_text, observations, self._render_context())
             replans += 1
             if nxt.steps:
+                # 保留完成结果，供跨轮参数引用和指纹去重，避免重复执行。
                 # Seed with completed results so param_refs across rounds still resolve
                 # and dedup fingerprints survive the replan (anti re-execution).
                 done = {r.step_id: r for r in results}
@@ -132,6 +142,7 @@ class PlannerEngine:
         self._remember(user_text, text)
         return EngineTurn(text=text, plan=plan, results=results, replans=replans)
 
+    # 确定性结果汇报。
     # -- compose (deterministic, grounded by construction) ---------------------
 
     _STATUS_ZH = {

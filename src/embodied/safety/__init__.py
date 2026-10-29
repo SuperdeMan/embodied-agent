@@ -2,6 +2,9 @@
 
 Export surface is deliberately minimal — the Safety Guardian process lands
 here in M1 from a separate work stream.
+
+
+安全层包含权限引擎与本体 scope，独立 Guardian 在同层实现，导出保持最小。
 """
 from .permission import AuthContext, Decision, PermissionEngine, check_permission
 from .scopes import (

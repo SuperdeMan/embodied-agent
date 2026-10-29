@@ -4,6 +4,9 @@ Covers the D015 chain piece by piece: HSV conversion, color-blob detection,
 pinhole back-projection self-consistency, depth lifting with the half-size ray
 correction, and the PerceivedSim seam (agent sees perception, judges see truth,
 proprioception never touched).
+
+
+仅 numpy 的离线感知测试覆盖颜色、反投影、深度补偿和包装边界；Agent 看感知、裁判看真值，本体反馈不改。
 """
 
 from __future__ import annotations
@@ -40,7 +43,9 @@ def test_rgb_to_hsv_matches_colorsys():
 
 
 def test_color_blob_finds_red_square():
+    # 灰色桌面。
     img = np.full((60, 80, 3), 180, dtype=np.uint8)  # grey table
+    # 红色方块。
     img[20:30, 45:55] = (200, 20, 25)  # red square
     dets = ColorBlobProvider().detect(img, ["color:red", "color:blue"])
     assert len(dets) == 1 and dets[0].label == "color:red"
@@ -59,6 +64,7 @@ def test_build_perception_provider_factory():
 
 
 def synthetic_cam(f: float = 100.0) -> CameraModel:
+    # 相机位于原点上方一米并朝下；坐标映射与焦距选择便于断言，管线测试使用真实量级以满足面积门。
     # Camera 1 m above the origin looking straight down: world x -> image right,
     # world y -> image up. rot maps camera frame -> world; -Z_cam must be world -Z.
     # f=100 keeps geometry assertions round; pipeline tests use f=650 (realistic
@@ -72,11 +78,14 @@ def synthetic_cam(f: float = 100.0) -> CameraModel:
 
 def test_backproject_center_and_offsets():
     cam = synthetic_cam()
+    # 中心像素一米深度映射世界原点。
     # Center pixel at depth 1.0 -> the world origin.
     assert np.allclose(cam.backproject(49.5, 49.5, 1.0), (0.0, 0.0, 0.0), atol=1e-9)
+    # 右移像素增大世界 X，下移像素减小世界 Y。
     # 10 px right of center at depth 1 -> +0.1 world x; 10 px DOWN -> -0.1 world y.
     assert np.allclose(cam.backproject(59.5, 49.5, 1.0), (0.1, 0.0, 0.0), atol=1e-9)
     assert np.allclose(cam.backproject(49.5, 59.5, 1.0), (0.0, -0.1, 0.0), atol=1e-9)
+    # 中心视线竖直向下。
     # Ray through the center points straight down.
     assert np.allclose(cam.ray_dir(49.5, 49.5), (0.0, 0.0, -1.0), atol=1e-9)
 
@@ -91,13 +100,16 @@ class OneBoxProvider(BasePerceptionProvider):
 
 def test_pipeline_lift_applies_half_size_ray_correction():
     cam = synthetic_cam(f=650.0)
+    # 地面上三厘米方块的上表面。
     depth = np.full((100, 100), 0.97, dtype=np.float32)  # top face of a 3 cm cube on the floor
     pipeline = PerceptionPipeline(
+        # 中心检测框映射世界平面原点。
         OneBoxProvider((40, 40, 60, 60)),  # centered box -> world (0, 0)
         {"obj_cube": ObjectSpec(prompt="p", approx_size_m=0.03)},
     )
     rgb = np.zeros((100, 100, 3), dtype=np.uint8)
     poses = pipeline.locate(rgb, depth, cam)
+    # 表面点沿向下视线补偿 1.5 厘米得到方块中心。
     # Surface point (0,0,0.03) pushed 1.5 cm along the down-ray -> cube CENTER (0,0,0.015).
     assert "obj_cube" in poses
     assert np.allclose(poses["obj_cube"].pos, (0.0, 0.0, 0.015), atol=1e-3)
@@ -105,6 +117,7 @@ def test_pipeline_lift_applies_half_size_ray_correction():
 
 def test_pipeline_skips_invalid_depth():
     cam = synthetic_cam(f=650.0)
+    # 没有有效深度。
     depth = np.zeros((100, 100), dtype=np.float32)  # no valid depth anywhere
     pipeline = PerceptionPipeline(OneBoxProvider((40, 40, 60, 60)), {"obj_cube": ObjectSpec(prompt="p")})
     assert pipeline.locate(np.zeros((100, 100, 3), np.uint8), depth, cam) == {}
@@ -112,10 +125,14 @@ def test_pipeline_skips_invalid_depth():
 
 def test_pipeline_rejects_oversized_detection():
     """A confident detection far larger than the object can appear at its depth is a
-    mislabeled structure (open-vocab failure mode) — dropped by the size gate."""
+    mislabeled structure (open-vocab failure mode) — dropped by the size gate.
+
+    高置信但尺寸不可能的检测是误标结构，应由面积门拒绝。
+    """
     cam = synthetic_cam(f=650.0)
     depth = np.full((100, 100), 0.97, dtype=np.float32)
     pipeline = PerceptionPipeline(
+        # 检测面积远超该距离下三厘米物体的预期。
         OneBoxProvider((5, 5, 95, 95)),  # 90x90 px >> ~20 px expected for 3 cm at 0.97 m
         {"obj_cube": ObjectSpec(prompt="p", approx_size_m=0.03)},
     )
@@ -123,7 +140,10 @@ def test_pipeline_rejects_oversized_detection():
 
 
 class FakeSimForWrap:
-    """Minimal embodiment: truth objects + render_rgbd/camera_model stubs."""
+    """Minimal embodiment: truth objects + render_rgbd/camera_model stubs.
+
+    最小本体替身提供真值、渲染和相机模型。
+    """
 
     def __init__(self):
         self.t = 0.0
@@ -133,6 +153,7 @@ class FakeSimForWrap:
         return Observation(
             t=self.t, qpos=(0.1, 0.2), qvel=(0, 0), gripper_opening=0.7,
             ee_pose=Pose(pos=(0, 0, 0.2)),
+            # 真值标记。
             objects={"obj_cube": Pose(pos=(9.0, 9.0, 9.0))},  # truth marker
             extras={"regions": {"bin_region": {"center": (0, 0, 0), "half": (1, 1, 1)}}},
         )
@@ -161,27 +182,38 @@ def test_perceived_sim_swaps_objects_keeps_proprioception_and_truth():
     wrapped = PerceivedSim(inner, PerceptionPipeline(ColorBlobProvider(), {"obj_cube": ObjectSpec("color:red")}),
                            cameras=("cam0",), width=100, height=100, min_interval_s=0.25)
     obs = wrapped.read()
+    # 本体感觉保持原样。
     assert obs.qpos == (0.1, 0.2) and obs.gripper_opening == 0.7  # proprioception untouched
+    # 工作区标注透传。
     assert obs.extras["regions"]  # workspace annotations pass through
     perceived = obs.objects["obj_cube"].pos
+    # Agent 的感知视角。
     assert perceived != (9.0, 9.0, 9.0) and abs(perceived[2] - 0.015) < 0.005  # the agent's eyes
+    # 裁判的真值视角。
     assert wrapped.read_truth().objects["obj_cube"].pos == (9.0, 9.0, 9.0)  # the judge's eyes
+    # 其他能力委托透传。
     assert wrapped.spec() == "spec-sentinel"  # passthrough delegation
 
+    # 时间间隔内重复读取不触发额外渲染。
     # Throttle: repeated reads within the interval do not re-render.
     wrapped.read()
     wrapped.read()
     assert inner.renders == 1
+    # 仿真时间推进 0.4 秒。
     inner.step(200)  # 0.4 s of sim time
     wrapped.read()
     assert inner.renders == 2
+    # 即使时间未推进，重置也使缓存失效。
     # reset invalidates the cache even without time passing
     wrapped.reset(randomize=True)
     assert inner.renders == 3
 
 
 class BlinkingProvider(BasePerceptionProvider):
-    """Detects on the first call, then goes blind — models transient occlusion."""
+    """Detects on the first call, then goes blind — models transient occlusion.
+
+    首次检测后失明，模拟临时遮挡。
+    """
 
     def __init__(self):
         self.calls = 0
@@ -198,10 +230,13 @@ def test_registry_keeps_last_pose_through_occlusion_and_clears_on_reset():
     wrapped = PerceivedSim(inner, PerceptionPipeline(BlinkingProvider(), {"obj_cube": ObjectSpec("p")}),
                            cameras=("cam0",), width=100, height=100, min_interval_s=0.25)
     first = wrapped.read().objects
+    # 曾观测到一次。
     assert "obj_cube" in first  # seen once
     inner.step(200)
+    # 检测失明后由注册表保持位姿。
     again = wrapped.read().objects  # provider now blind -> registry persistence
     assert again["obj_cube"].pos == first["obj_cube"].pos
+    # 重置清空注册表，从未再次看见的物体如实缺席。
     # reset clears the registry: a never-again-seen object is honestly absent
     wrapped.reset(randomize=True)
     assert "obj_cube" not in wrapped.read().objects

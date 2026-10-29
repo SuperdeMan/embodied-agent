@@ -5,6 +5,9 @@ Public surface: provider classes + build_provider() (llm.py), LLMRuntime/get_run
 ProviderHealth/health_tracker (health.py), ASR/TTS providers + build_asr_provider()/
 build_tts_provider()/build_streaming_asr_provider()/build_tts_stream_provider() (audio.py, M1).
 S2S stays out of scope.
+
+
+模型提供方包保留来源，导出 LLM、运行时、缓存、限流、健康与批量/流式音频工厂；S2S 不在此模块范围。
 """
 from .audio import (
     TTS_STREAM_CATALOG,

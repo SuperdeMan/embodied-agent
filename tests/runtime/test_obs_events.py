@@ -1,5 +1,9 @@
+# 保留来源，传输测试改为本地 sink，保留事件形状和会话注入断言。
 # Ported from car-agent observability/tests/test_events.py + test_turn_events.py @ f0b08f8, changes: NATS transport tests replaced by fresh sink tests (JsonlSink/StdoutSink/OBS_DIR/failure isolation); payload-shape and session-injection assertions kept.
-"""EventEmitter + sinks：JSONL 落盘、OBS_DIR/OBS_STDOUT 门控、失败隔离、payload 形状。"""
+"""EventEmitter + sinks：JSONL 落盘、OBS_DIR/OBS_STDOUT 门控、失败隔离、payload 形状。
+
+Event tests cover JSONL storage, sink configuration, failure isolation and payload shapes.
+"""
 import json
 
 import pytest
@@ -32,6 +36,7 @@ class _BoomSink:
         raise RuntimeError("sink down")
 
 
+# Tests for the redesigned sink transport.
 # ── 传输层（fresh：sink 重设计）──────────────────────────────────────────
 
 async def test_jsonl_sink_writes_valid_jsonl_and_honors_obs_dir(tmp_path, monkeypatch):
@@ -46,6 +51,7 @@ async def test_jsonl_sink_writes_valid_jsonl_and_honors_obs_dir(tmp_path, monkey
     assert path.exists()
     lines = path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 2
+    # Every output line is valid JSON.
     bodies = [json.loads(line) for line in lines]      # 每行都是合法 JSON
     assert bodies[0]["subject"] == "obs.span"
     assert bodies[0]["service"] == "runtime-test"
@@ -81,11 +87,15 @@ async def test_stdout_sink_writes_json_line(monkeypatch, capsys):
 
 
 async def test_emit_never_raises_when_sink_fails():
-    """Sink 抛错必须被吞掉（log-and-drop）：观测绝不反噬主链路。"""
+    """Sink 抛错必须被吞掉（log-and-drop）：观测绝不反噬主链路。
+
+    Sink errors are logged and dropped, never propagated into the primary request path.
+    """
     boom = _BoomSink()
     emitter = EventEmitter("runtime-test", sinks=[boom])
     await emitter.emit_span("t1", "planner.step")
     await emitter.emit_turn("t1", "s1", user_text="拿一下桌上的杯子")
+    # Must not raise.
     await emitter.flush()          # 不抛
     assert boom.calls == 2
     await emitter.close()
@@ -101,7 +111,10 @@ async def test_failing_sink_does_not_block_other_sinks():
 
 
 async def test_emit_is_noop_with_no_sinks():
-    """空 sink 列表 = 禁用：不抛、不排队。"""
+    """空 sink 列表 = 禁用：不抛、不排队。
+
+    An empty sink list disables emission without errors or queued work.
+    """
     emitter = EventEmitter("runtime-test", sinks=[])
     await emitter.emit_span("t1", "planner.step")
     assert emitter._disabled is True
@@ -115,6 +128,7 @@ def test_get_emitter_returns_one_instance_per_service(tmp_path, monkeypatch):
     assert get_emitter("svc-b") is not a
 
 
+# Preserved payload-shape tests.
 # ── payload 形状（ported）────────────────────────────────────────────────
 
 def _capture_emitter():

@@ -1,5 +1,8 @@
 """v0 -> LeRobotDataset conversion. Auto-skips without the learn group (like tests/rpc);
-CI never installs lerobot, locally these MUST run (uv sync --group learn)."""
+CI never installs lerobot, locally these MUST run (uv sync --group learn).
+
+LeRobot 转换测试缺学习组时跳过，轻量 CI 不安装，本地完整环境必须运行。
+"""
 
 from __future__ import annotations
 
@@ -14,6 +17,7 @@ from embodied.control.hal import ActionCommand, Observation, Pose  # noqa: E402
 from embodied.data_engine.lerobot_convert import convert_episodes  # noqa: E402
 from embodied.data_engine.recorder import EpisodeRecorder  # noqa: E402
 
+# 夹具采用 50Hz 采样。
 DT = 0.02  # 50 Hz capture cadence in the fixture episodes
 
 
@@ -31,6 +35,9 @@ def write_episode(root, *, success: bool = True, boundaries: bool = True, task: 
     joint0 ramps linearly with sim time (lerp-checkable); actions are the staircase
     of written targets (zoh-checkable). The settle gap (0.54 -> 1.0) mimics a single
     step(n) call producing one late sample.
+    
+
+    合成抓取、稳定间隙和放置片段；关节线性变化便于验证插值，阶梯动作便于验证零阶保持，间隙模拟多步推进只采一帧。
     """
     w = EpisodeRecorder(root).start(
         task=task, embodiment_id="sim.fake", seed=0,
@@ -53,6 +60,7 @@ def test_episode_mode_round_trip(tmp_path):
     root = tmp_path / "episodes"
     write_episode(root, success=True)
     write_episode(root, success=True)
+    # 默认排除。
     write_episode(root, success=False)  # excluded by default
     out = tmp_path / "ds"
 
@@ -67,6 +75,7 @@ def test_episode_mode_round_trip(tmp_path):
     feats = ds.meta.features
     assert tuple(feats["observation.state"]["shape"]) == (3,) and tuple(feats["action"]["shape"]) == (3,)
     assert feats["observation.state"]["names"] == ["j0", "j1", "gripper"]
+    # 环境向量按物体名字排序，每物体七维。
     # environment_state: sorted object order (obj_a before obj_b), 7 dims each
     assert tuple(feats["observation.environment_state"]["shape"]) == (14,)
     assert feats["observation.environment_state"]["names"][0] == "obj_a.x"
@@ -75,8 +84,10 @@ def test_episode_mode_round_trip(tmp_path):
     item = ds[0]
     assert item["observation.state"].shape == (3,)
     assert item["observation.environment_state"].shape == (14,)
+    # 首网格点等于首采样时刻。
     # first grid point sits at the first sample: j0 == t == DT
     assert abs(float(item["observation.state"][0]) - DT) < 1e-5
+    # 两个物体分别沿 Y 和 X 随时间移动。
     # obj_a moves along y with t; obj_b along x
     assert abs(float(item["observation.environment_state"][1]) - DT) < 1e-5
     assert abs(float(item["observation.environment_state"][7]) - DT) < 1e-5
@@ -89,13 +100,18 @@ def test_resampling_lerp_and_zoh_across_gap(tmp_path):
     convert_episodes(root, out, fps=50, progress=lambda s: None)
     ds = LeRobotDataset(repo_id="local/ds", root=out)
 
+    # 固定网格跨稳定间隙时观测线性插值，动作保持间隙入口值。
     # Uniform grid from t0=0.02: index k -> sim time 0.02 + k/50. Inside the settle
     # gap (0.54 -> 1.0): state lerps between the flanking samples, action holds 0.54.
+    # 该仿真时刻位于采样间隙。
     k = 30  # sim time 0.62, inside the gap
     item = ds[k]
     sim_t = DT + k / 50
+    # 线性坡度插值。
     assert abs(float(item["observation.state"][0]) - sim_t) < 1e-4  # lerp of a linear ramp
+    # 保持间隙入口动作。
     assert abs(float(item["action"][0]) - 0.54) < 1e-5  # zero-order hold at gap entry
+    # 每个数据局时间从零开始，步长严格为采样周期。
     # timestamps restart at 0 per dataset episode and step exactly 1/fps
     assert abs(float(ds[0]["timestamp"])) < 1e-6
     assert abs(float(ds[1]["timestamp"]) - 0.02) < 1e-6
@@ -111,6 +127,7 @@ def test_skill_segmentation(tmp_path):
     ds = LeRobotDataset(repo_id="local/ds", root=out)
     assert ds.meta.total_episodes == 2
     assert set(ds.meta.tasks.index) == {"skill.fake.pick", "skill.fake.place"}
+    # 抓取应为 27 帧，放置应为 26 帧。
     # pick spans 0.02..0.54 -> 27 frames; place spans 1.0..1.5 -> 26 frames
     lengths = sorted(int(ds.meta.episodes[i]["length"]) for i in range(ds.meta.total_episodes))
     assert lengths == [26, 27]
@@ -121,6 +138,7 @@ def test_skill_mode_skips_pre_m2_recordings(tmp_path):
     write_episode(root, success=True, boundaries=False)
     with pytest.raises(ValueError, match="no convertible episodes"):
         convert_episodes(root, tmp_path / "ds", segment="skill", progress=lambda s: None)
+    # 失败不留下半写入数据。
     assert not (tmp_path / "ds").exists()  # transactional: nothing half-written
 
 
@@ -140,6 +158,7 @@ def test_layout_mismatch_fails_loudly(tmp_path):
     w = EpisodeRecorder(root).start(task="odd", embodiment_id="sim.fake")
     for k in range(1, 8):
         t = k * DT
+        # 不同关节数与物体集合，验证形状不兼容。
         w.on_step(  # 1 arm joint instead of 2 -> state dim 2, and different objects
             Observation(t=t, qpos=(t,), qvel=(0.0,), gripper_opening=0.5,
                         ee_pose=Pose(pos=(0, 0, 0.2)), objects={"obj_x": Pose(pos=(t, 0, 0))}),
@@ -167,4 +186,5 @@ def test_nan_padded_objects_get_filled(tmp_path):
     convert_episodes(root, out, progress=lambda s: None)
     ds = LeRobotDataset(repo_id="local/ds", root=out)
     env = np.stack([ds[i]["observation.environment_state"].numpy() for i in range(len(ds))])
+    # 前缀缺测用首次观察向后填充。
     assert not np.isnan(env).any()  # NaN prefix back-filled from first sighting

@@ -1,3 +1,4 @@
+// hri.v0 WebSocket 控制台客户端，协议说明见服务端文档字符串。
 // Console client for the hri.v0 WS contract (see src/embodied/hri/server.py docstring).
 import { PcmPlayer, PcmRecorder } from "/console/pcm.js";
 
@@ -80,6 +81,7 @@ function sendText() {
 $("send").onclick = sendText;
 textEl.addEventListener("keydown", (e) => { if (e.key === "Enter") sendText(); });
 
+// 按住开始录制与传输，松开后结束输入。
 // push-to-talk: hold down = record & stream; release = finalize
 async function talkStart(e) {
   e.preventDefault();
@@ -107,6 +109,7 @@ talkBtn.addEventListener("pointerdown", talkStart);
 talkBtn.addEventListener("pointerup", talkEnd);
 talkBtn.addEventListener("pointerleave", talkEnd);
 
+// 场景约每秒刷新五帧。
 // scene refresh ~5 fps
 setInterval(() => { sceneEl.src = `/api/scene.jpg?t=${Date.now()}`; }, 200);
 

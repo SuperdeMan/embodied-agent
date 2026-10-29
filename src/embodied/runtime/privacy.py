@@ -1,3 +1,4 @@
+# 保留来源；提取敏感上下文过滤机制并改为 robot_state，不迁入依赖缺席的原领域隐私目标注册表。
 # Ported from car-agent orchestrator/cloud/clients.py (_SENSITIVE_SCOPE + _merge_meta scope filter) @ f0b08f8, changes: mechanism extracted into a standalone module; origin embodiment-state scope key renamed robot_state (battery context key now robot_battery); car-domain GDPR target registry from runtime/privacy_registry.py not carried (adapters/targets reference modules that do not exist here; revisit in M1).
 """Sensitive-context minimization: the ``context_scopes`` declaration/strip mechanism.
 
@@ -14,11 +15,15 @@ broadcast. Scope vocabulary (``CONTEXT_SCOPES``):
 Filtering semantics are identical to the origin: ``context_scopes=None``
 (legacy/local paths) means no filtering; an explicit list — even an empty
 one — means minimize.
+
+
+按声明 scope 最小化位置、本体内部状态和图像引用。None 保持旧行为不筛选，显式列表即使为空也执行最小化；图像只传受控引用。
 """
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 
+# Map sensitive context keys to the scopes required for disclosure.
 # 敏感上下文键 → 所需 scope。技能经 manifest context_scopes 声明后才下发（最小化）。
 SENSITIVE_SCOPE: dict[str, str] = {
     "current_lat": "location",
@@ -27,11 +32,13 @@ SENSITIVE_SCOPE: dict[str, str] = {
     "current_location_at": "location",
     "current_location_source": "location",
     "robot_battery": "robot_state",
+    # Camera references are sensitive and require explicit vision scope rather than broadcast to every skill.
     # 相机单帧的**引用**。只有声明 context_scopes: [vision] 的技能收得到——
     # 图像引用属敏感上下文，不该随每轮广播给全部技能。
     "vision_frame_id": "vision",
 }
 
+# Complete vocabulary for valid context-scope declarations.
 # 合法的 context scope 声明全集（manifest 校验可用）。
 CONTEXT_SCOPES: frozenset[str] = frozenset(SENSITIVE_SCOPE.values())
 
@@ -42,6 +49,9 @@ def strip_sensitive(prefs: Mapping | None,
 
     context_scopes 非 None 时：未声明 location/robot_state/vision 的调用方
     收不到对应敏感键；非敏感键始终保留。None = 不过滤（保持既有行为）。
+    
+
+    Return a filtered copy without mutating input; undeclared sensitive scopes are removed while nonsensitive keys remain. None preserves legacy behavior.
     """
     out = dict(prefs or {})
     if context_scopes is None:

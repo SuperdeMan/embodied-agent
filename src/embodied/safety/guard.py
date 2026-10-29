@@ -1,10 +1,12 @@
 """SG-2 v0: deterministic guard on the HAL write path (docs/architecture.md §4.5).
 
-Runs in-process inside the driver for M1 (the standalone guardian process — proto
-already defined — arrives with the process split). Nothing here may ever depend on
+Runs in-process inside the driver alongside the separate guardian liveness service. Nothing here may ever depend on
 an AI output being correct: pure geometry, limits, and whitelists. A fence breach
 LATCHES the halted state; only an explicit reset() releases it, so a runaway
 trajectory cannot "recover on its own" and keep moving.
+
+
+驱动写路径的确定性 Guard 不信任 AI 输出；几何、限位和白名单独立检查，围栏越界闩锁，只有显式重置释放。
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ def _finite(values) -> bool:
 class GuardLimits:
     joint_lower: tuple[float, ...]
     joint_upper: tuple[float, ...]
+    # 每关节每写入允许的弧度增量，用于抑制伺服突跳。
     max_delta_per_write: float = 0.12  # rad, per joint per write (position-servo lunge backstop)
     ee_fence_min: Vec3 = (-0.45, -0.45, -0.005)
     ee_fence_max: Vec3 = (0.45, 0.45, 0.60)
@@ -52,6 +55,7 @@ class GuardLimits:
 
 @dataclass
 class GuardEvent:
+    # 事件区分拒绝、夹限、停机、急停和重置。
     kind: str  # denied | clamped | halted | estop | reset
     reason: str
     detail: dict = field(default_factory=dict)
@@ -64,6 +68,7 @@ class Guard:
         self.halted = False
         self.halt_reason = ""
 
+    # 生命周期管理。
     # -- lifecycle -------------------------------------------------------------
 
     def estop(self, reason: str = "estop") -> None:
@@ -77,12 +82,16 @@ class Guard:
         self.halt_reason = ""
         self._emit(GuardEvent(kind="reset", reason="guard reset"))
 
+    # 动作写入门禁。
     # -- write-path gate -------------------------------------------------------
 
     def gate(self, cmd: ActionCommand, obs: Observation) -> tuple[ActionCommand | None, WriteResult]:
         """Validate/clamp a command against the current observation.
 
         Returns (command_to_apply, result); command is None when denied.
+        
+
+        根据当前观测校验并夹限命令；拒绝时返回空命令和原因。
         """
         lim = self.limits
         if self.halted:
@@ -103,6 +112,7 @@ class Guard:
             self._latch("invalid_observation", kind="halted")
             return None, self._deny("invalid_observation")
 
+        # 检查当前末端围栏，越界即闩锁。
         # Fence check on the CURRENT end-effector: breach latches halt.
         px, py, pz = obs.ee_pose.pos
         fmin, fmax = lim.ee_fence_min, lim.ee_fence_max
@@ -116,6 +126,7 @@ class Guard:
             t2 = min(max(t, lim.joint_lower[i]), lim.joint_upper[i])
             cur = obs.qpos[i]
             lo, hi = cur - lim.max_delta_per_write, cur + lim.max_delta_per_write
+            # 增量窗口不能把目标推到关节限位之外。
             # The rate window must not push a bounded target outside joint limits.
             lo, hi = max(lo, lim.joint_lower[i]), min(hi, lim.joint_upper[i])
             if lo > hi:
@@ -135,10 +146,14 @@ class Guard:
         return out, WriteResult(applied=True, clamped=clamped)
 
     def check_target(self, pos: Vec3) -> bool:
-        """Advisory pre-check for planned cartesian targets (skills call this before moving)."""
+        """Advisory pre-check for planned cartesian targets (skills call this before moving).
+
+        技能运动前的笛卡尔目标辅助预检。
+        """
         fmin, fmax = self.limits.ee_fence_min, self.limits.ee_fence_max
         return len(pos) == 3 and _finite(pos) and all(fmin[i] <= pos[i] <= fmax[i] for i in range(3))
 
+    # 内部实现。
     # -- internals -------------------------------------------------------------
 
     def _latch(self, reason: str, kind: str) -> None:
@@ -156,4 +171,5 @@ class Guard:
         try:
             self._on_event(event)
         except Exception:
+            # 监听器故障不能破坏 Guard。
             pass  # guard never fails because a listener did

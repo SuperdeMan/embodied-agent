@@ -4,6 +4,9 @@ Pointer-not-payload policy (CLAUDE.md): git tracks this script + assets/README.m
 the downloaded model payload is gitignored. Re-run any time to (re)materialize.
 
 Usage: uv run python scripts/fetch_assets.py
+
+
+获取 MuJoCo Menagerie 机械臂模型；Git 仅跟踪脚本和来源说明，模型载荷忽略，可随时重新获取。
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DEST = ROOT / "assets" / "menagerie"
 REPO = "https://github.com/google-deepmind/mujoco_menagerie.git"
+# 上游提供 SO-ARM101 时优先选用，否则回退 SO-ARM100。
 # Prefer SO-ARM101 when Menagerie ships it; fall back to SO-ARM100.
 CANDIDATES = ["trs_so_arm101", "so_arm101", "trs_so_arm100"]
 

@@ -1,6 +1,10 @@
+# 保留移植来源，内存标准库限流逻辑不变，仅整理导入。
 # Ported from car-agent llm-gateway/ratelimit.py @ f0b08f8, changes: none (already in-memory,
 # pure stdlib; import order adjusted for ruff isort).
-"""令牌桶限流。防止单用户/全局过载。"""
+"""令牌桶限流。防止单用户/全局过载。
+
+Token buckets limit per-user and global load.
+"""
 from __future__ import annotations
 
 import logging
@@ -10,12 +14,18 @@ logger = logging.getLogger("llm.ratelimit")
 
 
 class TokenBucket:
-    """令牌桶限流器。"""
+    """令牌桶限流器。
+
+    Token-bucket rate limiter.
+    """
 
     def __init__(self, rate: float = 10, capacity: float = 20):
         """
         rate: 每秒补充的令牌数
         capacity: 桶容量（允许的突发量）
+        
+
+        Rate is tokens replenished per second; capacity defines permitted bursts.
         """
         self.rate = rate
         self.capacity = capacity
@@ -23,7 +33,10 @@ class TokenBucket:
         self.last_refill = time.monotonic()
 
     def allow(self, cost: int = 1) -> bool:
-        """消耗 cost 个令牌。返回是否允许。"""
+        """消耗 cost 个令牌。返回是否允许。
+
+        Consume the requested token cost and return whether admission succeeds.
+        """
         now = time.monotonic()
         elapsed = now - self.last_refill
         self.tokens = min(self.capacity, self.tokens + elapsed * self.rate)
@@ -37,7 +50,10 @@ class TokenBucket:
 
 
 class RateLimiter:
-    """全局 + 每 key 限流。"""
+    """全局 + 每 key 限流。
+
+    Combine global and per-key limits.
+    """
 
     def __init__(self, global_rate: float = 20, global_capacity: float = 50,
                  per_key_rate: float = 5, per_key_capacity: float = 10):

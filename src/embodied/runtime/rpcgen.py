@@ -4,6 +4,9 @@ Stubs are build artifacts (D011): regenerate any time with scripts/gen-proto.ps1
 Generated modules live under the `embodiedrpc.*` python root (proto FILE directory) while
 proto PACKAGES stay `embodied.<service>.v1` per convention — the split exists exactly so
 generated code can never collide with the real `embodied` package.
+
+
+生成的 RPC 导入适配；stubs 在忽略的 gen/python，可随时重建。Python 根名 embodiedrpc 与协议包名分离，避免覆盖真实 embodied 包。
 """
 
 from __future__ import annotations

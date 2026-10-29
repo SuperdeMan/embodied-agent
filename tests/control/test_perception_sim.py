@@ -1,5 +1,8 @@
 """Perception v1 over the real sim driver: depth render, truth-vs-perceived accuracy,
-and the perception-driven closed loop (D015). Auto-skips without mujoco/assets."""
+and the perception-driven closed loop (D015). Auto-skips without mujoco/assets.
+
+真实仿真感知测试覆盖深度、真值误差和闭环；缺 MuJoCo 或资产时跳过。
+"""
 
 from __future__ import annotations
 
@@ -42,12 +45,16 @@ def test_render_rgbd_shapes_and_plausible_depth(sim):
     assert rgb.shape == (240, 320, 3) and rgb.dtype == np.uint8
     assert depth.shape == (240, 320) and depth.dtype == np.float32
     center = depth[100:140, 140:180]
+    # 相机在桌面上方 0.75 米。
     assert 0.3 < float(np.median(center)) < 1.2  # camera sits 0.75 m above the table
 
 
 def test_perceived_position_close_to_truth(sim):
     """Multi-camera fallback (the wrapper's strategy): the arm occludes parts of the
-    sector from any single view, so detection may need the second camera."""
+    sector from any single view, so detection may need the second camera.
+
+    单相机可能被机械臂遮挡，需验证第二相机后备。
+    """
     pipeline = PerceptionPipeline(ColorBlobProvider(), dict(TABLETOP_OBJECTS))
     worst = 0.0
     for _ in range(5):
@@ -71,14 +78,19 @@ def test_perceived_sim_agent_vs_judge_views(sim):
     wrapped.reset(randomize=True)
     agent = wrapped.read()
     judge = wrapped.read_truth()
+    # 本体反馈共用真实状态。
     assert agent.qpos == judge.qpos  # proprioception is shared truth
     a, j = np.asarray(agent.objects["obj_cube"].pos), np.asarray(judge.objects["obj_cube"].pos)
+    # 结果接近真值但确实来自感知。
     assert 0.0 < float(np.linalg.norm(a - j)) <= 0.02  # close, but genuinely perceived
 
 
 def test_perception_driven_pick_place_closed_loop(sim):
     """The M2 DoD line: scripted skills acting ONLY on perceived objects, success
-    judged from ground truth."""
+    judged from ground truth.
+
+    技能仅使用感知物体，成功由独立真值判定。
+    """
     from embodied.skills.registry import SkillRegistry
     from embodied.skills.scripted.manip import register_sim_skills
 

@@ -1,5 +1,8 @@
 """Guard v0 contract tests: pure logic, no sim required. These pin SG-2 semantics —
-fix code, never tests, if they regress (docs/architecture.md §4.5)."""
+fix code, never tests, if they regress (docs/architecture.md §4.5).
+
+无仿真依赖的 Guard 纯逻辑契约；回退时修代码而非放宽断言。
+"""
 
 from __future__ import annotations
 
@@ -39,6 +42,7 @@ def test_pass_through(guard):
 def test_range_clamp(guard):
     applied, result = guard.gate(cmd(targets=(5.0, -5.0), gripper=2.0), obs(qpos=(0.95, -0.95)))
     assert result.applied and result.clamped
+    # 先按范围夹限，且仍在当前位置增量窗口内。
     assert applied.joint_targets == (1.0, -1.0)  # range-clamped, within rate window of current qpos
     assert applied.gripper == 1.0
 
@@ -46,6 +50,7 @@ def test_range_clamp(guard):
 def test_rate_clamp(guard):
     applied, result = guard.gate(cmd(targets=(0.5, 0.0)), obs(qpos=(0.0, 0.0)))
     assert result.clamped
+    # 受每写最大增量限制。
     assert applied.joint_targets[0] == pytest.approx(0.1)  # limited to max_delta_per_write
 
 
@@ -63,6 +68,7 @@ def test_bad_shape(guard):
 def test_fence_breach_latches(guard):
     applied, result = guard.gate(cmd(), obs(ee=(0.7, 0.0, 0.1)))
     assert applied is None and result.reason == "ee_fence_breach"
+    # 闩锁后即使安全命令也拒绝，直至显式重置。
     # latched: even a safe follow-up command is refused until reset
     applied2, result2 = guard.gate(cmd(), obs())
     assert applied2 is None and result2.reason.startswith("halted:")
@@ -92,5 +98,6 @@ def test_events_and_listener_faults_do_not_leak(guard):
         raise RuntimeError("listener bug")
 
     guard.set_listener(boom)
+    # 监听器异常不能破坏门禁。
     applied, result = guard.gate(cmd(), obs())  # listener fault must not break the gate
     assert result.applied

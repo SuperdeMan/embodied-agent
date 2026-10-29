@@ -3,6 +3,9 @@
 Pins the M2 impl-swap contract: policy skills register under the SAME manifests as
 the scripted skills, success comes from ground-truth predicates (never the policy),
 and guard vetoes fail the rollout closed.
+
+
+学习执行器用假本体和策略离线验证同 manifest 替换、独立效果判定与 Guard 拒绝即停止，不依赖 ONNX 或 MuJoCo。
 """
 
 from __future__ import annotations
@@ -19,12 +22,16 @@ from embodied.skills.scripted.manip import register_sim_skills
 META = PolicyMeta(chunk_size=5, control_hz=50.0, state_dim=3, env_dim=7, action_dim=3)
 
 TABLE = (0.2, 0.0, 0.015)
+# 物体在末端附近且高于持物阈值，因此判为持有。
 IN_HAND = (0.0, 0.0, 0.1)  # near ee (0,0,0.12), above GRASP_MIN_Z -> held
 IN_BIN = (0.16, -0.18, 0.03)
 
 
 class FakeEmb:
-    """Two joints + gripper; object teleports per a scripted write-count schedule."""
+    """Two joints + gripper; object teleports per a scripted write-count schedule.
+
+    两个关节加夹爪，物体按写入次数安排改变位置。
+    """
 
     def __init__(self, *, obj=TABLE, deny_after=None, schedule=()):
         self.t = 0.0
@@ -32,6 +39,7 @@ class FakeEmb:
         self.grip = 1.0
         self.obj = obj
         self.deny_after = deny_after
+        # 每项为写入次数及新的物体位置。
         self.schedule = list(schedule)  # [(write_count, new_obj_pos)]
         self.writes = 0
         self.steps = 0
@@ -90,6 +98,7 @@ def test_manifests_identical_after_impl_swap():
     register_sim_skills(hybrid, emb, skip=("skill.manip.pick", "skill.manip.place"))
     register_policy_sim_skills(hybrid, emb, pick=hold_policy(), place=hold_policy())
     assert [m.name for m in hybrid.catalog()] == [m.name for m in scripted.catalog()]
+    # 共用同一 manifest 对象，确认和验证配置不能漂移。
     # the exact manifest OBJECTS are shared — verification/require_confirm cannot drift
     assert hybrid.get("skill.manip.pick") is scripted.get("skill.manip.pick")
 
@@ -108,8 +117,10 @@ async def test_pick_succeeds_when_predicate_turns_true():
     policy = hold_policy()
     result = await invoke_pick(emb, policy)
     assert result.ok and result.data == {"object": "obj_cube"}
+    # 只在动作块边界检查完成，十二次写入在第三块发现。
     # done() is checked between chunks: 12 writes -> caught at the 3rd chunk boundary
     assert policy.resets == 1 and policy.calls == 3 and emb.writes == 15
+    # 50Hz 控制配两毫秒步长，每写推进十次物理步。
     # 50 Hz on a 2 ms sim -> 10 physics steps per write
     assert emb.steps == emb.writes * 10
 
@@ -120,9 +131,11 @@ async def test_pick_fails_closed_on_guard_veto():
 
 
 async def test_pick_horizon_reached_reports_failure():
+    # 物体一直不移动。
     emb = FakeEmb()  # object never moves
     result = await invoke_pick(emb, hold_policy())
     assert not result.ok and "horizon reached" in result.detail
+    # 耗尽抓取时间预算后停止。
     assert emb.writes == int(12.0 * 50)  # MAX_PICK_SECONDS budget, then stop
 
 
@@ -162,6 +175,7 @@ def test_runner_observe_layout_matches_converter():
     emb = FakeEmb(obj=TABLE)
     runner = PolicyRunner(emb, hold_policy())
     state, env = runner.observe()
+    # 状态由关节位置与夹爪开度拼成。
     assert np.allclose(state, [0.0, 0.0, 1.0])  # qpos + gripper_opening
     assert env.shape == (7,) and env.dtype == np.float32
     assert np.allclose(env[:3], TABLE) and np.allclose(env[3:], [1.0, 0.0, 0.0, 0.0])

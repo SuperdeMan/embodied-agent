@@ -1,3 +1,4 @@
+# 保留来源；NATS 改为可插拔本地 sink，公共事件接口保持，状态主题与默认服务名称改为本项目语义。
 # Ported from car-agent observability/events.py @ f0b08f8, changes: NATS transport replaced by pluggable Sink protocol (JsonlSink default, StdoutSink via OBS_STDOUT=1); emit_* API surface unchanged; state subject renamed robot.state.changed; change_source default now "robot"; get_emitter default service now "runtime".
 """Best-effort observability event publishing to pluggable sinks.
 
@@ -18,6 +19,9 @@ collector service. Here events go to in-process sinks instead:
 
 The public ``emit_*`` coroutine API is identical to the origin so call
 sites port unchanged.
+
+
+观测事件由后台任务调用同步 sink，异常记录后丢弃而不向调用方传播。默认写 JSONL，可选镜像标准输出；公共异步事件 API 保持兼容。
 """
 from __future__ import annotations
 
@@ -48,7 +52,10 @@ def _now_ms() -> int:
 class Sink(Protocol):
     """Pluggable event sink. ``emit`` is synchronous and is only ever called
     from the emitter's background worker; it may raise — the emitter catches
-    and drops (never propagates to the emitting caller)."""
+    and drops (never propagates to the emitting caller).
+
+    可插拔同步事件接收器由后台工作任务调用，异常由发射器捕获。
+    """
 
     def emit(self, subject: str, payload: dict) -> None: ...
 
@@ -58,6 +65,9 @@ class JsonlSink:
 
     ``OBS_DIR`` defaults to ``outputs/obs`` (relative to cwd); the directory
     is auto-created on first write.
+    
+
+    事件按 JSON Lines 追加到配置目录，首次写入创建目录。
     """
 
     def __init__(self, obs_dir: str | None = None):
@@ -77,15 +87,22 @@ class JsonlSink:
 
 
 class StdoutSink:
-    """Mirror events to stdout as JSON lines (enabled by env ``OBS_STDOUT=1``)."""
+    """Mirror events to stdout as JSON lines (enabled by env ``OBS_STDOUT=1``).
+
+    可选将相同 JSON 事件镜像到标准输出。
+    """
 
     def emit(self, subject: str, payload: dict) -> None:
+        # Read current stdout on each call so capture fixtures remain effective.
         # 每次调用取当前 sys.stdout：测试的 capsys 替换后仍然生效。
         sys.stdout.write(json.dumps({"subject": subject, **payload}, ensure_ascii=False) + "\n")
 
 
 def default_sinks() -> list[Sink]:
-    """Build the env-configured default sink set (JSONL always; stdout opt-in)."""
+    """Build the env-configured default sink set (JSONL always; stdout opt-in).
+
+    默认总有 JSONL 接收器，标准输出须显式开启。
+    """
     sinks: list[Sink] = [JsonlSink()]
     if os.getenv("OBS_STDOUT", "").strip().lower() in {"1", "true", "on"}:
         sinks.append(StdoutSink())
@@ -93,7 +110,10 @@ def default_sinks() -> list[Sink]:
 
 
 class EventEmitter:
-    """Publish observability events without affecting the primary request path."""
+    """Publish observability events without affecting the primary request path.
+
+    尽力发布观测事件，不让异常影响主请求路径。
+    """
 
     def __init__(self, service: str, sinks: list[Sink] | None = None):
         self.service = service
@@ -105,7 +125,10 @@ class EventEmitter:
         self._worker_task: asyncio.Task | None = None
 
     def _deliver(self, subject: str, payload: dict) -> None:
-        """Fan out one event to all sinks; each failure is logged and dropped."""
+        """Fan out one event to all sinks; each failure is logged and dropped.
+
+        逐个接收器分发，单个失败仅记录并丢弃。
+        """
         for sink in self.sinks:
             try:
                 sink.emit(subject, payload)
@@ -133,6 +156,7 @@ class EventEmitter:
             return
         payload.setdefault("ts", _now_ms())
         payload.setdefault("service", self.service)
+        # Attach session context automatically when present; background tasks without a session do not inject empty fields.
         # 会话维度自动携带：请求入口 set_session_id 一次，所有事件免逐点透传。
         # 后台任务（无请求上下文）取到空串则不注入，保持事件干净。
         if not payload.get("session_id"):
@@ -192,6 +216,9 @@ class EventEmitter:
 
         内容字段（user_text/speech）经 OBS_CONTENT_CAPTURE 门控 + 统一脱敏；
         error 恒脱敏（异常串可能夹带敏感参数）。ts 传请求开始时刻（缺省=发射时刻）。
+        
+
+        Emit one event per request turn; content capture is gated and redacted, errors always redacted, and timestamp defaults to emission time.
         """
         from .redact import gate_content, redact
 
@@ -236,7 +263,10 @@ class EventEmitter:
         """LLM 调用事件（provider 网关唯一出口收口）：模型/tokens/时延/缓存按 trace 归档。
         provider=实际 serving 的厂商 id；requested_tier=调用方原始 model 参数（""/@fast/具体名，
         审计谁在用什么档）；pinned=本次调用是否被请求级锁定。
-        prompt_tail/content_head 受 OBS_CONTENT_CAPTURE 门控 + 脱敏。"""
+        prompt_tail/content_head 受 OBS_CONTENT_CAPTURE 门控 + 脱敏。
+
+        Record actual provider, requested tier, model, usage, latency, cache and pinning by trace; prompt and content excerpts are capture-gated and redacted.
+        """
         from .redact import gate_content, redact
 
         await self._emit(
@@ -321,7 +351,10 @@ class EventEmitter:
             self._worker_task = None
 
     async def flush(self) -> None:
-        """Wait until queued events have been delivered or dropped."""
+        """Wait until queued events have been delivered or dropped.
+
+        等待排队事件送达或被丢弃。
+        """
         await self._queue.join()
 
 
@@ -329,7 +362,10 @@ _default_emitters: dict[str, EventEmitter] = {}
 
 
 def get_emitter(service: str = "runtime") -> EventEmitter:
-    """Return one best-effort emitter per service in the current process."""
+    """Return one best-effort emitter per service in the current process.
+
+    每个服务在当前进程中共享一个尽力发射器。
+    """
     emitter = _default_emitters.get(service)
     if emitter is None:
         emitter = EventEmitter(service)

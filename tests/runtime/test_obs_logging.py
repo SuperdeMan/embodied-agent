@@ -1,5 +1,9 @@
+# 保留来源，删除已移除传输器的测试，补结构化格式与控制台/文件日志覆盖。
 # Ported from car-agent observability/tests/test_logging_ship.py @ f0b08f8, changes: NatsLogHandler tests dropped with the handler; fresh StructuredFormatter + setup_logging (console / LOG_FILE) coverage.
-"""logging：结构化 JSON 格式、脱敏、trace/session 注入、setup_logging handler 装配。"""
+"""logging：结构化 JSON 格式、脱敏、trace/session 注入、setup_logging handler 装配。
+
+Logging tests verify JSON, redaction, trace/session injection and handler configuration.
+"""
 import json
 import logging
 

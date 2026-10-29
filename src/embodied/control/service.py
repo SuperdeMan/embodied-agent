@@ -5,6 +5,9 @@ SupervisorLink open with periodic pings. When supervision is required, a stale/a
 link LATCHES the halt (only an explicit Reset releases it) — kill any upstream process
 and the arm stops and stays stopped. The latch also drives the in-driver Guard when a
 sim is attached, so an in-flight motion is denied at the write path, not just new calls.
+
+
+控制进程通过 gRPC 提供技能。监督链缺失或过期时闩锁，显式重置才释放；有仿真时同时闩锁驱动 Guard，阻断进行中的写入。
 """
 
 from __future__ import annotations
@@ -42,6 +45,7 @@ class ControlState:
         self.halted = True
         self.halt_reason = reason
         if self.sim is not None and hasattr(self.sim, "guard"):
+            # 驱动层同时拒绝进行中的写入。
             self.sim.guard.estop(reason)  # deny in-flight writes at the driver path too
 
     def reset(self, reason: str) -> None:
@@ -81,6 +85,7 @@ def build_servicer(state: ControlState):
             if state.halted or not state.supervision_ok():
                 reason = state.halt_reason or "supervisor_link_down"
                 if not state.halted and state.require_supervisor:
+                    # 监督缺席不仅拒绝本次调用，还闩锁后续执行。
                     state.halt(reason)  # absent supervision latches, not just rejects
                 yield ev(pb2.SkillEvent.HALTED, f"halted: {reason}", "halted")
                 return
@@ -100,6 +105,7 @@ def build_servicer(state: ControlState):
             except Exception as e:
                 yield ev(pb2.SkillEvent.FAILED, f"{type(e).__name__}: {e}", "invoke_error")
                 return
+            # 停止与运动竞争时如实报告停止。
             if state.halted:  # halt raced the motion: report honestly
                 yield ev(pb2.SkillEvent.HALTED, f"halted during execution: {state.halt_reason}", "halted")
                 return
@@ -152,7 +158,10 @@ def build_servicer(state: ControlState):
 
 async def watchdog_loop(state: ControlState, interval_s: float = 0.2) -> None:
     """Latches halt when a required supervisor goes stale WITHOUT the stream closing
-    (e.g. frozen process: TCP stays up, pings stop)."""
+    (e.g. frozen process: TCP stays up, pings stop).
+
+    监督流未关闭但心跳过期也闩锁，例如 TCP 仍连接而进程冻结。
+    """
     while True:
         if (
             state.require_supervisor and state.supervisor_connected

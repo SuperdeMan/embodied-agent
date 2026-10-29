@@ -1,5 +1,8 @@
 """Teleop session over the real sim driver. Auto-skips like the other sim tests
-(CI has no mujoco/assets; run locally via `uv run --group sim pytest tests/control`)."""
+(CI has no mujoco/assets; run locally via `uv run --group sim pytest tests/control`).
+
+真实仿真上的遥操作测试，缺少依赖或资产时按同类测试规则跳过。
+"""
 
 from __future__ import annotations
 
@@ -34,6 +37,7 @@ def test_jog_moves_ee_and_records(sim, tmp_path):
     session = TeleopSession(sim, task="teleop smoke", root=tmp_path)
     session.start_episode(randomize=False)
     before = sim.read().ee_pose.pos
+    # 向上两厘米，处于围栏和可达范围内。
     result = session.jog(0.0, 0.0, 0.02)  # 2 cm up: safely inside fence and reach
     after = sim.read().ee_pose.pos
     assert result.ok, result.reason
@@ -45,6 +49,7 @@ def test_jog_moves_ee_and_records(sim, tmp_path):
     assert meta["success"] is True and meta["aborted"] is False
     assert meta["extra_meta"]["collector"] == TELEOP_COLLECTOR_ID
     assert meta["extra_meta"]["state_names"][-1] == "Jaw"
+    # 钩子将步骤写入记录。
     assert meta["length"] > 0  # hooks streamed steps into the episode
 
 
@@ -52,8 +57,10 @@ def test_fence_jog_refused_without_motion(sim, tmp_path):
     session = TeleopSession(sim, task="t", root=tmp_path, record=False)
     session.start_episode(randomize=False)
     before = sim.read().ee_pose.pos
+    # 明显高于工作区围栏。
     result = session.jog(0.0, 0.0, 5.0)  # far above the workspace fence
     assert not result.ok and result.reason in ("fence", "unreachable")
+    # 拒绝时完全不运动。
     assert math.dist(before, sim.read().ee_pose.pos) < 1e-6  # fail closed: no motion at all
 
 
@@ -65,7 +72,9 @@ def test_gripper_toggle_roundtrip(sim, tmp_path):
     mid = sim.read().gripper_opening
     assert session.toggle_gripper()
     end = sim.read().gripper_opening
+    # 位置确实改变。
     assert abs(mid - start) > 0.15  # visibly moved
+    # 又向初始位置靠近。
     assert abs(end - start) < abs(mid - start)  # and came back toward the start side
 
 

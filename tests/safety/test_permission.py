@@ -1,5 +1,9 @@
+# 保留来源，夹具改为机器人权限目录，排除未移植验证器，补动作映射测试。
 # Ported from car-agent security/tests/test_permission.py @ f0b08f8, changes: scope fixtures rewritten to the robot catalog (arm/gripper/camera/mic/speaker/memory/net); SlotValidator tests dropped (injection module not ported); check_action coverage added for the new map.
-"""安全模块单元测试：scope 覆盖、trust 上限、权限引擎、运行时唯一决策。"""
+"""安全模块单元测试：scope 覆盖、trust 上限、权限引擎、运行时唯一决策。
+
+Safety tests cover scope hierarchy, trust ceilings and the shared runtime decision.
+"""
 import pytest
 
 from embodied.safety.permission import (
@@ -24,6 +28,7 @@ from embodied.safety.scopes import (
     is_scope_covered,
 )
 
+# Scope coverage tests.
 # ─── Scope 覆盖测试 ───
 
 
@@ -47,6 +52,7 @@ def test_empty_effective():
     assert is_scope_covered("arm.move", set()) is False
 
 
+# Trust-level ceiling tests.
 # ─── trust_level 上限测试 ───
 
 
@@ -82,6 +88,7 @@ def test_deny_third_party_strips_actuation_and_sensors():
                              SPEAKER_SAY, NET_FETCH}) == {SPEAKER_SAY, NET_FETCH}
 
 
+# Permission engine tests.
 # ─── PermissionEngine 测试 ───
 
 
@@ -110,6 +117,7 @@ def test_third_party_denied_actuation_in_effective_scopes():
     engine = PermissionEngine()
     auth = AuthContext(token_scopes=[ARM_MOVE, CAMERA_READ, SPEAKER_SAY])
     m = MockManifest(trust_level="third_party")
+    # Third-party dangerous scopes are removed even when token grants them.
     # third_party 即使 token 授予了执行器/相机也被剔除
     eff = engine.effective_scopes(m, auth)
     assert ARM_MOVE not in eff
@@ -134,19 +142,29 @@ def test_empty_required_always_allowed():
     assert d.allowed is True
 
 
+# Planning and execution use the same runtime permission decision.
 # ─── check_permission：运行时唯一权限决策（规划期过滤 + 执行期同源）───
 
 
 @pytest.mark.parametrize("trust,required,granted,kind,allowed", [
+    # No required scopes allows the call.
     ("first_party", [], [], "agent", True),                                   # 无 required 放行
+    # Parent scopes cover children.
     ("first_party", ["arm.move"], ["arm"], "agent", True),                    # 父覆盖子
+    # Sibling scopes do not cover each other.
     ("first_party", ["gripper.open"], ["gripper.close"], "agent", False),     # 兄弟不覆盖
+    # Third-party actuation is denied despite grants.
     ("third_party", ["arm.move"], ["arm"], "agent", False),                   # 第三方执行器硬禁（虽授权）
+    # Tool actuation is denied despite grants.
     ("first_party", ["arm.move"], ["arm.move"], "tool", False),               # 工具执行器硬禁（虽授权）
+    # Granted first-party actuation is allowed.
     ("first_party", ["arm.move"], ["arm.move"], "agent", True),               # first_party 授权可执行
+    # Third-party gripper actuation is also denied.
     ("third_party", ["gripper.close"], ["gripper.close"], "agent", False),    # 第三方夹爪同样硬禁
+    # Required permission missing.
     ("first_party", ["net.fetch"], ["camera.read"], "agent", False),          # 缺权
     ("first_party", ["net.fetch", "camera.read"],
+     # All required scopes covered.
      ["net.fetch", "camera.read"], "agent", True),                            # 全覆盖
 ])
 def test_check_permission_contract(trust, required, granted, kind, allowed):
@@ -180,7 +198,10 @@ def test_check_permission_tool_actuation_reason():
 
 
 def test_permission_engine_check_delegates_to_check_permission():
-    """PermissionEngine.check 委托 check_permission：token∪user_grants 作 granted。"""
+    """PermissionEngine.check 委托 check_permission：token∪user_grants 作 granted。
+
+    PermissionEngine delegates to the common decision with unioned token and user grants.
+    """
     engine = PermissionEngine()
     m = MockManifest(trust_level="first_party")
     auth = AuthContext(token_scopes=[NET_FETCH],
@@ -189,6 +210,7 @@ def test_permission_engine_check_delegates_to_check_permission():
     assert d.allowed is True
 
 
+# Execution-layer action permission checks.
 # ─── check_action：执行层动作级校验 ───
 
 

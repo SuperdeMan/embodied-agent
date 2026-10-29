@@ -4,6 +4,9 @@ M1 scouting (docs/roadmap.md): proves the sim asset + toolchain before real work
 Local-only — CI installs neither the sim group nor the assets.
 
 Usage: uv run --group sim python scripts/sim_smoke.py [out.png]
+
+
+加载模型、推进物理并渲染离屏帧，验证仿真资产和工具链；仅本地运行，轻量 CI 不安装仿真依赖及资产。
 """
 
 from __future__ import annotations

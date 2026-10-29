@@ -3,6 +3,9 @@
 Joint-space interpolation with guard-checked writes; a single denied write aborts
 the whole motion (the guard latches on breach — motions never fight it). These run
 synchronously and are wrapped in asyncio.to_thread by the skill handlers.
+
+
+阻塞运动原语进行关节插值，每次写入经 Guard；任一次拒绝终止整段运动，由技能线程调用。
 """
 
 from __future__ import annotations
@@ -66,7 +69,10 @@ def reach(
     gripper: float | None = None,
 ) -> bool:
     """IK to a cartesian grasp-site target, then joint-space move. Fails closed:
-    unreachable target (per tolerance) or fence-vetoed target → no motion at all."""
+    unreachable target (per tolerance) or fence-vetoed target → no motion at all.
+
+    先求笛卡尔抓取点逆解再做关节运动；不可达或围栏拒绝时不运动。
+    """
     target = np.asarray(target_pos, dtype=float)
     if hasattr(emb, "guard") and not emb.guard.check_target(tuple(target)):
         return False

@@ -1,4 +1,7 @@
-"""GuardedProvider: cache + rate-limit wiring around the provider contract."""
+"""GuardedProvider: cache + rate-limit wiring around the provider contract.
+
+验证提供方契约外的缓存和限流接线。
+"""
 
 from __future__ import annotations
 
@@ -32,19 +35,25 @@ async def test_cache_hit_skips_inner():
     g = GuardedProvider(inner, cache=LLMCache(ttl_seconds=60), limiter=RateLimiter(global_rate=100, global_capacity=100))
     r1 = await g.complete(MSGS, "m", 0.1, 64)
     r2 = await g.complete(MSGS, "m", 0.1, 64)
+    # 正文由缓存返回。
     assert r1[0] == r2[0] and inner.completes == 1  # content served from cache
     r3 = await g.complete([{"role": "user", "content": "other"}], "m", 0.1, 64)
+    # 不同消息不命中缓存。
     assert r3[0] == "r2" and inner.completes == 2  # different messages miss
 
 
 async def test_complete_tools_never_cached():
     """The ported cache cannot represent tool_calls; planning calls must always hit the
-    provider (a silently dropped tool_calls list would look like 'no plan')."""
+    provider (a silently dropped tool_calls list would look like 'no plan').
+
+    旧缓存不能表达工具调用，规划请求必须到达提供方，不能丢工具列表伪装成无计划。
+    """
     inner = CountingProvider()
     g = GuardedProvider(inner, cache=LLMCache(ttl_seconds=60), limiter=RateLimiter(global_rate=100, global_capacity=100))
     out1 = await g.complete_tools(MSGS, "m", 0.1, 64, tools=[{"a": 1}])
     out2 = await g.complete_tools(MSGS, "m", 0.1, 64, tools=[{"a": 1}])
     assert inner.tool_calls == 2
+    # 两次工具调用结果均完整。
     assert out1[4] and out2[4]  # tool_calls intact both times
 
 
@@ -52,6 +61,7 @@ async def test_rate_limit_raises_after_wait_cap(monkeypatch):
     monkeypatch.setenv("LLM_RATE_WAIT_CAP_S", "0.3")
     inner = CountingProvider()
     g = GuardedProvider(inner, cache=None, limiter=RateLimiter(global_rate=0.001, global_capacity=1))
+    # 消耗唯一可用令牌。
     await g.complete(MSGS, "m", 0.1, 64)  # consumes the single token
     with pytest.raises(RateLimited):
         await g.complete([{"role": "user", "content": "again"}], "m", 0.1, 64)

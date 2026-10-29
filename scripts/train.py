@@ -9,6 +9,9 @@ root (no hub), hub push off, wandb off (lerobot default), dataloader workers 0
 ``outputs/train/<dataset-name>/checkpoints/last/pretrained_model`` — the input
 ``scripts/export_onnx.py`` expects. Anything beyond these knobs: call lerobot-train
 directly; this wrapper deliberately stays thin so lerobot upgrades stay cheap.
+
+
+一条命令调用上游 ACT 训练：本地数据、关闭 Hub 上传与 wandb、Windows 零数据加载子进程、适配 CPU 的纯状态模型。检查点路径供导出脚本直接消费；高级选项直接使用上游工具。
 """
 
 from __future__ import annotations
@@ -60,6 +63,7 @@ def main() -> int:
         f"--seed={args.seed}",
         f"--log_freq={args.log_freq}",
         f"--save_freq={args.save_freq if args.save_freq > 0 else args.steps}",
+        # Windows 的 spawn 数据加载子进程在此开销高于收益。
         "--num_workers=0",  # Windows: spawn-based dataloader workers cost more than they give here
     ]
     if args.device:

@@ -4,6 +4,9 @@ Duck-types SkillRegistry for the planner engine (catalog/tool_schemas/resolve_to
 invoke); manifests come from ListSkills, invocation streams SkillEvents until terminal.
 The confirm UX stays in agent-core; the `confirmed` flag rides the SkillCommand — the
 control process still re-checks require_confirm at its own registry (defense in depth).
+
+
+远端注册表从控制服务获取 manifest 并流式调用至终态；Agent 负责确认交互，确认标记跨 RPC 传递，控制端再独立校验。
 """
 
 from __future__ import annotations
@@ -34,6 +37,7 @@ class RemoteSkillRegistry:
             self._manifests[m.name] = m
         return self
 
+    # 技能注册表接口。
     # -- SkillRegistry surface -------------------------------------------------
 
     def get(self, name: str) -> SkillManifest:
@@ -57,6 +61,7 @@ class RemoteSkillRegistry:
     async def invoke(self, name: str, params: dict[str, Any] | None = None, *, confirmed: bool = False) -> SkillResult:
         manifest = self.get(name)
         if manifest.require_confirm and not confirmed:
+            # 与进程内注册表相同的本地确认门。
             raise ConfirmationRequired(name)  # same local gate as the in-process registry
         merged = SkillRegistry._validate_params(manifest, {} if params is None else params)
         cmd = self._pb2.SkillCommand(

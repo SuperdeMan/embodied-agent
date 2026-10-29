@@ -1,5 +1,9 @@
+# 保留来源；删除 NATS 日志传输，改为控制台与可选文件日志入口。
 # Ported from car-agent observability/logging.py @ f0b08f8, changes: NatsLogHandler dropped (log shipping superseded by JSONL sink design); setup_structured_logging(service) replaced by setup_logging() with console + optional LOG_FILE file handler.
-"""结构化日志 + 敏感字段脱敏。"""
+"""结构化日志 + 敏感字段脱敏。
+
+Structured logging with sensitive-field redaction.
+"""
 from __future__ import annotations
 
 import json
@@ -11,7 +15,10 @@ from .redact import SENSITIVE_PATTERNS as _SHARED_PATTERNS
 
 
 class StructuredFormatter(logging.Formatter):
-    """结构化 JSON 日志格式。敏感字段自动脱敏（规则与观测事件共享 redact.py）。"""
+    """结构化 JSON 日志格式。敏感字段自动脱敏（规则与观测事件共享 redact.py）。
+
+    JSON log formatting shares redaction rules with observability events.
+    """
 
     SENSITIVE_PATTERNS = _SHARED_PATTERNS
 
@@ -23,6 +30,7 @@ class StructuredFormatter(logging.Formatter):
             "msg": record.getMessage(),
         }
 
+        # Attach trace and session IDs for direct incident lookup.
         # 附加 trace_id / session_id（如有）——badcase 排查按 id 直接 grep/检索
         from .tracing import get_session_id, get_trace_id
         tid = get_trace_id()
@@ -32,6 +40,7 @@ class StructuredFormatter(logging.Formatter):
         if sid:
             log_data["session_id"] = sid
 
+        # Attach extra structured fields.
         # 附加额外字段
         if hasattr(record, "extra_data"):
             log_data.update(record.extra_data)
@@ -49,6 +58,9 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> None:
     """配置结构化日志：stdout JSON 恒开；文件 handler 可选。
 
     log_file 参数缺省时读 env ``LOG_FILE``（非空即追加一个同格式的文件 handler）。
+    
+
+    Always enable JSON stdout logging and optionally add a matching file handler from argument or environment.
     """
     root = logging.getLogger()
     root.setLevel(getattr(logging, level.upper(), logging.INFO))
@@ -65,6 +77,7 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> None:
         handlers.append(file_handler)
     root.handlers = handlers
 
+    # Reduce noisy library logging.
     # 降低吵闹库的日志级别
     for name in ("grpc", "urllib3", "httpx"):
         logging.getLogger(name).setLevel(logging.WARNING)

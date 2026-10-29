@@ -1,6 +1,9 @@
 """Contract tests pinning the two registry invariants (see registry.py docstring).
 
 If one of these fails, the architecture regressed — fix the code, never the test.
+
+
+契约固定注册表两项不变量，失败意味着架构回退，须修实现而非测试。
 """
 
 from __future__ import annotations
@@ -61,7 +64,10 @@ async def test_unknown_skill(registry):
 
 
 async def test_confirm_gate_cannot_be_bypassed(registry):
-    """SG-3: the gate lives in the registry, below any planner bug."""
+    """SG-3: the gate lives in the registry, below any planner bug.
+
+    确认门在 Registry 内，位于任何规划错误之下。
+    """
     executed: list[str] = []
 
     async def dangerous() -> SkillResult:

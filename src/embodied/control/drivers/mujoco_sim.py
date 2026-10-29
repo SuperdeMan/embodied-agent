@@ -3,6 +3,9 @@
 Ground-truth object poses flow into Observation.objects until perception lands (M2).
 Every write passes through the Safety Guard — skills cannot reach data.ctrl directly,
 which is exactly the seam the real-hardware driver (M3) will preserve.
+
+
+首个本体实现为 MuJoCo 桌面仿真；物体真值或感知进入观察表，每次写入强制经过 Guard，后续真机沿用此边界。
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ GRASP_SITE = "grasp"
 OBJECT_PREFIX = "obj_"
 REGION_SUFFIX = "_region"
 
+# 夹爪关节位置与归一化开度按模型指垫几何标定。
 # Jaw qpos ↔ normalized opening (calibrated against the Menagerie model's pad geometry).
 JAW_CLOSED_Q = 0.0
 JAW_OPEN_Q = 1.2
@@ -41,7 +45,10 @@ StepHook = Callable[[Observation, ActionCommand | None], None]
 
 
 class TabletopSim:
-    """Implements the Embodiment protocol plus reach-solving for scripted skills."""
+    """Implements the Embodiment protocol plus reach-solving for scripted skills.
+
+    实现本体协议并为脚本技能提供可达求解。
+    """
 
     def __init__(
         self,
@@ -59,6 +66,7 @@ class TabletopSim:
         self._rng = np.random.default_rng(seed)
         self._on_step = on_step
         self._last_cmd: ActionCommand | None = None
+        # 默认随机化范围属于版本化任务语义，修改须新任务版本；覆盖值仅供定向采集。
         # The DEFAULTS are part of eval task semantics (tabletop_pick_place@v1 documents
         # them) — never change them without a new task version. Overrides exist for
         # targeted data collection (e.g. oversampling a failure zone).
@@ -81,6 +89,7 @@ class TabletopSim:
         self._objects: dict[str, int] = {}
         self._object_qpos_adr: dict[str, int] = {}
         self._object_default: dict[str, np.ndarray] = {}
+        # 以初始关节状态提取物体生成位姿。
         mujoco.mj_resetData(m, self.data)  # qpos0 baseline, used to capture object spawn poses
         for b in range(m.nbody):
             name = mujoco.mj_id2name(m, mujoco.mjtObj.mjOBJ_BODY, b) or ""
@@ -91,6 +100,7 @@ class TabletopSim:
                     adr = int(m.jnt_qposadr[jadr])
                     self._object_qpos_adr[name] = adr
                     default = self.data.qpos[adr : adr + 7].copy()
+                    # 初始状态丢失 XML 位姿时回退物体坐标。
                     if np.linalg.norm(default[:3]) < 1e-9:  # qpos0 lost the XML pose; fall back to body frame
                         default = np.concatenate([m.body_pos[b], m.body_quat[b]])
                     self._object_default[name] = default
@@ -106,6 +116,7 @@ class TabletopSim:
         )
         self.reset()
 
+    # 本体接口实现。
     # -- Embodiment protocol ---------------------------------------------------
 
     def spec(self) -> EmbodimentSpec:
@@ -160,6 +171,7 @@ class TabletopSim:
             self._on_step(self.read(), self._last_cmd)
 
     def reset(self, *, randomize: bool = False) -> Observation:
+        # 上游 home 关键帧没有新增物体自由关节；仅对机械臂和夹爪应用关键帧，物体使用生成位姿，避免零填充导致传送到基座。
         # The upstream "home" keyframe predates our scene objects (MuJoCo zero-pads the
         # extra free-joint slots, which would teleport objects into the arm base), so
         # apply it selectively: arm+jaw from the keyframe, objects from their spawn poses.
@@ -176,9 +188,11 @@ class TabletopSim:
         self.guard.reset()
         self._last_cmd = None
         mujoco.mj_forward(m, self.data)
+        # 伺服保持初始姿态，等待自由物体重力沉降。
         self.step(100)  # let free objects settle under gravity while servos hold home
         return self.read()
 
+    # 脚本技能使用的扩展能力。
     # -- extras used by scripted skills ---------------------------------------
 
     @property
@@ -190,7 +204,10 @@ class TabletopSim:
         on_step: StepHook | None = None,
         on_guard_event: Callable[[GuardEvent], None] | None = None,
     ) -> None:
-        """Attach/detach per-episode listeners (recorder wiring)."""
+        """Attach/detach per-episode listeners (recorder wiring).
+
+        挂接或解除本局录制监听器。
+        """
         self._on_step = on_step
         self.guard.set_listener(on_guard_event)
 
@@ -234,7 +251,10 @@ class TabletopSim:
         request breaks camera geometry downstream. Thread-keyed: GL contexts bind to
         the creating thread — sharing one renderer between the main thread and a
         perception render thread yields stale/garbage frames (WGL make-current
-        failures), so each thread owns its instances outright."""
+        failures), so each thread owns its instances outright.
+
+        渲染器按线程、尺寸和类型缓存；尺寸错误破坏相机几何，跨线程共享 GL 上下文会产生陈旧帧或 WGL 失败，因此各线程独占实例。
+        """
         cache: dict[tuple[int, int, int, bool], mujoco.Renderer] = self.__dict__.setdefault("_renderers", {})
         key = (threading.get_ident(), width, height, depth)
         r = cache.get(key)
@@ -251,7 +271,10 @@ class TabletopSim:
         return r.render()
 
     def render_rgbd(self, camera: str = "side", width: int = 640, height: int = 480):
-        """RGB frame + metric depth map (meters along the view axis) — perception input."""
+        """RGB frame + metric depth map (meters along the view axis) — perception input.
+
+        感知输入为 RGB 与沿视轴的米制深度图。
+        """
         rgb = self.render(camera, width, height)
         d = self._renderer_for(width, height, depth=True)
         d.update_scene(self.data, camera=camera)
@@ -262,6 +285,7 @@ class TabletopSim:
 
         return CameraModel.from_mujoco(self.model, self.data, camera, width, height)
 
+    # 内部实现。
     # -- internals -------------------------------------------------------------
 
     def _name2id(self, objtype: int, name: str) -> int:
@@ -277,7 +301,10 @@ class TabletopSim:
         return Pose(pos=tuple(map(float, pos)), quat=tuple(map(float, quat)))
 
     def _randomize_objects(self) -> None:
-        """Uniform placement in the (calibrated, or overridden) reachable sector, away from the bin."""
+        """Uniform placement in the (calibrated, or overridden) reachable sector, away from the bin.
+
+        在已标定或覆盖的可达扇区均匀放置，避开容器。
+        """
         for name, adr in self._object_qpos_adr.items():
             for _ in range(64):
                 r = self._rng.uniform(*self._spawn_radial)
@@ -285,6 +312,7 @@ class TabletopSim:
                     math.radians(self._spawn_angle_deg[0]), math.radians(self._spawn_angle_deg[1])
                 )
                 x, y = r * math.cos(theta), r * math.sin(theta)
+                # 与容器保持间隔。
                 if math.hypot(x - 0.16, y + 0.18) < 0.10:  # keep clear of the bin
                     continue
                 self.data.qpos[adr : adr + 7] = [x, y, 0.0155, 1.0, 0.0, 0.0, 0.0]

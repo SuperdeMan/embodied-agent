@@ -1,3 +1,4 @@
+# 保留来源与核心契约；能力来自技能注册表，重写桌面机器人提示，去掉旧领域补槽与知识通道；保留原子拒绝、依赖修复、两次解析和 manifest 权威链。
 # Ported from car-agent orchestrator/cloud/planning.py @ f0b08f8, changes: capabilities are
 # SkillManifests from SkillRegistry (agent_id/intent → skill; re-homing dropped — skill names
 # are globally unique by construction); prompt rewritten for a desktop robot planner (Chinese
@@ -13,6 +14,9 @@ Iron rules pinned by contract tests:
   remainder drops user intents and falsely reports completion).
 - `require_confirm` / `verification` / `timeout_s` are populated from the SkillManifest;
   same-named fields in LLM output are never read (authority chain, D009).
+
+
+模型经 submit_plan 生成经校验 DAG；计划原子接受，任一步非法拒绝全计划。确认、验证和超时由 manifest 控制，不读模型同名字段。
 """
 
 from __future__ import annotations
@@ -61,7 +65,10 @@ def _skill_catalog(manifests: list[SkillManifest]) -> str:
 def submit_plan_tools() -> list[dict]:
     """OpenAI-style tools list for BaseProvider.complete_tools. Schema top level = the plan
     dict consumed by validation — zero semantic drift between wire and validation. No
-    require_confirm in schema: confirmation authority is never the LLM's (origin M0a)."""
+    require_confirm in schema: confirmation authority is never the LLM's (origin M0a).
+
+    工具协议顶层与计划校验一致；不暴露确认权字段给模型。
+    """
     step_props = {
         "id": {"type": "string"},
         "skill": {"type": "string"},
@@ -110,7 +117,10 @@ class PlanBuilder:
 
     async def build(self, text: str, context_block: str = "") -> Plan:
         """Two attempts; each: toolcall channel first, same-round JSON salvage from content.
-        Still nothing valid → empty plan marked degraded_chat (engine answers conversationally)."""
+        Still nothing valid → empty plan marked degraded_chat (engine answers conversationally).
+
+        最多两次尝试，每次优先工具调用，再挽救同轮正文 JSON；仍无有效计划则降级对话。
+        """
         manifests = self._registry.catalog()
         by_name = {m.name: m for m in manifests}
         messages = [
@@ -140,6 +150,7 @@ class PlanBuilder:
                 no_action += 1
 
         if no_action >= 2:
+            # 连续两次明确无动作需求应尊重回答，不反复猜测模型是否失败。
             # The model said "no action needed" twice: that's its answer, not a failure —
             # second-guessing an explicit answer is what the origin learned NOT to do.
             return Plan(steps=[], raw_text=text, plan_mode="no_action_chat", raw_llm=last_raw)
@@ -167,6 +178,7 @@ class PlanBuilder:
         plan.raw_llm = raw
         return plan
 
+    # 传输格式处理。
     # -- wire ------------------------------------------------------------------
 
     async def _call(self, messages: list[dict]) -> tuple[str, dict | None]:
@@ -205,6 +217,7 @@ class PlanBuilder:
             return None
         return data if isinstance(data, dict) else None
 
+    # 计划原子校验。
     # -- validation (atomic) ---------------------------------------------------
 
     def _validated_steps(self, raw_steps: Any, by_name: dict[str, SkillManifest]) -> list[Step]:
@@ -251,6 +264,7 @@ class PlanBuilder:
             deps_raw = s.get("depends_on")
             deps = [d for d in deps_raw if isinstance(d, str)] if isinstance(deps_raw, list) else []
             params = dict(raw_params)
+            # 补齐默认参数，使验证引用看到技能实际使用的值。
             # Fill manifest defaults for omitted params so the step carries its EFFECTIVE
             # values: $param: verification refs must see what the skill will actually use,
             # not just what the LLM bothered to write.
@@ -263,6 +277,7 @@ class PlanBuilder:
                 params=params,
                 depends_on=deps,
                 param_refs=refs,
+                # 权威仅来自 manifest；模型同名确认与验证字段不获执行权。
                 # Authority chain: manifest only. LLM-supplied require_confirm/verification
                 # keys in the step dict are unknown-params-rejected above anyway.
                 require_confirm=manifest.require_confirm,
@@ -281,6 +296,7 @@ class PlanBuilder:
         self._derive_depends_on_from_refs(steps, valid_ids)
         return steps
 
+    # 引用其他步骤输出即构成依赖；补齐遗漏边避免错误并发，不虚构生产者，自引用按循环处理。
     # Referencing another step's output IS the definition of a dependency; models often
     # write the ref but leave depends_on empty — that's a self-contradictory plan, and the
     # topo sort would run both in one parallel layer. Repair the contradiction; never

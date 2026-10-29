@@ -6,6 +6,9 @@ model is staged verbatim except for one patch: a `grasp` site injected into the
 Fixed_Jaw body — the upstream model ships no end-effector site and differential IK
 needs one. The patch anchors on the Wrist_Roll joint line, which is stable because
 assets are pinned by commit (see assets/README.md and <model>/.source).
+
+
+场景在每进程 ASCII 临时目录构建，规避原生解析器不支持中文路径；上游模型仅补抓取点，稳定锚点由固定资产提交保证。
 """
 
 from __future__ import annotations
@@ -36,7 +39,10 @@ def find_menagerie_model(root: Path | None = None) -> Path:
 
 
 def stage_tabletop(model_dir: Path | None = None, scene_template: Path | None = None) -> Path:
-    """Stage arm model + tabletop scene into an ASCII dir; return the loadable scene path."""
+    """Stage arm model + tabletop scene into an ASCII dir; return the loadable scene path.
+
+    将模型与桌面场景暂存到 ASCII 路径，返回可加载文件。
+    """
     model_dir = model_dir or find_menagerie_model()
     scene_template = scene_template or repo_root() / "sim" / "tabletop.xml"
     key = (str(model_dir), str(scene_template))

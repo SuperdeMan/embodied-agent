@@ -4,18 +4,23 @@ package embodied.control.v1;
 
 import "embodiedrpc/common/v1/common.proto";
 
+// 认知到控制的唯一通道仅引用注册技能，不允许原始电机指令。
 // agent-core (System 2) → realtime-control (System 1).
 // This is the ONLY channel through which cognition reaches actuators:
 // commands reference registered skills, never raw motor values (D009).
 service ControlService {
+  // 提供技能目录供远端规划器构建注册表。
   // Skill catalog so agent-core can build its planner registry remotely.
   rpc ListSkills(ListSkillsRequest) returns (ListSkillsReply);
+  // 执行一个技能并持续返回进度，直至终态。
   // Execute one skill; server streams progress until a terminal phase.
   rpc InvokeSkill(SkillCommand) returns (stream SkillEvent);
   rpc StreamState(StateRequest) returns (stream embodied.common.v1.RobotState);
+  // 停止闩锁急停状态，仅显式重置释放。
   // Halt latches the estop state; only an explicit Reset releases it.
   rpc Halt(HaltRequest) returns (HaltReply);
   rpc Reset(ResetRequest) returns (ResetReply);
+  // Guardian 持有监督链；要求监督时连接缺席或过期即停止。
   // Liveness channel held open by the safety guardian (SG-2 chain:
   // agent-core -> guardian Heartbeat, guardian -> control SupervisorLink).
   // Stale/absent link while supervision is required => halt.
@@ -30,7 +35,7 @@ message ListSkillsReply {
 }
 
 message SkillInfo {
-  string manifest_json = 1; // full SkillManifest, JSON-serialized (schema owned by python model)
+  string manifest_json = 1; // 完整技能声明，结构由 Python 模型定义 / full SkillManifest, JSON-serialized (schema owned by python model)
 }
 
 message ResetRequest {
@@ -42,10 +47,10 @@ message ResetReply {
 }
 
 message SkillCommand {
-  string command_id = 1;  // idempotency key
-  string skill = 2;       // e.g. "skill.manip.pick"
-  string params_json = 3; // validated against the skill manifest before execution
-  bool confirmed = 4;     // require_confirm skills must carry true (re-checked downstream)
+  string command_id = 1;  // 请求标识，持久接收去重尚待接线 / request identity; durable receiver dedup remains pending
+  string skill = 2;       // 技能标识示例 / e.g. "skill.manip.pick"
+  string params_json = 3; // 执行前按技能声明校验 / validated against the skill manifest before execution
+  bool confirmed = 4;     // 危险技能需为真，下游再次校验 / require_confirm skills must carry true (re-checked downstream)
   string trace_id = 5;
 }
 
@@ -63,7 +68,7 @@ message SkillEvent {
   string detail = 3;
   embodied.common.v1.RobotState state = 4;
   embodied.common.v1.Error error = 5;
-  string data_json = 6; // SkillResult.data on terminal events (param_refs need it upstream)
+  string data_json = 6; // 终态结构化结果供上游参数引用 / SkillResult.data on terminal events (param_refs need it upstream)
 }
 
 message StateRequest {

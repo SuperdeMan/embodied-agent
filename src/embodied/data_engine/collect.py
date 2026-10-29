@@ -6,6 +6,9 @@ Success is judged against sim ground truth, never the skill's self-report; faile
 episodes are kept and labeled (architecture §4.6 — failure data is an asset).
 skill_start/skill_end events carry ``sim_t`` at the TRUE skill boundaries so the
 LeRobot converter can segment episodes per skill (docs/decisions.md D014).
+
+
+脚本专家直接经 Registry 在随机场景采集，默认录制；真值独立判定，失败保留标记。技能起止事件携带实际仿真时间，供按技能切分训练数据。
 """
 
 from __future__ import annotations
@@ -52,10 +55,14 @@ async def collect_episodes(
     A failed skill aborts the remaining sequence but the episode is still finalized
     (success=False) — partial trajectories train recovery behaviors later. ``judge``
     runs on a fresh ground-truth snapshot only when every skill reported ok.
+    
+
+    运行指定次数的专家序列；失败即中止后续技能但仍保存失败轨迹，全部技能成功后才对新真值快照判定。
     """
     recorder = EpisodeRecorder(root)
     report = CollectReport()
     spec = sim.spec()
+    # 保存关节名称使状态列自描述，缺失时回退通用列名。
     # Self-describing datasets: joint names ride along so the converter can label
     # observation.state columns (falls back to generic names when absent).
     state_names = [j.name for j in getattr(spec, "joints", ())]

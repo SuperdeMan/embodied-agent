@@ -31,6 +31,7 @@ def test_object_in_region():
 
 def test_margin_semantics():
     snap = make_snap()
+    # 位于边界外一毫米。
     snap.objects["obj_cube"] = Pose(pos=(0.16 + 0.046, -0.18, 0.045))  # 1mm outside
     assert not object_in_region(snap, "obj_cube", "bin_region")
     assert object_in_region(snap, "obj_cube", "bin_region", margin=0.002)

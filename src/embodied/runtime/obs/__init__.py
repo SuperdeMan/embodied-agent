@@ -1,5 +1,9 @@
+# 保留来源，未移植指标模块；新增 sink 导出并重命名日志初始化入口。
 # Ported from car-agent observability/__init__.py @ f0b08f8, changes: metrics module not ported (dropped export); sink-based emitter exports added; setup_structured_logging renamed setup_logging.
-"""可观测模块：trace 贯通 + 结构化日志 + 事件发射（可插拔 sink）。"""
+"""可观测模块：trace 贯通 + 结构化日志 + 事件发射（可插拔 sink）。
+
+Observability combines trace propagation, structured logging and pluggable event sinks.
+"""
 from .events import EventEmitter, JsonlSink, Sink, StdoutSink, get_emitter
 from .logging import StructuredFormatter, setup_logging
 from .tracing import (

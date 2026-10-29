@@ -1,5 +1,8 @@
 """PolicyProvider family. ONNX tests auto-skip without the policy/learn groups
-(CI installs neither); locally they MUST run."""
+(CI installs neither); locally they MUST run.
+
+策略测试在缺少部署或学习依赖时跳过，本地安装组后必须运行。
+"""
 
 from __future__ import annotations
 
@@ -31,6 +34,7 @@ def test_mock_chunk_policy_reshapes_and_counts():
     assert np.allclose(out[3], np.arange(6))
 
 
+# ONNX 推理路径。
 # -- ONNX path ---------------------------------------------------------------------
 
 ort = pytest.importorskip("onnxruntime", reason="policy group not installed (uv sync --group policy)")
@@ -39,7 +43,10 @@ onnx = pytest.importorskip("onnx", reason="learn group not installed (uv sync --
 
 
 class Tiny(torch.nn.Module):
-    """chunk[k] = state + k + env[0]; checkable in closed form."""
+    """chunk[k] = state + k + env[0]; checkable in closed form.
+
+    动作块按状态、块索引和环境首值确定，可用闭式表达验证。
+    """
 
     def forward(self, observation_state, environment_state):
         rows = [observation_state + float(k) for k in range(4)]

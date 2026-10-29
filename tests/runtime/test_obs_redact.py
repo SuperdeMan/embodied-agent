@@ -1,5 +1,9 @@
+# 保留来源，仅更换导入路径。
 # Ported from car-agent observability/tests/test_redact.py @ f0b08f8, changes: import path only.
-"""redact.py：共享脱敏 + 内容采集门控。"""
+"""redact.py：共享脱敏 + 内容采集门控。
+
+Shared redaction and content-capture gating tests.
+"""
 from embodied.runtime.obs.redact import content_capture_enabled, gate_content, redact
 
 

@@ -10,6 +10,9 @@ human demos separate from scripted-expert ones (D014 conversion works unchanged)
 Safety: every motion goes through the same guarded write path as skills — the
 fence pre-check refuses out-of-bounds jog targets BEFORE any motion, and a guard
 veto mid-motion aborts the jog (never fought, same rule as motions.py).
+
+
+输入无关遥操作将增量命令经逆解和 Guard 执行并录制；键盘、手柄或未来主臂共用链路。默认录制并标明人工来源；越界预检拒绝，运动中 Guard 否决即中止。
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ from embodied.skills.scripted import motions
 
 TELEOP_COLLECTOR_ID = "teleop/v1"
 
+# 开度与脚本抓取保持一致，保证示教数据一致。
 GRIP_OPEN = 0.6  # matches the scripted skills' grasp opening: consistent demo data
 GRIP_CLOSED = 0.0
 
@@ -32,11 +36,15 @@ GRIP_CLOSED = 0.0
 @dataclass
 class JogResult:
     ok: bool
+    # 原因区分越界、不可达、拒绝或无错误。
     reason: str = ""  # "fence" | "unreachable" | "denied" | ""
 
 
 class TeleopSession:
-    """One operator session over a sim embodiment; episodes open/close explicitly."""
+    """One operator session over a sim embodiment; episodes open/close explicitly.
+
+    一个仿真操作者会话，显式开启与结束 episode。
+    """
 
     def __init__(
         self,
@@ -60,10 +68,14 @@ class TeleopSession:
         if self._state_names and spec.gripper_joint is not None:
             self._state_names.append(spec.gripper_joint.name)
 
+    # 数据局生命周期。
     # -- episode lifecycle --------------------------------------------------------
 
     def start_episode(self, *, randomize: bool = True) -> None:
-        """Reset the scene and open a fresh episode (closing any dangling one as failed)."""
+        """Reset the scene and open a fresh episode (closing any dangling one as failed).
+
+        重置场景并开始新局，未结束旧局按失败收尾。
+        """
         if self.writer is not None:
             self.abort_episode("superseded by new episode")
         self.sim.reset(randomize=randomize)
@@ -81,7 +93,10 @@ class TeleopSession:
         self.episodes += 1
 
     def finish_episode(self, success: bool) -> Path | None:
-        """Human marks the outcome — the operator IS the judge in teleop."""
+        """Human marks the outcome — the operator IS the judge in teleop.
+
+        遥操作由操作者判定结果。
+        """
         if self.writer is None:
             return None
         self.sim.set_hooks(None, None)
@@ -97,9 +112,13 @@ class TeleopSession:
         self.writer = None
 
     def close(self) -> None:
-        """End of session: a dangling episode is kept, labeled failed (data, not garbage)."""
+        """End of session: a dangling episode is kept, labeled failed (data, not garbage).
+
+        会话结束时保留未完成局并标失败。
+        """
         self.abort_episode("session closed mid-episode")
 
+    # 运动命令。
     # -- motion commands ----------------------------------------------------------
 
     def jog(self, dx: float, dy: float, dz: float) -> JogResult:
@@ -107,6 +126,9 @@ class TeleopSession:
 
         Fails closed without any motion when the target leaves the safety fence or
         IK cannot reach it within tolerance.
+        
+
+        保持俯向抓取姿态微调末端；越界或逆解误差超限时不产生运动。
         """
         obs = self.sim.read()
         target = np.asarray(obs.ee_pose.pos, dtype=float) + [dx, dy, dz]
@@ -129,6 +151,7 @@ class TeleopSession:
     def home(self) -> bool:
         return motions.move_to_q(self.sim, self.sim.home_qpos(), seconds=1.0)
 
+    # 状态查询。
     # -- introspection ------------------------------------------------------------
 
     def status(self) -> str:

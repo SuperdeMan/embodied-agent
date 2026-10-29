@@ -23,6 +23,9 @@ GET /           — static console from console/.
 Voice v0 is push-to-talk: endpoint authority stays client-side (the car-agent real-device
 lesson: provider-side silence detection deadlocks against client finalization; carried
 here by design even though v0 has no VAD yet).
+
+
+控制台用单 WebSocket 传文本、16k 单声道 PCM、识别、步骤、语音和确认事件；场景通过图片接口轮询。按住说话的端点权威在客户端，避免服务端静音检测与客户端收尾互等。
 """
 
 from __future__ import annotations
@@ -45,7 +48,10 @@ CTX_KEY = web.AppKey("ctx", object)
 
 
 class ConsoleSession:
-    """One websocket = one conversation session with its own engine history."""
+    """One websocket = one conversation session with its own engine history.
+
+    一个 WebSocket 对应独立对话历史的会话。
+    """
 
     def __init__(self, app_ctx: "AppContext", ws: web.WebSocketResponse) -> None:
         self.ctx = app_ctx
@@ -54,12 +60,15 @@ class ConsoleSession:
         self.recording = False
         self._pending_confirms: dict[str, asyncio.Future[bool]] = {}
         self.engine = app_ctx.make_engine(self._confirm)
+        # 每个会话一次只运行一轮。
         self._turn_lock = asyncio.Lock()  # one turn at a time per session
+        # 任务在后台运行，使 WebSocket 读取循环可接收确认回复；内联等待会导致确认门死锁。
         # Turns run as background tasks: the WS read loop must stay free to receive
         # confirm_reply frames while a turn is blocked inside the confirm bridge —
         # awaiting the turn inline deadlocks the danger gate (caught by contract test).
         self._tasks: set[asyncio.Task] = set()
 
+    # 浏览器危险动作确认桥。
     # -- confirm bridge (danger gate reaches the browser) ----------------------
 
     async def _confirm(self, skill: str, params: dict[str, Any]) -> bool:
@@ -70,6 +79,7 @@ class ConsoleSession:
         try:
             return await asyncio.wait_for(fut, timeout=30.0)
         except asyncio.TimeoutError:
+            # 未收到回答按拒绝处理。
             return False  # fail-closed: no answer = denied
         finally:
             self._pending_confirms.pop(rid, None)
@@ -89,6 +99,7 @@ class ConsoleSession:
         if not self.ws.closed and chunk:
             await self.ws.send_bytes(chunk)
 
+    # 消息处理。
     # -- message handling ------------------------------------------------------
 
     async def handle_text_frame(self, raw: str) -> None:
@@ -130,8 +141,10 @@ class ConsoleSession:
             task.cancel()
         for fut in self._pending_confirms.values():
             if not fut.done():
+                # 断连时按拒绝处理。
                 fut.set_result(False)  # fail-closed on disconnect
 
+    # 对话轮次。
     # -- turns -----------------------------------------------------------------
 
     async def run_voice_turn(self, pcm: bytes) -> None:
@@ -168,7 +181,10 @@ class ConsoleSession:
 
     async def _speak(self, text: str) -> None:
         """TTS stream contract (providers/audio.py): first a {"type":"meta","sample_rate":N}
-        dict, then raw PCM byte chunks. tts_start carries the provider-declared rate."""
+        dict, then raw PCM byte chunks. tts_start carries the provider-declared rate.
+
+        语音流先发采样率元数据，再发 PCM；播放起始事件使用提供方声明的采样率。
+        """
         started = False
         try:
             async for item in self.ctx.synthesize_stream(text):
@@ -180,6 +196,7 @@ class ConsoleSession:
                             "sample_rate": int(item.get("sample_rate") or self.ctx.tts_sample_rate),
                         })
                     continue
+                # 提供方省略元数据时回退配置采样率。
                 if not started:  # provider skipped meta: fall back to configured rate
                     started = True
                     await self.send({"type": "tts_start", "sample_rate": self.ctx.tts_sample_rate})
@@ -193,7 +210,10 @@ class ConsoleSession:
 
 
 class AppContext:
-    """Wires sim + registry + engine factory + audio providers; owned by `embodied console`."""
+    """Wires sim + registry + engine factory + audio providers; owned by `embodied console`.
+
+    控制台装配仿真、技能、引擎工厂与音频提供方。
+    """
 
     def __init__(
         self, sim: Any, registry: Any, make_engine, asr: Any, tts_stream: Any,
@@ -201,6 +221,7 @@ class AppContext:
     ):
         self.sim = sim
         self.registry = registry
+        # 从确认回调构建规划引擎。
         self.make_engine = make_engine  # (confirm_cb) -> PlannerEngine
         self._asr = asr
         self._tts_stream = tts_stream
@@ -210,9 +231,11 @@ class AppContext:
     async def transcribe(self, pcm: bytes) -> str:
         from embodied.providers.audio import _wav_header
 
+        # 控制台上行是原始 PCM16，批量 ASR 需要封装 WAV。
         # Console uplink is raw 16 kHz mono PCM16; batch ASR providers expect WAV.
         wav = _wav_header(len(pcm), PCM_SAMPLE_RATE) + pcm
         out = await self._asr.transcribe(wav, "wav", "zh", "")
+        # 提供方返回文本、置信度、语言、名称及耗时。
         # Provider contract: (text, confidence, language, provider, latency_ms)
         return str(out[0]) if isinstance(out, tuple) else str(out)
 
@@ -233,6 +256,7 @@ class AppContext:
         return buf.getvalue()
 
 
+# aiohttp 服务接线。
 # -- aiohttp wiring -----------------------------------------------------------
 
 

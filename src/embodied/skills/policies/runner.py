@@ -10,6 +10,9 @@ BY CONSTRUCTION the converter's: state = qpos + gripper_opening, environment_sta
 through the guarded write path at the policy's control rate. Success is judged by
 the same ground-truth predicates the scripted skills use — a policy never
 self-reports success (D009). Guard vetoes fail the rollout closed.
+
+
+学习策略沿用脚本技能 manifest，只替换 handler。输入布局与转换器一致，按控制频率经 Guard 执行动作块；效果由共享谓词判断，策略不能自行宣称成功。
 """
 
 from __future__ import annotations
@@ -30,9 +33,13 @@ from embodied.providers.policy import BasePolicyProvider
 from embodied.skills.registry import SkillRegistry, SkillResult
 from embodied.skills.scripted.manip import PICK, PLACE
 
+# 平均抓取片段约 5.6 秒，预算留约两倍余量。
 MAX_PICK_SECONDS = 12.0  # dataset mean pick segment ~5.6 s; 2x headroom
+# 平均放置片段约 3.5 秒。
 MAX_PLACE_SECONDS = 10.0  # dataset mean place segment ~3.5 s
+# 与脚本技能和评测任务共用裁判容差。
 PLACE_MARGIN_M = 0.005  # same judge margin as the scripted skill and the eval task
+# 与脚本放置一致，待物体稳定再判断。
 SETTLE_STEPS = 150  # matches scripted place: let the object come to rest before judging
 
 
@@ -41,7 +48,10 @@ def _snap(emb: Any) -> WorldSnapshot:
 
 
 class PolicyRunner:
-    """Closed-loop chunk execution: act -> write -> step, re-observe between chunks."""
+    """Closed-loop chunk execution: act -> write -> step, re-observe between chunks.
+
+    按动作生成、写入、步进闭环运行，动作块之间重观测。
+    """
 
     def __init__(self, emb: Any, provider: BasePolicyProvider) -> None:
         n_joints = len(emb.spec().joints)
@@ -70,6 +80,9 @@ class PolicyRunner:
 
         Returns (ok, reason); a guard-denied write aborts immediately — the guard
         has latched and fighting it is never correct (same rule as motions.py).
+        
+
+        在动作块间检查完成或时域上限；Guard 拒绝立即终止，不对抗闩锁。
         """
         m = self.provider.meta
         per = max(1, round((1.0 / m.control_hz) / self.emb.timestep))
@@ -139,8 +152,12 @@ def register_policy_sim_skills(
 
     Callers must leave the matching names out of ``register_sim_skills`` (its
     ``skip`` parameter) — the registry rejects duplicates by design.
+    
+
+    注册学习实现时跳过同名脚本技能，Registry 禁止重复注册。
     """
     if pick is not None:
+        # 注册时验证维度，不延迟到首次调用。
         PolicyRunner(emb, pick)  # validate dims at registration, not first call
 
         async def pick_handler(object: str = "obj_cube") -> SkillResult:

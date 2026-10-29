@@ -1,6 +1,10 @@
+# 保留来源，仅改导入路径，测试逻辑不变。
 # Ported from car-agent llm-gateway/tests/test_thinking.py @ f0b08f8, changes: imports adapted
 # to embodied.providers.llm; sys.path hack dropped. Test bodies unchanged.
-"""动态思考开关：OpenAI 兼容 provider 按 thinking 形参决定是否发 disabled 键 + token 抬升。"""
+"""动态思考开关：OpenAI 兼容 provider 按 thinking 形参决定是否发 disabled 键 + token 抬升。
+
+Per-call thinking tests verify disabled fields and token-budget adjustments.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -14,14 +18,19 @@ def _run(coro):
 
 def test_resolve_thinking_default_and_override():
     p = OpenAICompatibleProvider("k", disable_thinking=True)
+    # Thinking is disabled by default.
     assert p._resolve_thinking(None) is True     # 默认关思考
+    # Enable thinking for this call.
     assert p._resolve_thinking(True) is False     # 本次开思考 → 不关
+    # Explicitly disable thinking for this call.
     assert p._resolve_thinking(False) is True      # 本次显式关
     p2 = OpenAICompatibleProvider("k", disable_thinking=False)
+    # Provider default enables thinking.
     assert p2._resolve_thinking(None) is False    # provider 默认开思考
 
 
 class _Resp:
+    # Provider checks HTTP status and preserves response details in errors.
     status_code = 200   # provider 现按 status_code 判 4xx（响应体带进异常，见 complete()）
 
     def raise_for_status(self):
@@ -55,7 +64,9 @@ def test_thinking_on_omits_disabled_and_bumps_tokens(monkeypatch):
     _patch_httpx(monkeypatch, captured)
     p = OpenAICompatibleProvider("k", disable_thinking=True)
     _run(p.complete([{"role": "user", "content": "hi"}], "m", 0.3, 400, thinking=True))
+    # Enabled thinking omits the disabled field.
     assert "thinking" not in captured                 # 开思考 → 不发 disabled 键
+    # Increase tokens to leave reasoning headroom.
     assert captured["max_completion_tokens"] >= 2048   # token 抬升给 reasoning 留头
 
 
@@ -64,5 +75,7 @@ def test_thinking_off_sends_disabled_keeps_tokens(monkeypatch):
     _patch_httpx(monkeypatch, captured)
     p = OpenAICompatibleProvider("k", disable_thinking=True)
     _run(p.complete([{"role": "user", "content": "hi"}], "m", 0.3, 400, thinking=None))
+    # Default thinking disabled.
     assert captured.get("thinking") == {"type": "disabled"}   # 默认关思考
+    # Do not increase token budget.
     assert captured["max_completion_tokens"] == 400            # 不抬 token

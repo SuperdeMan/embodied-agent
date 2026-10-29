@@ -3,7 +3,10 @@
 `embodied chat` — text conversation with mock skills (M0 DoD; no hardware, no keys).
 `embodied sim`  — tabletop MuJoCo sim: chat control, or `--eval N` headless episodes
                   with optional episode recording (M1).
-Voice/console and the process split attach in later M1 work.
+Voice/console and the split control/guardian services are also exposed here.
+
+
+Agent 核心入口：chat 使用模拟技能，sim 支持交互或无界面评测与可选录制；另提供语音控制台和进程服务入口。
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ from typing import Any
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Windows 管道可能使用旧代码页；交互终端输入输出不受影响。
     try:  # Windows may default pipes/console to a legacy codepage; interactive console IO is unaffected
         sys.stdin.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
@@ -254,7 +258,10 @@ async def _serve_guardian(args: argparse.Namespace) -> int:
 async def _sim_remote(args: argparse.Namespace) -> int:
     """agent-core against a serve-control process. World-state context/verification are
     local-sim features; remotely the verifier reads UNKNOWN (never convicts) until a
-    world streaming channel exists (noted in roadmap)."""
+    world streaming channel exists (noted in roadmap).
+
+    连接控制服务的 Agent 核心；远端世界状态流尚缺，验证结果为 UNKNOWN，不能据此认定失败或放行效果依赖。
+    """
     import grpc
 
     from embodied.cognition.engine import PlannerEngine
@@ -282,7 +289,10 @@ async def _sim_remote(args: argparse.Namespace) -> int:
 
 
 def _wrap_perception(sim: Any, kind: str) -> Any:
-    """Wrap the sim so the AGENT sees perceived objects; judges keep read_truth() (D015)."""
+    """Wrap the sim so the AGENT sees perceived objects; judges keep read_truth() (D015).
+
+    包装仿真使 Agent 仅看到感知物体，裁判继续读取独立真值。
+    """
     if kind in ("", "off"):
         return sim
     from embodied.cognition.perception import (
@@ -295,6 +305,7 @@ def _wrap_perception(sim: Any, kind: str) -> Any:
 
     provider = build_perception_provider(kind)
     objects = DINO_TABLETOP_OBJECTS if kind == "dino" else TABLETOP_OBJECTS
+    # 重型检测器降低检测频率，缓存按仿真时间索引。
     # Heavier detectors perceive less often; the cache is keyed on sim time.
     interval = 1.0 if kind == "dino" else 0.25
     return PerceivedSim(sim, PerceptionPipeline(provider, objects), min_interval_s=interval)
@@ -302,7 +313,10 @@ def _wrap_perception(sim: Any, kind: str) -> Any:
 
 def _register_skills(registry: Any, sim: Any, *, pick_policy: str = "", place_policy: str = "") -> None:
     """Scripted skills, with learned implementations claiming their manifests when given
-    (architecture §4.3: same manifest, implementation swapped)."""
+    (architecture §4.3: same manifest, implementation swapped).
+
+    默认注册脚本技能；提供学习实现时以相同 manifest 替换实现。
+    """
     from embodied.skills.scripted.manip import register_sim_skills
 
     pick = place = None
@@ -360,7 +374,10 @@ async def _sim(args: argparse.Namespace) -> int:
 
 
 async def _collect(args: argparse.Namespace) -> int:
-    """Scripted-expert rollouts (no planner) with recording on: the M2 data source."""
+    """Scripted-expert rollouts (no planner) with recording on: the M2 data source.
+
+    脚本专家直接采集并录制，不经过规划器，是 M2 数据来源。
+    """
     from embodied.cognition.world_state import object_in_region
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.data_engine.collect import collect_episodes
@@ -400,7 +417,10 @@ TELEOP_KEYS = """teleop keys (letters only — no arrow keys, no numpad):
 
 
 def _teleop(args: argparse.Namespace) -> int:
-    """Keyboard teleop: WASD-style jogging, human-judged episode marking."""
+    """Keyboard teleop: WASD-style jogging, human-judged episode marking.
+
+    键盘遥操作使用方向按键，任务结果由操作者标记。
+    """
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.control.teleop import TeleopSession
 
@@ -409,6 +429,7 @@ def _teleop(args: argparse.Namespace) -> int:
 
         def read_key() -> str:
             return msvcrt.getwch()
+    # POSIX 平台回退路径。
     except ImportError:  # POSIX fallback
         import termios
         import tty
@@ -441,6 +462,7 @@ def _teleop(args: argparse.Namespace) -> int:
         while True:
             ch = read_key()
             note = ""
+            # Esc 退出键。
             if ch == "\x1b":  # ESC
                 break
             if ch in jogs:
@@ -504,6 +526,7 @@ def _console(args: argparse.Namespace) -> int:
         return _make_sim_engine(sim, registry, provider, confirm)
 
     asr = build_asr_provider()
+    # 流式语音未配置时工厂返回空；控制台使用静音模拟器补齐交互链路。
     # Factory returns None when streaming TTS is unconfigured (origin semantics: off);
     # the console always speaks, so fall back to the silent mock.
     tts = build_tts_stream_provider() or MockStreamingTTSProvider()
@@ -515,7 +538,10 @@ def _console(args: argparse.Namespace) -> int:
 async def _sim_eval_task(args: argparse.Namespace) -> int:
     """Versioned eval: fresh sim per seed, fresh engine per episode, result JSON persisted.
     --pick-policy/--place-policy swap in learned implementations — same task, same judge,
-    so scripted vs learned numbers are directly comparable (golden-gate discipline)."""
+    so scripted vs learned numbers are directly comparable (golden-gate discipline).
+
+    版本化评测每个种子新建仿真、每局新建引擎并保存 JSON；学习与脚本共用任务及裁判，保证结果可比较。
+    """
     from embodied.cognition.offline import SIM_PLAN_RULES, ScriptedPlanProvider
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.data_engine.evaluation import EvalTask, run_task
@@ -527,6 +553,7 @@ async def _sim_eval_task(args: argparse.Namespace) -> int:
         sim = _wrap_perception(TabletopSim(seed=seed), str(args.perception))
         registry = SkillRegistry()
         _register_skills(registry, sim, pick_policy=str(args.pick_policy), place_policy=str(args.place_policy))
+        # 创建时配对保存，供引擎工厂取回。
         sim._eval_registry = registry  # paired at creation; engine factory reads it back
         return sim
 
@@ -546,7 +573,10 @@ EVAL_COMMAND = "把红色方块放进盒子"
 async def _sim_eval(sim: Any, registry: Any, *, n: int, record: bool) -> int:
     """Headless DoD harness: N randomized episodes driven end-to-end through the
     PlannerEngine (text command → plan → DAG → skills → verified report). Success is
-    judged INDEPENDENTLY against sim ground truth, never by the agent's self-report."""
+    judged INDEPENDENTLY against sim ground truth, never by the agent's self-report.
+
+    无界面端到端评测覆盖指令、计划、DAG、技能和报告；成功由仿真真值独立判断，不信任 Agent 自报。
+    """
     from embodied.cognition.offline import SIM_PLAN_RULES, ScriptedPlanProvider
     from embodied.cognition.world_state import WorldSnapshot, object_in_region
 
@@ -563,6 +593,7 @@ async def _sim_eval(sim: Any, registry: Any, *, n: int, record: bool) -> int:
     for i in range(n):
         sim.reset(randomize=True)
         cube = tuple(round(v, 3) for v in truth_obs().objects["obj_cube"].pos)
+        # 每局独立引擎，防止评测局间历史泄漏。
         # Fresh engine per episode: no cross-episode history leakage in eval
         engine = _make_sim_engine(sim, registry, ScriptedPlanProvider(SIM_PLAN_RULES), confirm=None)
         writer = None

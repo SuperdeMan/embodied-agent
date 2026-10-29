@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+# 分段拼接禁用术语，避免本测试移到源码下时误匹配自身。
 # assembled to avoid this file matching itself if it ever moves under src/
 _TERMS = ["vehi" + "cle", "cock" + "pit", "hv" + "ac", "座" + "舱", "车" + "机", "车" + "控"]
 FORBIDDEN = re.compile("|".join(_TERMS), re.IGNORECASE)

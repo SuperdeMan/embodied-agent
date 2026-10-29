@@ -18,6 +18,9 @@ Conversion contract (D014):
   natural-language command. ``segment="skill"`` splits at the sim_t boundaries that
   ``embodied collect`` wrote into events.jsonl, task = skill name — the data basis
   for replacing scripted skills one at a time (manifest unchanged).
+
+
+轻量记录转换为 LeRobot v3，重型依赖延迟导入。状态和动作含关节及夹爪，环境向量按物体名排序拼位姿；不规则采样重采样到固定 fps，动作零阶保持、观测线性插值。支持整局或真实技能边界切分。
 """
 
 from __future__ import annotations
@@ -41,6 +44,7 @@ class ConvertReport:
     episodes_converted: int = 0
     segments_written: int = 0
     frames_written: int = 0
+    # 记录目录及拒绝原因。
     skipped: list[tuple[str, str]] = field(default_factory=list)  # (episode dir, reason)
 
 
@@ -52,7 +56,10 @@ class _Segment:
 
 
 def _monotonic(ts: np.ndarray) -> np.ndarray:
-    """Mask keeping only strictly-increasing timestamps (guards interp/searchsorted)."""
+    """Mask keeping only strictly-increasing timestamps (guards interp/searchsorted).
+
+    仅保留严格递增时间戳，保护插值和有序搜索。
+    """
     return np.diff(ts, prepend=-np.inf) > 0
 
 
@@ -70,6 +77,9 @@ def _fill_nan_columns(arr: np.ndarray) -> np.ndarray:
 
     Returns a copy; raises if any column is entirely NaN (object never observed —
     that episode cannot supply a dense environment_state).
+    
+
+    逐列前向再后向填充缺测；整列全 NaN 时拒绝，因为无法提供稠密环境状态。
     """
     out = arr.copy()
     for j in range(out.shape[1]):
@@ -80,6 +90,7 @@ def _fill_nan_columns(arr: np.ndarray) -> np.ndarray:
         if not nan.any():
             continue
         idx = np.arange(len(col))
+        # 内部线性插值，边缘夹持端值。
         col[nan] = np.interp(idx[nan], idx[~nan], col[~nan])  # interior lerp, edges clamp
     return out
 
@@ -89,7 +100,10 @@ def _env_state(ep: Episode, names_order: list[str]) -> np.ndarray:
 
 
 def _skill_segments(ep: Episode) -> list[_Segment]:
-    """Pair skill_start/skill_end events (top-level sim_t) into time segments."""
+    """Pair skill_start/skill_end events (top-level sim_t) into time segments.
+
+    配对技能起止事件的仿真时间形成片段。
+    """
     segments: list[_Segment] = []
     open_start: tuple[str, float] | None = None
     for ev in ep.events:
@@ -102,6 +116,7 @@ def _skill_segments(ep: Episode) -> list[_Segment]:
         elif open_start is not None and open_start[0] == skill:
             segments.append(_Segment(task=skill, t0=open_start[1], t1=float(sim_t)))
             open_start = None
+    # 技能中断时以最后采样关闭片段。
     if open_start is not None and len(ep.timestamp):  # crash mid-skill: close at last sample
         segments.append(_Segment(task=open_start[0], t0=open_start[1], t1=float(ep.timestamp[-1])))
     return segments
@@ -137,6 +152,9 @@ def convert_episodes(
     immutable artifacts, re-convert to a fresh directory instead of appending.
     ``skills`` (skill mode only) keeps just the named skills' segments — vanilla ACT
     is not task-conditioned, so per-skill policies train on per-skill datasets.
+    
+
+    转换一个根目录下的所有记录；默认排除失败局，目标目录必须不存在，数据集不可变。技能模式可筛选指定技能，为非任务条件 ACT 提供单技能数据。
     """
     episodes_root, out_dir = Path(episodes_root), Path(out_dir)
     if out_dir.exists():
@@ -147,6 +165,7 @@ def convert_episodes(
 
     report = ConvertReport(out_dir=out_dir, fps=fps)
 
+    # 第一遍过滤、重采样与切分；至少有一个有效片段后才建目录，避免半成品。
     # Pass 1 — prepare in memory: filter, resample, segment. The dataset directory is
     # only created once at least one segment is known-good (no half-written artifacts).
     prepared: list[tuple[str, list[tuple[_Segment, dict[str, np.ndarray]]]]] = []
@@ -215,6 +234,7 @@ def convert_episodes(
             f"(skipped: {report.skipped or 'none'}) — record with `embodied collect` first"
         )
 
+    # 第二遍写数据集；确认有工作后才导入重型依赖，路径和筛选错误不要求学习组。
     # Pass 2 — write the dataset. The heavy import happens only once there is real
     # work to do; path/filter errors above never require the learn group installed.
     try:

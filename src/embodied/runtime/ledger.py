@@ -1,3 +1,4 @@
+# 保留来源：持久数据库改为内存字典且保持异步 API；移除数据库映射和 schema，幂等、预算、孤儿与状态机纯逻辑不变。
 # Ported from car-agent agents/_sdk/ledger.py @ f0b08f8, changes: Postgres/asyncpg storage replaced by an in-process dict store with the same public async API (pg_ok renamed ready; dsn param dropped); PG row converters (row_to_task/_epoch/_jsonb), ledger_schema.sql and the GDPR PERSONAL_DATA_TARGETS wiring dropped; pure logic (idem key / budgets / orphan detection / state machine) unchanged.
 """Task Ledger：跨轮持久任务账本。
 
@@ -13,6 +14,9 @@
 
 **cancel 走拉模式（零新通道）**：用户说「别干了」→ 执行方 `cancel()` 置态 →
 后台任务下一次 `heartbeat()` 读到 `cancelled` 自行收尾。取消延迟上限≈心跳间隔（≤10s）。
+
+
+The ledger tracks cross-turn task ownership, progress, cancellation and budgets. This port uses an in-memory dictionary, so restart persistence is not guaranteed. Workers poll cancellation through heartbeat and must stop themselves.
 """
 from __future__ import annotations
 
@@ -26,15 +30,20 @@ from dataclasses import dataclass, field, replace
 
 logger = logging.getLogger("runtime.ledger")
 
+# State transitions are terminal except orphaned, which is an observation that late heartbeat can correct.
 # 状态机（单向，终态不可逆；orphaned 是**判定**不是结局，见 heartbeat 的复活分支）
 ACCEPTED, RUNNING = "accepted", "running"
 DONE, FAILED, CANCELLED, ORPHANED = "done", "failed", "cancelled", "orphaned"
+# States shown to users as active work.
 ACTIVE = (ACCEPTED, RUNNING)                 # 用户可见的「在跑」态
+# True terminal states; orphaned may revive.
 TERMINAL = (DONE, FAILED, CANCELLED)         # 真终态（orphaned 可被迟到心跳复活）
 
+# Store the stop reason in the budget for accurate cancellation reporting.
 # 停止原因（写进 budget.stop_reason，供上层区分话术：用户取消 / 超时停了 / 预算用尽）
 STOP_USER, STOP_DEADLINE, STOP_BUDGET = "user", "deadline", "budget"
 
+# Recommended heartbeat interval is at most 10 seconds; the default orphan threshold allows roughly nine missed beats.
 # 心跳节律建议 ≤10s；ORPHAN_TTL 默认 90s ≈ 9 个心跳的余量（防抖动误判）
 DEFAULT_ORPHAN_TTL_S = 90.0
 _PUNCT_RE = re.compile(r"[\s，,。.！!？?、；;：:~～\-—_“”\"'‘’()（）]+")
@@ -42,7 +51,10 @@ _PUNCT_RE = re.compile(r"[\s，,。.！!？?、；;：:~～\-—_“”\"'‘’
 
 @dataclass
 class LedgerTask:
-    """一条任务账目。时间统一 epoch 秒（float）。"""
+    """一条任务账目。时间统一 epoch 秒（float）。
+
+    Task record timestamps use floating-point epoch seconds.
+    """
     task_id: str
     user_id: str = ""
     session_id: str = ""
@@ -61,7 +73,10 @@ class LedgerTask:
 
     @property
     def stop_reason(self) -> str:
-        """主动截停时写入的原因（user|deadline|budget），无则空串。"""
+        """主动截停时写入的原因（user|deadline|budget），无则空串。
+
+        Read the explicit user, deadline or budget stop reason, otherwise empty.
+        """
         return str((self.budget or {}).get("stop_reason") or "")
 
     @property
@@ -74,19 +89,29 @@ class Duplicate:
     """幂等命中：同一 (user_id, kind, 归一化 goal) 已有在跑任务。
 
     供上层出「已经在干了，大概还要 N 分钟」话术——防连说两遍/重试风暴双跑。
+    
+
+    An active task with the same user, kind and normalized goal returns a duplicate marker to prevent repeated execution.
     """
     existing: LedgerTask
 
 
+# Pure offline-testable functions; storage only moves data.
 # ── 纯函数（无 IO，可离线单测；存储层只做搬运）─────────────────────────────
 
 def normalize_goal(goal: str) -> str:
-    """幂等键的目标归一：去标点空白 + 小写。中文小写是空操作，英文主题受益。"""
+    """幂等键的目标归一：去标点空白 + 小写。中文小写是空操作，英文主题受益。
+
+    Normalize goals by removing punctuation and whitespace and lowercasing text.
+    """
     return _PUNCT_RE.sub("", (goal or "").strip()).lower()
 
 
 def idem_key(user_id: str, kind: str, goal: str) -> str:
-    """sha256(user_id|kind|归一化 goal)[:16]。"""
+    """sha256(user_id|kind|归一化 goal)[:16]。
+
+    Use the first 16 hexadecimal SHA-256 characters of user, kind and normalized goal.
+    """
     raw = f"{user_id}|{kind}|{normalize_goal(goal)}".encode()
     return hashlib.sha256(raw).hexdigest()[:16]
 
@@ -97,6 +122,9 @@ def budget_exhausted(budget: dict | None, now: float | None = None) -> str:
     - `deadline_ts`（epoch 秒）过期 → `deadline`
     - `llm_calls_used >= llm_calls_max` / `ext_calls_used >= ext_calls_max` → `budget`
     上限缺省/非数 = 不限（弱声明不制造误截停）。
+    
+
+    Return deadline or budget stop reasons; missing or nonnumeric limits remain unbounded rather than causing false cancellation.
     """
     b = budget or {}
     now = time.time() if now is None else now
@@ -119,7 +147,10 @@ def budget_exhausted(budget: dict | None, now: float | None = None) -> str:
 
 
 def merge_used(budget: dict | None, used: dict | None) -> dict:
-    """把本次心跳上报的用量累加进 budget（只累加 *_used 计数键，不动上限）。"""
+    """把本次心跳上报的用量累加进 budget（只累加 *_used 计数键，不动上限）。
+
+    Accumulate reported usage counters without modifying limits.
+    """
     b = dict(budget or {})
     for k, v in (used or {}).items():
         key = k if k.endswith("_used") else f"{k}_used"
@@ -138,6 +169,9 @@ def is_orphaned(status: str, heartbeat_at: float, created_at: float,
 
     从未心跳过（accepted 刚开单就崩）时以 created_at 为参照。判定只在**读**的时候做
     （query_active/get），不额外起扫描进程。
+    
+
+    Mark active tasks orphaned lazily on reads after heartbeat expiry, using creation time if no heartbeat exists; no scanning process is required.
     """
     if status not in ACTIVE:
         return False
@@ -155,11 +189,15 @@ def orphan_ttl() -> float:
 
 
 def _snapshot(task: LedgerTask) -> LedgerTask:
-    """返回账目快照（与 origin 的 row→dataclass 语义一致：调用方改快照不脏账本）。"""
+    """返回账目快照（与 origin 的 row→dataclass 语义一致：调用方改快照不脏账本）。
+
+    Return a detached record snapshot so callers cannot mutate ledger state.
+    """
     return replace(task, budget=dict(task.budget or {}),
                    result_ref=dict(task.result_ref or {}))
 
 
+# Storage layer.
 # ── 存储层 ─────────────────────────────────────────────────────────────────
 
 class TaskLedger:
@@ -167,6 +205,9 @@ class TaskLedger:
 
     单进程单事件循环下，每个方法体内无 await 打断，check-then-write 天然原子——
     origin 用 INSERT ... ON CONFLICT 交给数据库裁决的并发窗在这里不存在。
+    
+
+    In-memory async API: method bodies contain no awaits, making check-and-write atomic within one event loop; this is not cross-process durability.
     """
 
     def __init__(self):
@@ -175,14 +216,21 @@ class TaskLedger:
 
     @property
     def ready(self) -> bool:
-        """存储是否可用（in-memory 恒 True；origin 的 pg_ok 对应位）。"""
+        """存储是否可用（in-memory 恒 True；origin 的 pg_ok 对应位）。
+
+        In-memory storage is always ready.
+        """
         return True
 
     async def init(self) -> bool:
-        """幂等初始化。in-memory 无池无表，保留调用面（恒 True）。"""
+        """幂等初始化。in-memory 无池无表，保留调用面（恒 True）。
+
+        Initialization is idempotent and preserves the public API without creating tables or pools.
+        """
         self._init_done = True
         return True
 
+    # Task admission.
     # ── 开单 ──
     async def open(self, user_id: str, session_id: str, agent_id: str, kind: str,
                    goal: str, *, budget: dict | None = None,
@@ -197,6 +245,9 @@ class TaskLedger:
         idempotency_goal：幂等指纹的来源文本（缺省用 goal）。规划槽位会波动，
         用用户原话作指纹可保证同一句话命中同一任务。
         返回 None 仅保留给「存储不可用」的降级语义（持久后端接入后生效）。
+        
+
+        Accept a task unless an active duplicate exists; stale orphans do not block retries. Idempotency may use original user text instead of unstable planned slots; None is reserved for future unavailable storage.
         """
         key = idem_key(user_id, kind, idempotency_goal or goal)
         existing = self._latest_active(user_id, key)
@@ -209,6 +260,7 @@ class TaskLedger:
 
         now = time.time()
         task = LedgerTask(
+            # Do not use object identity as a key; garbage collection can reuse addresses.
             task_id=uuid.uuid4().hex,   # 禁 id(obj)：内存地址 GC 复用会撞键
             user_id=user_id,
             session_id=session_id or "",
@@ -226,6 +278,7 @@ class TaskLedger:
         self._tasks[task.task_id] = task
         return _snapshot(task)
 
+    # Heartbeat carries cancellation polling and budget enforcement.
     # ── 心跳（cancel 拉模式 + 预算强制的载体）──
     async def heartbeat(self, task_id: str, *, progress: str = "",
                         used: dict | None = None) -> str:
@@ -238,11 +291,15 @@ class TaskLedger:
         - **迟到心跳复活**：被惰性判定成 orphaned 的任务若又打上心跳，说明它其实活着
           → 拉回 running。orphaned 是判定不是结局，误判不该变成假的中断报告。
         - 行不存在（被清理/从没开成）→ 返回 `cancelled`，后台任务据此收尾不空转。
+        
+
+        Heartbeat returns current status, enforces budgets and cancellation, revives falsely orphaned live tasks, and tells missing-record workers to stop.
         """
         task = self._tasks.get(task_id)
         if task is None:
             return CANCELLED
         if task.status not in ACTIVE + (ORPHANED,):
+            # Return terminal state unchanged, including cancellation observed through polling.
             # 不在可推进态（已 done/failed/cancelled）→ 原样回报，
             # 拉模式的 cancelled 正是从这条路返回的。
             return task.status
@@ -266,10 +323,14 @@ class TaskLedger:
             task.budget = merged
         return task.status
 
+    # Task finalization.
     # ── 销单 ──
     async def close(self, task_id: str, status: str, *,
                     result_ref: dict | None = None, progress: str = "") -> bool:
-        """终态落账（done|failed|cancelled）。终态不可逆：已终态的行不再被覆盖。"""
+        """终态落账（done|failed|cancelled）。终态不可逆：已终态的行不再被覆盖。
+
+        Record a terminal outcome once; terminal states cannot be overwritten.
+        """
         if status not in TERMINAL:
             raise ValueError(f"close 只接受终态 {TERMINAL}，收到 {status!r}")
         task = self._tasks.get(task_id)
@@ -283,7 +344,10 @@ class TaskLedger:
         return True
 
     async def cancel(self, task_id: str, *, reason: str = STOP_USER) -> bool:
-        """置取消态（拉模式：后台任务下一次心跳读到即自行收尾）。已终态返回 False。"""
+        """置取消态（拉模式：后台任务下一次心跳读到即自行收尾）。已终态返回 False。
+
+        Cancel through pull-based heartbeat observation; terminal tasks return false.
+        """
         task = self._tasks.get(task_id)
         if task is None or task.status in TERMINAL:
             return False
@@ -292,10 +356,14 @@ class TaskLedger:
         task.updated_at = time.time()
         return True
 
+    # Read operations.
     # ── 读 ──
     async def query_active(self, user_id: str, *, kind: str = "",
                            limit: int = 10) -> list[LedgerTask]:
-        """该用户「还在跑」的任务（含惰性 orphaned 改判后剔除）。最近受理在前。"""
+        """该用户「还在跑」的任务（含惰性 orphaned 改判后剔除）。最近受理在前。
+
+        Return the user's active tasks newest first, excluding lazily detected orphans.
+        """
         rows = self._user_tasks(user_id, kind)
         out: list[LedgerTask] = []
         for task in rows:
@@ -314,6 +382,9 @@ class TaskLedger:
         """最近任务（含终态），供「刚才那个任务怎么样了」在无 active 时回答。
 
         孤儿保留但改标 orphaned——要能答出「干到一半中断了」。
+        
+
+        Return recent tasks including terminal and orphaned records so interrupted work remains explainable.
         """
         rows = self._user_tasks(user_id, kind)[:limit]
         out: list[LedgerTask] = []
@@ -331,6 +402,7 @@ class TaskLedger:
             self._mark_orphaned(task)
         return _snapshot(task)
 
+    # Internal helpers.
     # ── 内部 ──
     def _user_tasks(self, user_id: str, kind: str) -> list[LedgerTask]:
         rows = [t for t in self._tasks.values()
@@ -347,12 +419,18 @@ class TaskLedger:
 
     @staticmethod
     def _mark_orphaned(task: LedgerTask) -> None:
-        """惰性改判。写前再钉一次判定（origin 在 UPDATE WHERE 里重验 TTL 的对应位）。"""
+        """惰性改判。写前再钉一次判定（origin 在 UPDATE WHERE 里重验 TTL 的对应位）。
+
+        Recheck expiry before applying the lazy orphan transition.
+        """
         if task.status in ACTIVE and is_orphaned(task.status, task.heartbeat_at,
                                                  task.created_at):
             task.status = ORPHANED
             task.updated_at = time.time()
 
     async def close_pool(self) -> None:
-        """保留 origin 的关停调用面；in-memory 无池，清空即可重复使用。"""
+        """保留 origin 的关停调用面；in-memory 无池，清空即可重复使用。
+
+        Preserve the shutdown API; clearing in-memory state allows reuse.
+        """
         return None

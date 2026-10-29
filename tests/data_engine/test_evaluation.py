@@ -1,4 +1,7 @@
-"""Eval task loading/judging/persistence — hermetic (fake sim & engine, tmp dirs)."""
+"""Eval task loading/judging/persistence — hermetic (fake sim & engine, tmp dirs).
+
+隔离验证任务载入、裁判和结果持久化。
+"""
 
 from __future__ import annotations
 
@@ -91,6 +94,7 @@ async def test_run_judges_from_ground_truth_and_persists(task, tmp_path, monkeyp
     sims: dict[int, FakeSim] = {}
 
     def make_sim(seed):
+        # 每局交替模拟成功。
         sims[seed] = FakeSim(seed, [True, False])  # alternate success per episode
         return sims[seed]
 

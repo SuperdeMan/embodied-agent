@@ -1,4 +1,7 @@
-"""PlannerEngine end-to-end tests over the offline plan provider (hermetic)."""
+"""PlannerEngine end-to-end tests over the offline plan provider (hermetic).
+
+离线规划提供方上的隔离端到端引擎测试。
+"""
 
 from __future__ import annotations
 
@@ -27,6 +30,7 @@ async def test_chat_path_no_steps():
     engine = make_engine()
     turn = await engine.turn("你好呀")
     assert turn.results == []
+    # 对话回复不虚构动作。
     assert turn.text.startswith("[offline]")  # chat reply, grounded: no fake actions
 
 
@@ -68,7 +72,10 @@ def test_tier_budget_env_overrides(monkeypatch):
 
 
 async def test_replan_bounded_for_adaptive():
-    """An adaptive plan whose replans keep emitting steps must stop at the tier budget."""
+    """An adaptive plan whose replans keep emitting steps must stop at the tier budget.
+
+    持续生成步骤的自适应计划也必须受重规划预算限制。
+    """
 
     class LoopingProvider(ScriptedPlanProvider):
         def __init__(self):
@@ -92,5 +99,7 @@ async def test_replan_bounded_for_adaptive():
     turn = await engine.turn("keep going")
     max_iters, _ = tier_budget("adaptive")
     assert turn.replans <= max_iters
+    # 首次构建加有界重规划。
     assert provider.plan_calls <= max_iters + 1  # initial build + bounded replans
+    # 确有执行发生，随后循环停止。
     assert turn.results  # something actually ran, then the loop stopped

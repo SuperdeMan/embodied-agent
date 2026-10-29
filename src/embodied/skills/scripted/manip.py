@@ -4,6 +4,9 @@ Every skill verifies its declared effect against a fresh WorldSnapshot before
 claiming success (car-agent's outcome-verification discipline: motion finishing
 ≠ task done — a slipped grasp must report ok=False so the planner can react).
 Handlers wrap blocking sim motion in asyncio.to_thread to keep the agent loop live.
+
+
+桌面脚本技能回零、抓取和放置在报告成功前核对新世界快照；阻塞运动用线程执行，保持 Agent 循环响应。
 """
 
 from __future__ import annotations
@@ -19,12 +22,17 @@ from embodied.skills.registry import SkillRegistry, SkillResult
 from embodied.skills.scripted import motions
 
 PREGRASP_DZ = 0.08
+# 中途重新瞄准高度位于接触之上且低于易推移区域。
 MID_DZ = 0.035  # re-aim height: below nudge-risk, above contact
+# 抓取点略高于中心，使指垫夹住下半部且指尖不触地。
 GRASP_DZ = 0.010  # site above object center: pads grip the lower half without fingertips striking the floor
+# 固定指位于抓取点正 X 侧，向该侧偏移使其掠过物体外侧，由活动指完成闭合。
 # The gripper has a FIXED finger on the site's +x side: aim the site slightly to that
 # side of the object so the fixed finger slides past the object face instead of landing
 # on top of it; the moving finger then does all the closing travel.
+# 仿真网格扫描发现偏移 10 毫米仍碰撞，14 毫米抓取可靠。
 GRASP_LATERAL_OFF = 0.014  # grid-swept in sim: +10mm still strikes the cube, +14mm grasps reliably
+# 完全张开会使活动指下降时触地。
 OPEN_FOR_GRASP = 0.6  # full open swings the moving jaw low enough to strike the floor during descent
 OPEN_FOR_RELEASE = 0.8
 HOVER_Z = 0.13
@@ -62,6 +70,7 @@ PLACE = SkillManifest(
     effects=["object inside target region"],
     scopes=["arm.move", "gripper.open"],
     termination=TerminationSpec(timeout_s=60.0, success="object center inside region box"),
+    # 放置内部空间检查通过才返回物体与区域；外层结构验证确认真实结果存在，避免重复同一空间谓词。
     # Schema mode: the skill returns {object, region} only after its own in-skill region
     # check passed — asserting real data present exercises the second evaluator without
     # duplicating the spatial predicate (which pick already demonstrates).
@@ -74,7 +83,10 @@ def _snap(emb: Any) -> WorldSnapshot:
 
 
 def _jaw_x_world(emb: Any) -> np.ndarray:
-    """World direction of the grasp frame's +x (fixed-finger side), horizontalized."""
+    """World direction of the grasp frame's +x (fixed-finger side), horizontalized.
+
+    计算抓取框架固定指一侧正 X 的水平世界方向。
+    """
     w, x, y, z = emb.read().ee_pose.quat
     xa = np.array([1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y)])
     xa[2] = 0.0
@@ -97,6 +109,7 @@ def _pick_sync(emb: Any, obj: str) -> SkillResult:
         return SkillResult(ok=False, detail="guard denied gripper open")
     if not motions.move_to_q(emb, pregrasp.qpos, gripper=OPEN_FOR_GRASP):
         return SkillResult(ok=False, detail="pregrasp motion denied")
+    # 两段下降在中间高度重新观测并瞄准，修正扇区边缘斜向接近时固定指推动物体的偏差。
     # Two-stage descent with mid-height re-aim: at oblique approach angles (sector edges)
     # the fixed finger can clip and shove the object during descent; whatever the first
     # stage did to it, the final stage re-reads the LIVE pose and aims there.
@@ -110,6 +123,7 @@ def _pick_sync(emb: Any, obj: str) -> SkillResult:
         return SkillResult(ok=False, detail="grasp descent unreachable or denied")
     if not motions.set_gripper(emb, 0.0, seconds=0.6):
         return SkillResult(ok=False, detail="guard denied gripper close")
+    # 抬升返回已知预抓姿态，避免深抓配置下朝下轴逆解病态。
     # Lift by returning to the known pregrasp posture: no IK from the deep grasp
     # configuration, where the axis-down solve is poorly conditioned.
     if not motions.move_to_q(emb, pregrasp.qpos, seconds=0.9):
@@ -135,7 +149,9 @@ def _place_sync(emb: Any, region: str) -> SkillResult:
         return SkillResult(ok=False, detail="lower unreachable or denied")
     if not motions.set_gripper(emb, OPEN_FOR_RELEASE, seconds=0.5, settle_steps=200):
         return SkillResult(ok=False, detail="guard denied gripper open")
+    # 尽力撤离。
     motions.reach(emb, (cx, cy, HOVER_Z + 0.03), max_pos_err=0.015, seconds=0.6)  # retreat, best-effort
+    # 等待物体稳定。
     emb.step(150)  # let the object come to rest
     after = _snap(emb)
     if not object_in_region(after, held, region, margin=0.005):
@@ -146,7 +162,10 @@ def _place_sync(emb: Any, region: str) -> SkillResult:
 def register_sim_skills(registry: SkillRegistry, emb: Any, *, skip: tuple[str, ...] = ()) -> None:
     """Register the scripted skills. ``skip`` names manifests to leave unregistered so a
     learned implementation can claim them instead (skills.policies, same manifest —
-    architecture §4.3 impl swap; the registry rejects duplicates by design)."""
+    architecture §4.3 impl swap; the registry rejects duplicates by design).
+
+    按 skip 排除将由学习实现占用的 manifest，保留名称与契约不变。
+    """
 
     async def home() -> SkillResult:
         ok = await asyncio.to_thread(motions.move_to_q, emb, emb.home_qpos(), seconds=1.5)

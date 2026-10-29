@@ -1,4 +1,7 @@
-"""Learned skills (System 1, policy implementations) — docs/architecture.md §4.3."""
+"""Learned skills (System 1, policy implementations) — docs/architecture.md §4.3.
+
+学习技能的策略实现。
+"""
 
 from embodied.skills.policies.runner import (
     MAX_PICK_SECONDS,

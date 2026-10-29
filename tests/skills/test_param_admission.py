@@ -1,4 +1,7 @@
-"""Untrusted inputs must be rejected before a handler can produce side effects."""
+"""Untrusted inputs must be rejected before a handler can produce side effects.
+
+不可信输入须在 handler 产生副作用前拒绝。
+"""
 
 import pytest
 

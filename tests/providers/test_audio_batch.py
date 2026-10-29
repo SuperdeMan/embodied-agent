@@ -1,3 +1,4 @@
+# 保留测试来源，调整导入与隔离环境；排除未移植脚本依赖，补无密钥模拟语音契约，不改已有测试语义。
 # Ported from car-agent llm-gateway/tests/test_batch_audio_providers.py @ f0b08f8, changes:
 # imports adapted to embodied.providers.audio; dropped test_mimo_catalog_selects_real_female_and_male
 # (depends on llm-gateway scripts/prepare_voiceprint_fixtures, not ported) and
@@ -10,6 +11,9 @@
 背景：批处理面此前硬绑 MiMo，chat 换家（LLM_PROVIDER≠mimo 系）即静默降级 Mock。
 本组用例固化契约：ASR_PROVIDER/TTS_PROVIDER 显式可配 + auto 下桥接流式引擎，
 不用 MiMo 也有真 ASR/TTS。
+
+
+Offline tests ensure explicit batch provider selection and automatic streaming bridges, so changing chat vendors does not silently force mock audio.
 """
 from __future__ import annotations
 
@@ -43,10 +47,14 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(k, raising=False)
 
 
+# ASR factory tests.
 # ── 工厂：ASR ──────────────────────────────────────────────────────────
 
 def test_asr_default_mimo_unchanged(monkeypatch):
-    """历史现状不变：LLM_PROVIDER=mimo 系 + 有 key → MiMo 批处理。"""
+    """历史现状不变：LLM_PROVIDER=mimo 系 + 有 key → MiMo 批处理。
+
+    Preserve MiMo batch selection when its configured credentials are available.
+    """
     _clean_env(monkeypatch)
     monkeypatch.setenv("LLM_PROVIDER", "xiaomimimo")
     monkeypatch.setenv("LLM_API_KEY", "mk")
@@ -54,7 +62,10 @@ def test_asr_default_mimo_unchanged(monkeypatch):
 
 
 def test_asr_chat_switched_bridges_dashscope(monkeypatch):
-    """chat 换家 + 有百炼 key → 桥接 dashscope 流式引擎（此前会静默 Mock）。"""
+    """chat 换家 + 有百炼 key → 桥接 dashscope 流式引擎（此前会静默 Mock）。
+
+    After switching chat providers, available DashScope credentials select real streaming ASR through the batch bridge.
+    """
     _clean_env(monkeypatch)
     monkeypatch.setenv("LLM_PROVIDER", "deepseek")
     monkeypatch.setenv("LLM_API_KEY", "dsk")
@@ -71,7 +82,10 @@ def test_asr_chat_switched_no_key_mock(monkeypatch):
 
 
 def test_asr_explicit_mimo_pins_despite_chat_switch(monkeypatch):
-    """显式 ASR_PROVIDER=mimo：chat 切走后批处理仍钉住 MiMo。"""
+    """显式 ASR_PROVIDER=mimo：chat 切走后批处理仍钉住 MiMo。
+
+    Explicit ASR selection keeps MiMo pinned independently of chat.
+    """
     _clean_env(monkeypatch)
     monkeypatch.setenv("LLM_PROVIDER", "deepseek")
     monkeypatch.setenv("LLM_API_KEY", "mk")
@@ -87,6 +101,7 @@ def test_asr_explicit_mock_wins(monkeypatch):
     assert isinstance(build_asr_provider(), MockASRProvider)
 
 
+# TTS factory tests.
 # ── 工厂：TTS ──────────────────────────────────────────────────────────
 
 def test_tts_default_mimo_unchanged(monkeypatch):
@@ -97,7 +112,10 @@ def test_tts_default_mimo_unchanged(monkeypatch):
 
 
 def test_tts_chat_switched_bridges_stream_engine(monkeypatch):
-    """chat 换家 → 批处理 TTS 跟随 TTS_STREAM_PROVIDER（默认 cosyvoice）桥接。"""
+    """chat 换家 → 批处理 TTS 跟随 TTS_STREAM_PROVIDER（默认 cosyvoice）桥接。
+
+    Batch TTS follows the configured streaming engine after a chat switch.
+    """
     _clean_env(monkeypatch)
     monkeypatch.setenv("LLM_PROVIDER", "deepseek")
     monkeypatch.setenv("LLM_API_KEY", "dsk")
@@ -146,6 +164,7 @@ def test_batch_tts_providers_expose_the_real_provider_identity():
     assert StreamBridgeTTSProvider("cosyvoice").provider == "cosyvoice"
 
 
+# Configurable MiMo audio endpoint tests.
 # ── MiMo 端点可配 ──────────────────────────────────────────────────────
 
 def test_mimo_audio_base_url_override(monkeypatch):
@@ -153,27 +172,34 @@ def test_mimo_audio_base_url_override(monkeypatch):
     monkeypatch.setenv("MIMO_AUDIO_BASE_URL", "https://alt.example.com/v1/chat/completions")
     assert MiMoASRProvider("k").base_url == "https://alt.example.com/v1/chat/completions"
     assert MiMoTTSProvider("k").base_url == "https://alt.example.com/v1/chat/completions"
+    # Default to the official endpoint.
     # 缺省回落官方集群
     monkeypatch.delenv("MIMO_AUDIO_BASE_URL", raising=False)
     assert MiMoTTSProvider("k").base_url == MiMoTTSProvider.BASE_URL
 
 
+# WAV data extraction tests.
 # ── WAV data 块提取 ────────────────────────────────────────────────────
 
 def test_wav_pcm_data_standard_and_raw():
     pcm = b"\x01\x02" * 100
     assert _wav_pcm_data(_wav_header(len(pcm)) + pcm) == pcm
+    # Treat non-RIFF input as raw PCM.
     assert _wav_pcm_data(pcm) == pcm  # 非 RIFF 视为裸 PCM
 
 
 def test_wav_pcm_data_streaming_placeholder_size():
-    """ffmpeg pipe 产物：data size 可能是 0xFFFFFFFF 占位 → 取到末尾。"""
+    """ffmpeg pipe 产物：data size 可能是 0xFFFFFFFF 占位 → 取到末尾。
+
+    Pipe-generated WAV may use an unknown data length; consume through the end.
+    """
     pcm = b"\xaa\xbb" * 50
     hdr = bytearray(_wav_header(len(pcm)))
     hdr[-4:] = (0xFFFFFFFF).to_bytes(4, "little")
     assert _wav_pcm_data(bytes(hdr) + pcm) == pcm
 
 
+# Streaming-to-batch TTS bridge tests.
 # ── 流式桥接：TTS ──────────────────────────────────────────────────────
 
 class _FakeStreamTTS:
@@ -199,6 +225,7 @@ def test_bridge_tts_synthesize_wav(monkeypatch):
                           speed=1.0, fmt="wav"))
     assert fmt == "wav" and audio[:4] == b"RIFF"
     assert _wav_pcm_data(audio) == b"\x00\x01" * 800 + b"\x02\x03" * 800
+    # Do not forward a voice from a different engine; let the selected engine use its default to avoid request errors.
     # MiMo 音色「冰糖」不属于 cosyvoice → 不透传（引擎用自己默认），避免跨引擎 4xx
     assert fake.seen_voice == ""
     assert model == "cosyvoice-v3-flash"
@@ -221,6 +248,7 @@ def test_bridge_tts_list_voices():
     assert voices and all(v["gender"] == "male" for v in voices)
 
 
+# Streaming-to-batch ASR bridge tests.
 # ── 流式桥接：ASR ──────────────────────────────────────────────────────
 
 class _FakeStreamASR:
@@ -247,6 +275,7 @@ def test_bridge_asr_transcribe(monkeypatch):
     assert text == "拿起红色方块"
     assert model == "fake-rt-model"
     assert dur == 1000
+    # Strip the WAV header and preserve all PCM bytes.
     assert b"".join(fake.frames) == pcm  # WAV 头被剥掉、裸 PCM 完整喂入
 
 
@@ -260,14 +289,17 @@ def test_bridge_asr_no_engine_raises(monkeypatch):
         pass
 
 
+# Offline deterministic mock contracts support the keyless console demo.
 # ── Mock 契约（无 key 控制台演示的兜底，必须离线确定性）────────────────
 
 def test_mock_asr_offline_contract():
     prov = MockASRProvider()
     text, conf, lang, model, dur = asyncio.run(
         prov.transcribe(audio=b"\x00" * 320, fmt="wav", language="", model=""))
+    # Fixed nonempty transcript.
     assert text.startswith("[mock ASR]") and text  # 固定文本，非空
     assert conf == 0.0 and lang == "zh" and model == "mock" and dur == 0
+    # Language passes through and repeated calls remain deterministic.
     # 语言透传 + 再次调用结果一致（确定性）
     again = asyncio.run(prov.transcribe(audio=b"", fmt="pcm16", language="en", model="m"))
     assert again[0] == text and again[2] == "en"

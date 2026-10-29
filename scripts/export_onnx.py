@@ -12,6 +12,9 @@ IDENTITY; asserted here so a lerobot behavior change fails loudly instead of
 silently skewing actions), and the action chunk is unnormalized with the
 postprocessor's stats (x*std+mean — lerobot's exact inverse form). The export is
 verified against the torch policy before metadata is written.
+
+
+将 ACT 检查点导出为部署使用的单文件 ONNX。图内包含状态均值方差归一化与动作反归一化；environment_state 按上游契约保持原值，契约变化立即报错。写元数据前须与 torch 策略数值对照。
 """
 
 from __future__ import annotations
@@ -22,12 +25,16 @@ from pathlib import Path
 
 import numpy as np
 
+# 归一化分母加 epsilon；反归一化使用 x*std+mean。
 EPS = 1e-8  # lerobot normalizer epsilon (normalize divides by std+eps; inverse is x*std+mean)
 
 
 def _load_norm_stats(checkpoint: Path) -> tuple[dict, dict]:
     """Return (state_stats, action_stats) as {mean, std} float32 arrays, after
-    asserting the processor pipeline still matches the contract we bake in."""
+    asserting the processor pipeline still matches the contract we bake in.
+
+    先验证预后处理管线契约，再返回 float32 格式的状态和动作均值、标准差。
+    """
     from safetensors.torch import load_file
 
     pre_cfg = json.loads((checkpoint / "policy_preprocessor.json").read_text(encoding="utf-8"))
@@ -87,7 +94,10 @@ def main() -> int:
     state_stats, action_stats = _load_norm_stats(checkpoint)
 
     class ChunkExport(torch.nn.Module):
-        """raw (state, env) -> unnormalized action chunk; eval mode => VAE latent zeros."""
+        """raw (state, env) -> unnormalized action chunk; eval mode => VAE latent zeros.
+
+        原始状态与环境输入转换为反归一化动作块；评估模式下 VAE 隐变量置零。
+        """
 
         def __init__(self, model: torch.nn.Module) -> None:
             super().__init__()
@@ -118,6 +128,7 @@ def main() -> int:
         dynamo=False,
     )
 
+    # 写元数据前先过数值一致性门禁，避免发布静默错误的计算图。
     # Parity gate BEFORE stamping metadata: a silently-wrong graph must not ship.
     import onnxruntime as ort
 

@@ -1,4 +1,6 @@
-<!-- Tabletop pick-and-place scene (M1). Loaded via embodied.control.simassets.stage_tabletop,
+<!-- 桌面抓放场景由场景暂存器加载并替换模型路径；模型补入抓取点。
+     物体与容器按机械臂可达环标定，调整需与驱动围栏保持一致。
+     Tabletop pick-and-place scene (M1). Loaded via embodied.control.simassets.stage_tabletop,
      which replaces __ARM_XML__ with the staged Menagerie arm file (grasp site patched in).
      Object/bin placement is calibrated to the arm's reachable ring; keep changes in sync with
      the workspace fence in the sim driver. -->

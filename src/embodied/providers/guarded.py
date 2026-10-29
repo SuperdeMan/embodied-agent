@@ -3,6 +3,9 @@
 Wires the M0-ported LLMCache/RateLimiter into the serving path (roadmap M1 item).
 Wrap REAL providers only — the offline ScriptedToolProvider is stateful (sequence
 draining) and deterministic; caching it would replay stale plans.
+
+
+在真实模型提供方外包装缓存和限流；离线规则提供方有状态且确定，不缓存以免回放旧计划。
 """
 
 from __future__ import annotations
@@ -32,6 +35,9 @@ class GuardedProvider:
     The ported LLMCache stores (content, model_used) and reconstructs the rest — it cannot
     faithfully represent a complete_tools 5-tuple (tool_calls would be silently dropped),
     so planning calls are rate-limited but never cached. Streaming passes through untouched.
+    
+
+    普通补全使用令牌桶和 TTL 缓存，工具补全仅限流：旧缓存不能保留工具调用五元组。流式调用透传。
     """
 
     def __init__(self, inner: Any, *, cache: LLMCache | None = None, limiter: RateLimiter | None = None):
@@ -75,5 +81,6 @@ class GuardedProvider:
             tools=tools, tool_choice=tool_choice, thinking=thinking, timeout_s=timeout_s,
         )
 
+    # 流式、向量化及其他能力原样透传。
     def __getattr__(self, name: str) -> Any:  # stream/embed and anything else: pass through
         return getattr(self.inner, name)

@@ -1,3 +1,4 @@
+# 保留移植来源，逻辑不变，仅移除旧网关端点描述。
 # Ported from car-agent llm-gateway/health.py @ f0b08f8, changes: none (docstring trimmed of
 # gateway-endpoint references; logic identical).
 """Provider 被动健康统计（运行时硬化 D5）。
@@ -5,6 +6,9 @@
 调用路径（runtime.probe 等）顺手记账，status() 附带 health 块——「可用=配了 key」升级为
 「健康=最近真的答得上来」。刻意**无后台周期探活**（不给付费 API 烧闲置 token）。
 进程内滚动窗口，重启清零（健康是「近况」，无需持久化）。
+
+
+Record passive provider health during real calls without paid background probes. Rolling in-memory history resets on restart and distinguishes configured availability from observed health.
 """
 from __future__ import annotations
 
@@ -17,6 +21,7 @@ _WINDOW = 50
 class ProviderHealth:
     def __init__(self, window: int = _WINDOW):
         self._window = window
+        # 提供方 ID 映射到结果与失败类别队列。
         self._results: dict[str, deque] = {}    # pid -> deque[(ok, kind)]
         self._last_error: dict[str, str] = {}
         self._last_ok_at: dict[str, float] = {}
@@ -24,7 +29,10 @@ class ProviderHealth:
 
     def record(self, pid: str, ok: bool, *, kind: str = "", latency_ms: float = 0.0,
                error: str = "") -> None:
-        """kind: "" | "timeout" | "rate_limited"（失败分类）；ok=True 时更新 EWMA 时延。"""
+        """kind: "" | "timeout" | "rate_limited"（失败分类）；ok=True 时更新 EWMA 时延。
+
+        Classify timeout and rate-limit failures; successful calls update latency EWMA.
+        """
         if not pid:
             return
         dq = self._results.setdefault(pid, deque(maxlen=self._window))

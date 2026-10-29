@@ -23,11 +23,13 @@ embodied = "embodied.cli:main"
 dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "ruff>=0.6"]
 sim = ["mujoco>=3.2"]
 rpc = ["grpcio>=1.66", "grpcio-tools>=1.66"]
+# 训练重型依赖与部署隔离；运行时仅需策略组，ONNX 导出元数据工具放学习组。
 # M2 learning loop (docs/decisions.md D014): training-side deps are heavy (torch) and
 # NEVER required at runtime — deployment uses the `policy` group (ONNX) only.
 # `onnx` rides in learn for export-time metadata stamping (scripts/export_onnx.py).
 learn = ["lerobot>=0.4", "onnx>=1.16"]
 policy = ["onnxruntime>=1.18"]
+# 开放词汇检测使用本组，离线色块检测不需要额外依赖。
 # Perception v1 (D015): open-vocabulary detection. The color-blob fallback needs
 # nothing; this group only serves GroundingDinoProvider.
 perceive = ["transformers>=4.44", "torch>=2.4"]

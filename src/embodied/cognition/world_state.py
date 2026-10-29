@@ -3,6 +3,9 @@
 Ground truth flows from the sim driver for now; perception fills the same shapes
 from M2 on. Skills verify their own effects against snapshots ("did the world
 actually change") — the planner-level verify contract arrives with the engine port.
+
+
+带类型的世界快照与空间谓词；仿真或感知填充相同形状，技能和规划验证世界是否真正变化。
 """
 
 from __future__ import annotations
@@ -60,6 +63,7 @@ def object_near(snap: WorldSnapshot, obj: str, pos: Vec3, radius: float) -> bool
     return math.dist(p, pos) <= radius
 
 
+# 抓取阈值按仿真夹爪标定；脚本、学习策略与声明式验证共享同一裁判标准。
 # Grasp-hold thresholds calibrated on the sim gripper geometry (M1). Shared by the
 # scripted skills, the learned-skill runner and the declarative verifier defaults
 # (cognition/verify.py) — one judge, however the motion was produced.
@@ -70,7 +74,10 @@ GRASP_HOLD_RADIUS = 0.06
 def held_object(
     snap: WorldSnapshot, *, min_z: float = GRASP_MIN_Z, radius: float = GRASP_HOLD_RADIUS
 ) -> str | None:
-    """Name of the object currently held (lifted and near the grasp point), else None."""
+    """Name of the object currently held (lifted and near the grasp point), else None.
+
+    返回已抬升且靠近抓取点的持有物体名，否则为空。
+    """
     for name, pose in snap.objects.items():
         if pose.pos[2] > min_z and math.dist(pose.pos, snap.ee_pos) < radius:
             return name

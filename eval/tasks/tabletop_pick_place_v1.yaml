@@ -1,3 +1,4 @@
+# 版本化任务固定随机种子、容差、范围和指令；语义变更须新建版本，同版本才可对比。
 # Versioned eval task (schema eval.task/v1). Tasks are immutable once baselined:
 # changing ANYTHING here (seeds, margins, sector, command) means a new version file —
 # baselines are only comparable within one task version (docs/roadmap.md 评测驱动).
@@ -12,11 +13,13 @@ command: "把红色方块放进盒子"
 embodiment: sim.mujoco.so_arm100
 
 episodes:
+  # 每项初始化随机数流，物体位置由此确定性生成。
   # Each entry seeds the sim RNG stream; object placement derives deterministically.
   seeds: [0, 1, 2]
   per_seed: 10
 
 randomization:
+  # 记录驱动实现的随机化维度，采样器语义变化必须体现为任务版本变化。
   # Documented dims (implemented by TabletopSim._randomize_objects; recorded here so a
   # future change to the sampler is visibly a task-version change):
   object: obj_cube

@@ -4,6 +4,9 @@ Position task (3 dof) plus a soft axis-alignment task that points the gripper's
 approach axis at a world direction (default: straight down for top grasps) — the
 right shape for a 5-DOF arm where full 6D pose tracking is over-constrained.
 Operates on a scratch MjData so the live simulation state is never disturbed.
+
+
+使用 MuJoCo 雅可比进行阻尼最小二乘逆解；三维位置任务加软轴向约束，适配五自由度机械臂，避免完整六维姿态过约束。计算使用独立临时状态，不扰动实时仿真。
 """
 
 from __future__ import annotations
@@ -16,8 +19,11 @@ import numpy as np
 
 @dataclass
 class IKResult:
+    # 按输入顺序返回受控关节解。
     qpos: np.ndarray  # solution for the controlled joints, input order
+    # 单位米。
     pos_err: float  # meters
+    # 接近轴与目标轴夹角，单位弧度。
     axis_err: float  # radians between approach axis and target axis
     converged: bool
     iters: int
@@ -65,8 +71,10 @@ def solve_ik(
         pos_err = float(np.linalg.norm(e_pos))
         if t_axis is not None:
             a_world = rot @ a_local
+            # 将接近轴旋向目标轴。
             e_ori = np.cross(a_world, t_axis)  # rotates approach axis toward target axis
             axis_err = float(np.arcsin(np.clip(np.linalg.norm(e_ori), 0.0, 1.0)))
+            # 反平行是反正弦的盲点。
             if float(a_world @ t_axis) < 0:  # anti-parallel: arcsin blind spot
                 axis_err = float(np.pi) - axis_err
         else:

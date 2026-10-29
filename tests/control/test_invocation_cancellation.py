@@ -1,4 +1,7 @@
-"""A late worker must never commit a write after its invocation has ended."""
+"""A late worker must never commit a write after its invocation has ended.
+
+调用结束后迟到工作线程不得再提交写入。
+"""
 
 import asyncio
 import threading

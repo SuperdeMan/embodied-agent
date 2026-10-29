@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# 从协议生成 Python 存根到忽略的 gen/python，使用项目 RPC 组工具，无需全局安装。
 # Generate Python stubs from proto/ into gen/python (gitignored).
 # Uses grpcio-tools from the uv "rpc" dependency group (D011: no global buf install).
 set -euo pipefail

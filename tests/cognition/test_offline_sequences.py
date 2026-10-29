@@ -1,5 +1,8 @@
 """Sequence rules in the scripted provider: one call per round, abort on failure —
-the same cadence the planner sees from a real LLM."""
+the same cadence the planner sees from a real LLM.
+
+离线序列每轮一次调用，失败中断，复现真实模型的规划节奏。
+"""
 
 from __future__ import annotations
 
@@ -44,6 +47,7 @@ async def test_sequence_aborts_after_failed_step():
         {"role": "user", "content": "<tool_results>\n- skill.manip.pick: ok=False detail=miss\n</tool_results>"},
     ]
     text, _, _, _, calls = await _round(p, messages)
+    # 抓取失败后不得尝试放置。
     assert calls == []  # place is NOT attempted after pick failed
     assert "miss" in text
 

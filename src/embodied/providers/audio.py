@@ -1,3 +1,4 @@
+# 保留移植来源：音频部分拆为独立模块，共享 HTTP 配置及模拟器门禁；仅调整导入和格式，提供方逻辑、签名、协议帧及环境变量保持不变，上游文档路径仍指来源仓库。
 # Ported from car-agent llm-gateway/providers.py (audio section) @ f0b08f8, changes: extracted
 # lines 556-1722 into a standalone module (module docstring + import block added; section lived
 # mid-file upstream); _HTTP_LIMITS/_HTTP_CONNECT_S/_strict_mock_gate imported from
@@ -11,6 +12,9 @@ Same env-first philosophy as llm.py: switching audio vendors is an env change, n
 code change. Factories: build_asr_provider / build_streaming_asr_provider (speech to
 text), build_tts_provider / build_tts_stream_provider (text to speech). Mock providers
 keep the console loop runnable offline without any API key.
+
+
+批量与流式语音通过环境或请求切换提供方；无密钥时使用模拟器保持离线控制台可运行。
 """
 from __future__ import annotations
 
@@ -23,17 +27,24 @@ import httpx
 
 from .llm import _HTTP_CONNECT_S, _HTTP_LIMITS, _strict_mock_gate
 
+# ASR providers; the linked official reference defines the audio recognition API.
 # ─── ASR Provider（语音识别）───
 # 官方文档：https://platform.xiaomimimo.com/docs/zh-CN/api/audio/Speech-Recognition
 
 class BaseASRProvider:
     async def transcribe(self, audio: bytes, fmt: str, language: str, model: str):
-        """returns (text, confidence, language, model_used, duration_ms)"""
+        """returns (text, confidence, language, model_used, duration_ms)
+
+        返回文本、置信度、语言、实际模型和耗时。
+        """
         raise NotImplementedError
 
 
 class MockASRProvider(BaseASRProvider):
-    """无 API key 时的 ASR 兜底。"""
+    """无 API key 时的 ASR 兜底。
+
+    ASR fallback when no API key is available.
+    """
     async def transcribe(self, audio: bytes, fmt: str, language: str, model: str):
         return "[mock ASR] 语音识别结果（配置 LLM_API_KEY 后接入真实 ASR）", 0.0, language or "zh", "mock", 0
 
@@ -48,6 +59,7 @@ class MiMoASRProvider(BaseASRProvider):
 
     def __init__(self, api_key: str, base_url: str = ""):
         self.api_key = api_key
+        # Audio endpoints share their own configurable base URL independently from chat.
         # MiMo 音频端点可配（MIMO_AUDIO_BASE_URL，ASR/TTS 共用），与 chat 的 LLM_BASE_URL 独立
         self.base_url = base_url or os.getenv("MIMO_AUDIO_BASE_URL", "") or self.BASE_URL
         self._client: httpx.AsyncClient | None = None
@@ -55,6 +67,7 @@ class MiMoASRProvider(BaseASRProvider):
     async def transcribe(self, audio: bytes, fmt: str, language: str, model: str):
         import base64
 
+        # Encode audio as a base64 data URI.
         # 音频编码为 base64 data URI
         mime = f"audio/{fmt or 'wav'}"
         b64 = base64.b64encode(audio).decode("ascii")
@@ -80,6 +93,7 @@ class MiMoASRProvider(BaseASRProvider):
         resp.raise_for_status()
         result = resp.json()
 
+        # Recognition text is in message content; usage reports audio duration in seconds.
         # 响应：choices[0].message.content = 识别文本，usage.seconds = 音频秒数
         text = result["choices"][0]["message"]["content"]
         duration_sec = result.get("usage", {}).get("seconds", 0)
@@ -88,7 +102,10 @@ class MiMoASRProvider(BaseASRProvider):
 
 def _wav_pcm_data(audio: bytes) -> bytes:
     """提取 WAV 的 data 块裸 PCM；非 RIFF 输入视为已是裸 PCM 原样返回。
-    容忍 ffmpeg pipe 产物（RIFF/data 的 size 字段可能是 0 或 0xFFFFFFFF 占位）。"""
+    容忍 ffmpeg pipe 产物（RIFF/data 的 size 字段可能是 0 或 0xFFFFFFFF 占位）。
+
+    Extract PCM from WAV data chunks; pass non-RIFF data through and tolerate placeholder chunk sizes from pipes.
+    """
     if len(audio) < 12 or audio[:4] != b"RIFF":
         return audio
     i = audio.find(b"data", 12)
@@ -107,6 +124,9 @@ class StreamBridgeASRProvider(BaseASRProvider):
     存在意义：批处理面此前硬绑 MiMo——chat 换家（LLM_PROVIDER≠mimo 系）即静默降级
     Mock。经此桥接，批处理可跟随 dashscope 等流式引擎：WAV→裸 PCM→按帧喂流式引擎→
     取定稿文本。model 参数忽略（引擎模型由 ASR_STREAM_MODEL 控制）。
+    
+
+    Bridge streaming ASR to batch APIs: unwrap WAV, feed PCM frames and return final text. Engine selection follows configuration; the batch model argument is ignored.
     """
 
     def __init__(self, provider: str):
@@ -117,6 +137,7 @@ class StreamBridgeASRProvider(BaseASRProvider):
         if engine is None:
             raise RuntimeError(f"ASR 引擎 {self.provider} 无可用 key")
         pcm = _wav_pcm_data(audio)
+        # 16kHz 单声道 PCM16 每秒 32000 字节。
         duration_ms = int(len(pcm) / 32000 * 1000)  # 16kHz mono s16le = 32000 B/s
 
         async def frames():
@@ -137,7 +158,10 @@ def build_asr_provider() -> BaseASRProvider:
     ASR_PROVIDER：auto（默认）| mimo | dashscope | mock。
     auto：LLM_PROVIDER 为 MiMo 系且有 LLM_API_KEY → MiMo（历史现状）；否则有
     dashscope key → 桥接流式引擎；都不可用 → Mock。显式 mimo 复用 LLM_API_KEY
-    （多 LLM 源惯例：该 env 即 MiMo 的 key），chat 切走后批处理仍可钉住 MiMo。"""
+    （多 LLM 源惯例：该 env 即 MiMo 的 key），chat 切走后批处理仍可钉住 MiMo。
+
+    Build batch ASR at startup: auto prefers configured MiMo, then DashScope streaming bridge, then mock; explicit MiMo remains pinned through its configured key.
+    """
     choice = os.getenv("ASR_PROVIDER", "auto").strip().lower()
     api_key = os.getenv("LLM_API_KEY", "")
 
@@ -157,13 +181,17 @@ def build_asr_provider() -> BaseASRProvider:
     return _mock("无可用引擎（MiMo/DashScope key 均缺）")
 
 
+# Streaming ASR converts PCM frames into partial/final text; transport is separate and engines are configurable per request or environment.
 # ─── 流式 ASR Provider（实时识别上屏）───
 # 设计见 docs/design/2026-06-30-asr-streaming-design.md。
 # 传输层（HMI↔网关 WS + 网关流式 ffmpeg）在 http_server.py；此处是
 # "16k mono PCM16 帧流 → {text, final} 文本流" 的引擎抽象，引擎经 env/请求可换。
 
 def _wav_header(pcm_len: int, sr: int = 16000) -> bytes:
-    """给裸 PCM16 mono 加 44 字节 WAV 头（供 MiMo 批 ASR 当 wav 用）。"""
+    """给裸 PCM16 mono 加 44 字节 WAV 头（供 MiMo 批 ASR 当 wav 用）。
+
+    Wrap mono PCM16 in a 44-byte WAV header for batch ASR.
+    """
     import struct
     return (b"RIFF" + struct.pack("<I", 36 + pcm_len) + b"WAVEfmt "
             + struct.pack("<IHHIIHH", 16, 1, 1, sr, sr * 2, 2, 16)
@@ -172,14 +200,21 @@ def _wav_header(pcm_len: int, sr: int = 16000) -> bytes:
 
 class BaseStreamingASRProvider:
     async def stream(self, pcm_chunks, *, language: str = "zh"):
-        """pcm_chunks: 16kHz mono s16le PCM 帧的异步迭代器；yield {'text': str, 'final': bool}。"""
+        """pcm_chunks: 16kHz mono s16le PCM 帧的异步迭代器；yield {'text': str, 'final': bool}。
+
+        Consume asynchronous 16 kHz mono PCM16 frames and yield text with finality markers.
+        """
         raise NotImplementedError
+        # 用于标记异步生成器，正常不会到达。
         yield  # marks this as an async generator (never reached)
 
 
 class MiMoChunkedASRProvider(BaseStreamingASRProvider):
     """回退引擎：累积 PCM、每 ~interval 秒封 WAV 打一次 MiMo 批 ASR 产伪 partial。
-    用已验证可用的 MiMo 批 ASR，保证上屏功能在 DashScope 不可用时也跑通。"""
+    用已验证可用的 MiMo 批 ASR，保证上屏功能在 DashScope 不可用时也跑通。
+
+    Fallback ASR accumulates PCM and periodically invokes batch recognition to provide partial text when realtime service is unavailable.
+    """
 
     def __init__(self, batch: "MiMoASRProvider", model: str = "", interval_s: float = 1.2):
         self.batch = batch
@@ -193,6 +228,7 @@ class MiMoChunkedASRProvider(BaseStreamingASRProvider):
         last_text = ""
 
         async def transcribe_now() -> str:
+            # Skip requests shorter than 0.1 seconds.
             if len(buf) < 3200:  # <0.1s 不值得打
                 return last_text
             wav = _wav_header(len(buf)) + bytes(buf)
@@ -210,6 +246,7 @@ class MiMoChunkedASRProvider(BaseStreamingASRProvider):
                         last_text = t
                         yield {"text": t, "final": False}
                 except Exception:
+                    # Intermediate failure does not prevent final transcription.
                     pass  # 中途失败不影响整段定稿
         try:
             final = await transcribe_now()
@@ -222,12 +259,16 @@ class DashScopeRealtimeASRProvider(BaseStreamingASRProvider):
     """DashScope（百炼）实时 ASR——OpenAI 兼容 Realtime 协议（实测见设计 §2.1）。
     端点 wss://…/api-ws/v1/realtime?model=<id>，Bearer 鉴权。
     session.created → session.update → input_audio_buffer.append(base64 PCM16) →
-    （流末）commit → conversation.item.input_audio_transcription.delta(partial)/.completed(final)。"""
+    （流末）commit → conversation.item.input_audio_transcription.delta(partial)/.completed(final)。
+
+    DashScope realtime ASR uses bearer-authenticated WebSocket sessions, base64 PCM appends and delta/final transcription events.
+    """
 
     def __init__(self, api_key: str, ws_url: str, model: str, vad_silence_ms: int = 800):
         self.api_key = api_key
         self.ws_url = ws_url
         self.model = model
+        # Pass client silence timeout to server VAD, clamp to 300–2000 ms and default to 800; client-stopped Fun-ASR is unaffected.
         # R4.3b P2（U5b 治本）：server_vad 静音尾由客户端透传（原硬编码 800ms 盖过客户端设置），
         # 夹紧 [300, 2000]，异常/缺省回落 800（现状）。fun-asr 走客户端 stop 端点，不受此影响。
         try:
@@ -245,6 +286,7 @@ class DashScopeRealtimeASRProvider(BaseStreamingASRProvider):
             async with session.ws_connect(
                 url, headers={"Authorization": f"Bearer {self.api_key}"}, heartbeat=20.0,
             ) as ws:
+                # Wait tolerantly for session creation.
                 # 等 session.created（容错读几条）
                 for _ in range(5):
                     msg = await ws.receive(timeout=10)
@@ -259,6 +301,7 @@ class DashScopeRealtimeASRProvider(BaseStreamingASRProvider):
                     _eid[0] += 1
                     return {"event_id": f"ev{_eid[0]}", **o}
 
+                # Verified wire fields use pcm format, language and server VAD; manual mode failed. Partial text and final transcripts use different events.
                 # 实测协议：format=pcm（非 pcm16）、transcription.language（非 model）、**server_vad**
                 # （turn_detection=None 手动模式在该模型上报 1011，server_vad 实测可用）；
                 # 中间结果 .text(text+stash)、定稿 .completed(transcript)。
@@ -274,6 +317,7 @@ class DashScopeRealtimeASRProvider(BaseStreamingASRProvider):
                         async for chunk in pcm_chunks:
                             await ws.send_json(_ev({"type": "input_audio_buffer.append",
                                                     "audio": base64.b64encode(chunk).decode("ascii")}))
+                        # Append enough silence after release to exceed the configured VAD tail, using 100 ms frames.
                         # 流末（松手）追静音触发 server_vad 收尾定稿——须 > silence_duration_ms 才生效，
                         # 故按 vad_silence_ms 放大帧数（每帧 100ms 静音）：silence 越长、兜底静音越长。
                         sil = base64.b64encode(b"\x00" * 3200).decode("ascii")  # 100ms @16k s16le
@@ -292,6 +336,7 @@ class DashScopeRealtimeASRProvider(BaseStreamingASRProvider):
                         try:
                             msg = await ws.receive(timeout=15.0)
                         except asyncio.TimeoutError:
+                            # Exit on prolonged lack of transcription and handle it as missing output.
                             break  # 模型长时间无响应（如 fun-asr-realtime 不出转写）→ 退出，下面按无转写处理
                         if msg.type != aiohttp.WSMsgType.TEXT:
                             if msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
@@ -300,6 +345,7 @@ class DashScopeRealtimeASRProvider(BaseStreamingASRProvider):
                         m = json.loads(msg.data)
                         t = m.get("type", "")
                         if "input_audio_transcription" in t and t.endswith(".text"):
+                            # Combine confirmed text with draft suffix.
                             acc = (m.get("text") or "") + (m.get("stash") or "")  # 已确认 + 草稿后缀
                             if acc:
                                 yield {"text": acc, "final": False}
@@ -313,6 +359,7 @@ class DashScopeRealtimeASRProvider(BaseStreamingASRProvider):
                 finally:
                     pump_task.cancel()
                 if not final_sent:
+                    # Abnormal close without text raises for batch fallback; an existing partial transcript is retained as final.
                     # 异常关闭/无转写（如服务端 1011 InternalError）→ 抛错让网关回 error、
                     # HMI 无感回退批处理；有半截 partial 则当定稿用。
                     if not acc:
@@ -325,7 +372,10 @@ class DashScopeInferenceASRProvider(BaseStreamingASRProvider):
     与 qwen3 的 OpenAI-realtime 协议不同！实测见 docs/design §2.1）。
     run-task(task_group=audio/task=asr/function=recognition/parameters{format,sample_rate}/input{}) →
     task-started → **二进制音频帧** → result-generated(payload.output.sentence{text,sentence_end}) →
-    finish-task → task-finished。"""
+    finish-task → task-finished。
+
+    Fun-ASR and Paraformer use run-task with binary audio and task lifecycle events, distinct from Qwen realtime protocol.
+    """
 
     def __init__(self, api_key: str, ws_url: str, model: str):
         self.api_key = api_key
@@ -352,6 +402,7 @@ class DashScopeInferenceASRProvider(BaseStreamingASRProvider):
                     try:
                         await started.wait()
                         async for chunk in pcm_chunks:
+                            # Send binary audio frames rather than base64.
                             await ws.send_bytes(chunk)  # 二进制音频帧（非 base64）
                         await ws.send_json({"header": {"action": "finish-task", "task_id": task_id,
                                                        "streaming": "duplex"}, "payload": {"input": {}}})
@@ -359,6 +410,7 @@ class DashScopeInferenceASRProvider(BaseStreamingASRProvider):
                         pass
 
                 pump_task = asyncio.create_task(pump())
+                # Accumulate finalized sentence prefixes before the current sentence.
                 finalized = ""  # 已定稿句子前缀（多句时累积），current 句的 text 接其后
                 acc = ""
                 final_sent = False
@@ -401,7 +453,10 @@ def build_streaming_asr_provider(provider: str = "", model: str = "",
                                  vad_silence_ms: int = 0) -> "BaseStreamingASRProvider | None":
     """按请求/env 选流式引擎。provider/model 为请求级覆盖（HMI 设置可切），空则用 env 默认。
     vad_silence_ms：客户端静音尾（R4.3b P2），仅 qwen3 realtime 的 server_vad 消费；0=用 provider 缺省。
-    无可用 key 或 off → None（HMI 探测到则无感回退批处理 /api/asr）。"""
+    无可用 key 或 off → None（HMI 探测到则无感回退批处理 /api/asr）。
+
+    Request-level engine/model overrides precede environment defaults; silence settings affect realtime server VAD. Missing credentials or off returns None for batch fallback.
+    """
     provider = (provider or os.getenv("ASR_STREAM_PROVIDER", "dashscope")).strip().lower()
     if provider in ("", "off", "none"):
         return None
@@ -413,9 +468,11 @@ def build_streaming_asr_provider(provider: str = "", model: str = "",
         if provider in ("fun", "dashscope-fun") and not model:
             mdl = "fun-asr-realtime"
         if "qwen" in mdl.lower():
+            # Qwen ASR uses realtime sessions and base64 audio.
             # Qwen-ASR：OpenAI 兼容 Realtime 协议（/realtime，base64 音频，session.update）
             ws_url = os.getenv("DASHSCOPE_ASR_WS_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/realtime")
             return DashScopeRealtimeASRProvider(key, ws_url, mdl, vad_silence_ms=vad_silence_ms or 800)
+        # Fun-ASR and Paraformer use run-task with binary audio.
         # Fun-ASR / Paraformer：run-task 协议（/inference，二进制音频帧）
         inf_url = os.getenv("DASHSCOPE_ASR_INFERENCE_WS_URL", "wss://dashscope.aliyuncs.com/api-ws/v1/inference")
         return DashScopeInferenceASRProvider(key, inf_url, mdl)
@@ -427,6 +484,7 @@ def build_streaming_asr_provider(provider: str = "", model: str = "",
     return None
 
 
+# TTS providers; the linked official reference defines speech synthesis.
 # ─── TTS Provider（语音合成）───
 # 官方文档：https://platform.xiaomimimo.com/docs/zh-CN/usage-guide/speech-synthesis-v2.5
 
@@ -435,16 +493,25 @@ class BaseTTSProvider:
 
     async def synthesize(self, text: str, voice_id: str, model: str,
                          speed: float, fmt: str):
-        """returns (audio_bytes, format, duration_ms, model_used, voice_id)"""
+        """returns (audio_bytes, format, duration_ms, model_used, voice_id)
+
+        返回音频字节、格式、耗时、实际模型及音色。
+        """
         raise NotImplementedError
 
     async def list_voices(self, language: str, gender: str):
-        """returns list of VoiceInfo dicts"""
+        """returns list of VoiceInfo dicts
+
+        返回音色信息字典列表。
+        """
         raise NotImplementedError
 
 
 class MockTTSProvider(BaseTTSProvider):
-    """无 API key 时的 TTS 兜底。"""
+    """无 API key 时的 TTS 兜底。
+
+    TTS fallback when no API key is available.
+    """
     provider = "mock"
 
     async def synthesize(self, text: str, voice_id: str, model: str,
@@ -468,6 +535,7 @@ class MiMoTTSProvider(BaseTTSProvider):
     provider = "mimo"
     BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
 
+    # Official preset voices for the MiMo TTS model.
     # 官方预置音色（mimo-v2.5-tts）
     VOICES = [
         {"voice_id": "mimo_default", "name": "MiMo-默认", "language": "zh",
@@ -492,6 +560,7 @@ class MiMoTTSProvider(BaseTTSProvider):
 
     def __init__(self, api_key: str, base_url: str = ""):
         self.api_key = api_key
+        # Audio base URL is independent of the chat endpoint and shared by ASR/TTS.
         # MiMo 音频端点可配（MIMO_AUDIO_BASE_URL，ASR/TTS 共用），与 chat 的 LLM_BASE_URL 独立
         self.base_url = base_url or os.getenv("MIMO_AUDIO_BASE_URL", "") or self.BASE_URL
         self._client: httpx.AsyncClient | None = None
@@ -503,6 +572,7 @@ class MiMoTTSProvider(BaseTTSProvider):
         headers = {
             "api-key": self.api_key,
             "Content-Type": "application/json",
+            # Disable gzip to avoid decoding issues.
             "Accept-Encoding": "identity",  # 禁用 gzip，避免解码问题
         }
         out_fmt = "pcm16" if fmt == "pcm16" else "wav"
@@ -516,6 +586,7 @@ class MiMoTTSProvider(BaseTTSProvider):
                 "voice": voice_id or "mimo_default",
             },
         }
+        # Speaking rate can be expressed through user style instructions; the current request body deliberately omits a speed field.
         # speed 参数：通过 role=user 的风格指令传入（如"语速稍快"）
         # 当前不注入 speed 到请求体，保持简洁；需要时可加 role=user content
 
@@ -523,7 +594,9 @@ class MiMoTTSProvider(BaseTTSProvider):
             self._client = httpx.AsyncClient(limits=_HTTP_LIMITS)
         resp = await self._client.post(self.base_url, headers=headers, json=body, timeout=60)
         resp.raise_for_status()
+        # Parse JSON containing base64 audio explicitly to avoid encoding issues.
         # MiMo TTS 返回 JSON（含 base64 音频），手动解析避免编码问题
+        # Raw response bytes have already been decompressed.
         raw = resp.content  # 原始字节（已自动解压 gzip）
         try:
             import json as _json
@@ -531,9 +604,12 @@ class MiMoTTSProvider(BaseTTSProvider):
             audio_b64 = result["choices"][0]["message"]["audio"]["data"]
             audio_bytes = base64.b64decode(audio_b64)
         except (ValueError, KeyError, IndexError, UnicodeDecodeError):
+            # Fallback for a response containing audio bytes directly.
             # fallback：响应体直接是音频字节流
             audio_bytes = raw
+        # Estimate duration from 24 kHz mono PCM16 at 48000 bytes per second.
         # 估算时长：PCM16 24kHz mono = 48000 bytes/sec
+        # Ignore the WAV header in this estimate.
         bytes_per_sec = 48000 if out_fmt == "pcm16" else 48000  # WAV 头忽略
         duration_ms = int(len(audio_bytes) / bytes_per_sec * 1000) if audio_bytes else 0
         return audio_bytes, out_fmt, duration_ms, model or "mimo-v2.5-tts", voice_id or "mimo_default"
@@ -554,6 +630,9 @@ class StreamBridgeTTSProvider(BaseTTSProvider):
     整段文本一次流入 → 聚齐 PCM → 封 WAV 返回。调用方传入的 model/voice 若不属于该
     引擎（如 HMI 旧默认「冰糖」打到 cosyvoice），忽略并用引擎目录默认，避免跨引擎
     音色 4xx（与 HMI settings 的同名回落逻辑对称，双侧防御）。
+    
+
+    Bridge streaming TTS to batch WAV synthesis; incompatible model or voice selections fall back to that engine's catalog defaults.
     """
 
     def __init__(self, engine: str):
@@ -602,7 +681,10 @@ def build_tts_provider(requested_provider: str = "") -> BaseTTSProvider:
     provider/voice 的验收夹具，也与流式端点的显式 provider 选择保持一致。
     auto：LLM_PROVIDER 为 MiMo 系且有 LLM_API_KEY → MiMo（历史现状）；否则桥接
     TTS_STREAM_PROVIDER 指定的流式引擎（需对应 key）；都不可用 → Mock。
-    显式 mimo 复用 LLM_API_KEY（多 LLM 源惯例：该 env 即 MiMo 的 key）。"""
+    显式 mimo 复用 LLM_API_KEY（多 LLM 源惯例：该 env 即 MiMo 的 key）。
+
+    Build batch TTS with explicit request pinning first; auto selects configured MiMo, a streaming engine bridge, or mock when unavailable.
+    """
     choice = (
         requested_provider.strip().lower()
         or os.getenv("TTS_PROVIDER", "auto").strip().lower()
@@ -622,6 +704,7 @@ def build_tts_provider(requested_provider: str = "") -> BaseTTSProvider:
         if llm_provider in ("xiaomimimo", "mimo") and api_key:
             return MiMoTTSProvider(api_key)
         choice = os.getenv("TTS_STREAM_PROVIDER", "cosyvoice").strip().lower()
+        # Select the configured default engine.
         if choice == "dashscope":  # 泛指默认引擎（同 build_tts_stream_provider）
             choice = "cosyvoice"
     if choice in TTS_STREAM_CATALOG and build_tts_stream_provider(choice) is not None:
@@ -629,6 +712,7 @@ def build_tts_provider(requested_provider: str = "") -> BaseTTSProvider:
     return _mock("无可用引擎（流式引擎 key 均缺）")
 
 
+# Streaming TTS consumes text deltas and emits PCM; CosyVoice uses binary run-task audio, Qwen uses base64 realtime audio. Historical probe timings belong to the referenced run. Voice catalogs are engine-specific.
 # ─── 流式 TTS Provider（服务端 PCM 流式合成，R4.2）───
 # 文本增量进、PCM 音频分片出。两个 DashScope（百炼）模型经 P0 探针实测（见
 # docs/design/2026-07-04-r4.2-streaming-tts-bargein.md §7）：
@@ -670,6 +754,7 @@ QWEN_TTS_VOICES = [
      "description": "四川话·女声", "tags": ["方言", "四川话"]},
 ]
 
+# Common MiniMax system voices; query the provider API for the complete catalog.
 # MiniMax T2A 系统音色（部分常用；完整表可调 MiniMax「查询可用音色」API）。
 MINIMAX_VOICES = [
     {"voice_id": "female-tianmei", "name": "甜美女声", "language": "zh", "gender": "female",
@@ -688,6 +773,7 @@ MINIMAX_VOICES = [
      "description": "主持·男声", "tags": ["男声", "主持"]},
 ]
 
+# Shared engine catalog defines default model, voice, sample rate and available voices.
 # provider id → (默认模型, 默认音色, 采样率, 音色表)。HMI/工厂共用，避免散落硬编码。
 TTS_STREAM_CATALOG = {
     "cosyvoice": {"model": "cosyvoice-v3-flash", "voice": "longxiaochun_v3",
@@ -702,6 +788,7 @@ TTS_STREAM_CATALOG = {
 }
 
 
+# Group text deltas into sentences for APIs accepting whole text, then stream each synthesized sentence.
 # ── 句级切分：把「文本增量流」聚成「整句流」──
 # MiMo/MiniMax 的 TTS API 都是「整段文本一次入」（不像 cosyvoice/qwen 支持 continue-task 增量喂），
 # 故靠切句实现「边说边播」：每满一句就合成一段音频，逐段流式回。
@@ -715,6 +802,7 @@ def _find_sentence_end(s: str) -> int:
     return -1
 
 
+# Strip Markdown at TTS admission so every speech source is safe to read aloud; keep the minimal standalone implementation aligned with the original grounding helper.
 # TTS 入口 markdown 清理：朗读文本可能来自任何历史/未来路径（speech 增量、卡片全文朗读、
 # proactive 报告），星号/井号/表格符进合成会被读出来或产生怪停顿。与
 # `agents/_sdk/grounding.strip_markdown_speech` 配对（llm-gateway 自包含服务，不跨包 import，
@@ -730,13 +818,17 @@ def _strip_md_tts(text: str) -> str:
     t = _TTS_MD_LINK.sub(r"\1", t)
     t = _TTS_MD_LINE.sub("", t)
     t = t.replace("**", "").replace("`", "")
+    # Convert table separators to pauses rather than reading the symbol.
     t = t.replace("|", "，")            # 表格竖线读成顿号级停顿，不念符号
     return t.strip()
 
 
 async def _sentence_segments(text_deltas, *, max_chars: int = 60):
     """异步生成器：缓冲文本增量，遇句末标点或超 max_chars 即吐一整句，收尾 flush 余量。
-    句子组装完成后统一剥 markdown（跨增量的 ** 对已合并，此处剥不漏）。"""
+    句子组装完成后统一剥 markdown（跨增量的 ** 对已合并，此处剥不漏）。
+
+    Buffer text deltas into sentences at punctuation or length limits, flush the tail and remove Markdown only after assembly.
+    """
     buf = ""
     async for delta in text_deltas:
         if not delta:
@@ -770,11 +862,16 @@ class BaseStreamingTTSProvider:
     ):
         """text_deltas：文本分片的异步迭代器（增量进）。
         yield bytes（PCM s16le 音频帧）或 dict（控制事件，如 {'type':'meta','sample_rate':..,'format':'pcm'}）。
-        首个 yield 应为 meta（HMI 据此建 AudioContext 播放器）。"""
+        首个 yield 应为 meta（HMI 据此建 AudioContext 播放器）。
+
+        Consume incremental text and yield PCM bytes or control metadata; the first event declares playback format and sample rate.
+        """
         raise NotImplementedError
+        # Mark the function as an async generator.
         yield  # 标记为 async generator
 
 
+# Keep provider-specific emotion wording on the backend; clients send semantic tags. Unknown, neutral or empty tags omit the field without changing behavior.
 # M2 P2（记忆图谱子 RFC §2.3）：会话级情绪标签 → TTS 指令化措辞。
 # **措辞留在后端**：HMI 只传语义标签（happy/tired/...），不该知道某家 TTS 的 instruction
 # 怎么写——换引擎时只改这里。词表外/neutral/空 → 空串 = 不发键（零行为变化）。
@@ -787,16 +884,23 @@ EMOTION_INSTRUCT = {
 
 
 def emotion_instruct(emotion: str) -> str:
-    """情绪标签 → TTS instruction。未知/中性 → ""（缺省不发键）。"""
+    """情绪标签 → TTS instruction。未知/中性 → ""（缺省不发键）。
+
+    Map emotion tags to synthesis instructions; neutral or unknown tags omit the instruction.
+    """
     return EMOTION_INSTRUCT.get((emotion or "").strip().lower(), "")
 
 
+# Pure protocol frame builders for offline tests.
 # ── 协议帧构造（纯函数，离线单测）──
 def _cosyvoice_run_task(task_id: str, model: str, voice: str, sample_rate: int,
                         instruct: str = "", speed: float = 0.0) -> dict:
     """M1b C 件（母提案 §4.H 情感 TTS）：可选 instruct（指令化情感/风格，cosyvoice v3
     `instruction` 参数）与 speed（语速 `rate`，DashScope 取值 0.5~2.0）。缺省不发键=
-    与既有请求字节级一致；话术层按情绪标签选参的接线等 §4.D emotion 落地（M2）。"""
+    与既有请求字节级一致；话术层按情绪标签选参的接线等 §4.D emotion 落地（M2）。
+
+    Optional emotional instruction and speaking rate preserve unchanged requests when omitted; rate is limited by the provider, and emotion routing is a later integration.
+    """
     params: dict = {"text_type": "PlainText", "voice": voice,
                     "format": "pcm", "sample_rate": sample_rate}
     if instruct:
@@ -822,7 +926,10 @@ def _cosyvoice_finish(task_id: str) -> dict:
 
 class DashScopeCosyVoiceProvider(BaseStreamingTTSProvider):
     """CosyVoice 流式 TTS——run-task 协议（/api-ws/v1/inference，与 fun-asr 同壳）。
-    run-task→task-started→continue-task(每 delta)→二进制音频帧+result-generated→finish-task→task-finished。"""
+    run-task→task-started→continue-task(每 delta)→二进制音频帧+result-generated→finish-task→task-finished。
+
+    CosyVoice uses run-task, incremental continue-task text, binary audio and explicit task completion.
+    """
 
     def __init__(self, api_key: str, ws_url: str, model: str,
                  voice: str = "longxiaochun_v3", sample_rate: int = 22050):
@@ -831,6 +938,7 @@ class DashScopeCosyVoiceProvider(BaseStreamingTTSProvider):
         self.model = model
         self.voice = voice
         self.sample_rate = sample_rate
+        # Optional emotional and rate defaults come from environment; request-level wiring follows later emotion integration.
         # M1b C 件：情感/语速默认经 env 注入（缺省空=零行为变化）；请求级参数化接线
         # 等 §4.D emotion 标签落地（M2）后走 stream() 形参。
         self.instruct = os.getenv("TTS_INSTRUCT_DEFAULT", "").strip()
@@ -864,6 +972,7 @@ class DashScopeCosyVoiceProvider(BaseStreamingTTSProvider):
                                 await ws.send_json(_cosyvoice_continue(task_id, delta))
                         await ws.send_json(_cosyvoice_finish(task_id))
                     except Exception:
+                        # Cancellation and disconnect are silent; closing the WebSocket terminates the upstream task.
                         pass  # 取消/断连时静默；WS 关闭即终止上游任务
 
                 pump_task = asyncio.create_task(pump())
@@ -892,6 +1001,7 @@ class DashScopeCosyVoiceProvider(BaseStreamingTTSProvider):
                     pump_task.cancel()
 
 
+# Qwen realtime TTS protocol frames.
 # ── qwen3-tts-flash-realtime 协议帧（OpenAI-realtime）──
 def _qwen_session_update(voice: str, sample_rate: int) -> dict:
     return {"type": "session.update", "session": {
@@ -901,7 +1011,10 @@ def _qwen_session_update(voice: str, sample_rate: int) -> dict:
 class DashScopeQwenTTSProvider(BaseStreamingTTSProvider):
     """Qwen3-TTS 流式 TTS——OpenAI-realtime 协议（/api-ws/v1/realtime，与 qwen3-asr 同壳）。
     session.created→session.update→input_text_buffer.append(每 delta,text)→response.audio.delta(base64)
-    →commit/finish→response.audio.done→response.done。含北京/上海/四川方言音色。"""
+    →commit/finish→response.audio.done→response.done。含北京/上海/四川方言音色。
+
+    Qwen TTS uses realtime sessions and text appends, then base64 audio deltas and completion events; dialect voices are supported.
+    """
 
     def __init__(self, api_key: str, ws_url: str, model: str,
                  voice: str = "Cherry", sample_rate: int = 24000):
@@ -937,6 +1050,7 @@ class DashScopeQwenTTSProvider(BaseStreamingTTSProvider):
             async with session.ws_connect(
                 url, headers={"Authorization": f"Bearer {self.api_key}"}, heartbeat=20.0,
             ) as ws:
+                # Wait for session creation.
                 for _ in range(5):  # 等 session.created
                     msg = await ws.receive(timeout=10)
                     if msg.type == aiohttp.WSMsgType.TEXT:
@@ -994,7 +1108,10 @@ class DashScopeQwenTTSProvider(BaseStreamingTTSProvider):
 
 
 class MockStreamingTTSProvider(BaseStreamingTTSProvider):
-    """无 key/nightly 兜底：消费文本增量，按字数产出固定静音 PCM 分片（断言帧序而非音质）。"""
+    """无 key/nightly 兜底：消费文本增量，按字数产出固定静音 PCM 分片（断言帧序而非音质）。
+
+    Offline fallback consumes text and emits deterministic silent PCM chunks to test frame ordering.
+    """
 
     def __init__(self, sample_rate: int = 24000):
         self.sample_rate = sample_rate
@@ -1013,6 +1130,7 @@ class MockStreamingTTSProvider(BaseStreamingTTSProvider):
         yield {"type": "meta", "sample_rate": sr, "format": "pcm"}
         async for delta in text_deltas:
             n = max(1, len(delta or ""))
+            # Emit about 120 ms of silence per character to verify text-to-audio streaming.
             # 每字约 120ms 静音 @ sr（s16le），验证「文本增量→音频分片」链路
             yield b"\x00" * int(sr * 0.12) * 2 * n
 
@@ -1020,7 +1138,10 @@ class MockStreamingTTSProvider(BaseStreamingTTSProvider):
 class MiMoStreamingTTSProvider(BaseStreamingTTSProvider):
     """MiMo v2.5 流式 TTS（官方 stream:true + pcm16@24k）。TTS API 整段文本一次入 → 按句切分逐段
     流式合成、边说边播；每段一次 chat/completions(stream=true)，SSE 逐 chunk 取 delta.audio.data（base64 pcm16）。
-    docs: https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5"""
+    docs: https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
+
+    MiMo streams sentence-wise 24 kHz PCM16 through SSE audio deltas; each sentence is a separate streaming completion request.
+    """
 
     def __init__(self, api_key: str, base_url: str = "", model: str = "mimo-v2.5-tts",
                  voice: str = "冰糖", sample_rate: int = 24000):
@@ -1084,7 +1205,10 @@ class MiMoStreamingTTSProvider(BaseStreamingTTSProvider):
 class MiniMaxStreamingTTSProvider(BaseStreamingTTSProvider):
     """MiniMax T2A v2 流式 TTS（stream:true → SSE，音频 hex 编码在 data.audio）。整段文本一次入 →
     按句切分逐段流式合成。与 MiniMax LLM 同一把 MINIMAX_API_KEY（Bearer）。
-    docs: https://platform.minimaxi.com/docs/api-reference/speech-t2a-http.md"""
+    docs: https://platform.minimaxi.com/docs/api-reference/speech-t2a-http.md
+
+    MiniMax streams sentence-wise synthesis through SSE with hex audio payloads and bearer authentication.
+    """
 
     def __init__(self, api_key: str, url: str = "", model: str = "speech-2.8-turbo",
                  voice: str = "female-tianmei", sample_rate: int = 24000):
@@ -1133,6 +1257,7 @@ class MiniMaxStreamingTTSProvider(BaseStreamingTTSProvider):
                             continue
                         data = chunk.get("data") or {}
                         audio_hex = data.get("audio") or ""
+                        # MiniMax status 2 repeats the full audio: skip it after receiving deltas to avoid duplicate playback; use it only if no delta arrived, then end the segment.
                         # MiniMax T2A 流式：status=1 是增量音频块；status=2 是「整段音频汇总重发」（= 全部
                         # 增量拼起来，重复！）。已收到增量则跳过 status=2 防双份播放；仅当只有汇总（极短
                         # 文本无增量）时才用它。收到 status=2 即本段结束。
@@ -1156,7 +1281,10 @@ class MiniMaxStreamingTTSProvider(BaseStreamingTTSProvider):
 def build_tts_stream_provider(provider: str = "", model: str = "",
                               voice: str = "") -> "BaseStreamingTTSProvider | None":
     """按请求/env 选流式 TTS 引擎。provider/model/voice 为请求级覆盖（HMI 设置可切），空则 env 默认。
-    无可用 key 或 off → None（HMI 探测到则无感回退句级批处理 /api/tts，惯例同 ASR 流式）。"""
+    无可用 key 或 off → None（HMI 探测到则无感回退句级批处理 /api/tts，惯例同 ASR 流式）。
+
+    Select streaming TTS by request overrides then environment; disabled or missing credentials returns None for sentence-level batch fallback.
+    """
     provider = (provider or os.getenv("TTS_STREAM_PROVIDER", "cosyvoice")).strip().lower()
     if provider in ("", "off", "none"):
         return None
@@ -1180,6 +1308,7 @@ def build_tts_stream_provider(provider: str = "", model: str = "",
         key = os.getenv("DASHSCOPE_ASR_KEY") or os.getenv("LLM_EMBED_API_KEY", "")
         if not key:
             return None
+        # Use the default engine.
         if provider == "dashscope":  # 泛指默认引擎
             provider = "cosyvoice"
         cat = TTS_STREAM_CATALOG[provider]

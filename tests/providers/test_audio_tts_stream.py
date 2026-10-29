@@ -1,3 +1,4 @@
+# 保留移植测试，调整导入并补模拟语音时长契约，其余逻辑不变。
 # Ported from car-agent llm-gateway/tests/test_tts_stream.py @ f0b08f8, changes: imports adapted
 # to embodied.providers.audio (sys.path hack dropped); added
 # test_mock_stream_duration_matches_text_length (mock PCM duration contract for the keyless
@@ -6,6 +7,9 @@
 
 覆盖：协议帧构造（cosyvoice run-task/continue/finish、qwen session.update）、mock provider 分片产出、
 工厂路由（cosyvoice/qwen/mock/off/无 key→None）、FakeWS 驱动 DashScope provider 全循环（meta+bytes+cancel）。
+
+
+Offline streaming TTS tests cover frame builders, mock output, factory routing and full fake-WebSocket lifecycles including cancellation.
 """
 from __future__ import annotations
 
@@ -38,6 +42,7 @@ async def _aiter(items):
         yield x
 
 
+# Pure protocol-frame tests.
 # ── 协议帧构造（纯函数）─────────────────────────────────────────────────────
 
 def test_cosyvoice_run_task_frame():
@@ -53,7 +58,10 @@ def test_cosyvoice_run_task_frame():
 
 def test_cosyvoice_run_task_instruct_speed_optional():
     """M1b C 件（情感 TTS 能力面）：instruct/speed 缺省不发键=帧字节级不变（上面用例
-    锁定）；给了才注入 instruction/rate，rate 夹紧 [0.5, 2.0]。"""
+    锁定）；给了才注入 instruction/rate，rate 夹紧 [0.5, 2.0]。
+
+    Optional instruction and rate must not alter default frames; only explicit values are injected and rate is clamped to the provider range.
+    """
     f = _cosyvoice_run_task("t", "m", "v", 22050, instruct="用温柔的语气说", speed=1.2)
     p = f["payload"]["parameters"]
     assert p["instruction"] == "用温柔的语气说"
@@ -82,6 +90,7 @@ def test_qwen_session_update_frame():
                             "sample_rate": 24000, "mode": "server_commit"}
 
 
+# Mock metadata precedes audio chunks proportional to text length.
 # ── Mock provider：meta 先出，分片随文字数产出 ──────────────────────────────
 
 @pytest.mark.asyncio
@@ -91,6 +100,7 @@ async def test_mock_stream_yields_meta_then_chunks():
     assert isinstance(out[0], dict) and out[0]["type"] == "meta"
     assert out[0]["sample_rate"] == 24000 and out[0]["format"] == "pcm"
     audio = [x for x in out if isinstance(x, (bytes, bytearray))]
+    # Two text chunks produce two audio chunks.
     assert len(audio) == 2  # 两个文本分片 → 两块音频
     assert all(len(b) > 0 for b in audio)
 
@@ -111,18 +121,24 @@ async def test_mock_stream_empty_text_only_meta():
 
 @pytest.mark.asyncio
 async def test_mock_stream_duration_matches_text_length():
-    """无 key 演示的时长契约：每字 120ms 静音 @ 声明采样率（s16le），确定性可复算。"""
+    """无 key 演示的时长契约：每字 120ms 静音 @ 声明采样率（s16le），确定性可复算。
+
+    Mock audio duration is deterministic at 120 ms per character and declared sample rate.
+    """
     sr = 24000
+    # Four characters.
     text = "你好世界"  # 4 字
     prov = MockStreamingTTSProvider(sample_rate=sr)
     out = [x async for x in prov.stream(_aiter([text]))]
     pcm = b"".join(x for x in out if isinstance(x, (bytes, bytearray)))
+    # Pure silence.
     assert pcm and pcm == b"\x00" * len(pcm)  # 纯静音
     assert len(pcm) == int(sr * 0.12) * 2 * len(text)
     duration_ms = len(pcm) / (sr * 2) * 1000
     assert duration_ms == pytest.approx(120 * len(text), abs=1)
 
 
+# Factory routing.
 # ── 工厂路由 ────────────────────────────────────────────────────────────────
 
 def test_factory_off_returns_none(monkeypatch):
@@ -139,6 +155,7 @@ def test_factory_mock(monkeypatch):
 def test_factory_cosyvoice_needs_key(monkeypatch):
     monkeypatch.delenv("DASHSCOPE_ASR_KEY", raising=False)
     monkeypatch.delenv("LLM_EMBED_API_KEY", raising=False)
+    # No credentials returns None for batch fallback.
     assert build_tts_stream_provider("cosyvoice") is None  # 无 key → None（回退批处理）
 
 
@@ -173,16 +190,19 @@ def test_catalog_shape():
         assert cat["voices"] and all("voice_id" in v for v in cat["voices"])
 
 
+# Sentence assembly from incremental text.
 # ── 句级切分器（把文本增量流聚成整句流）──────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_sentence_segments_splits_on_punct():
     out = [s async for s in _sentence_segments(_aiter(["你好", "，今天", "天气不错。", "出门吗？好的"]))]
+    # Split on punctuation and flush the tail.
     assert out == ["你好，今天天气不错。", "出门吗？", "好的"]  # 句末切分 + 收尾 flush 余量
 
 
 @pytest.mark.asyncio
 async def test_sentence_segments_flushes_on_max_chars():
+    # Long unpunctuated text is forcibly split at the maximum length.
     long = "啊" * 70  # 无标点长串 → 超 max_chars(60) 强制切
     out = [s async for s in _sentence_segments(_aiter([long]))]
     assert len(out) >= 1 and "".join(out) == long
@@ -193,6 +213,7 @@ async def test_sentence_segments_empty():
     assert [s async for s in _sentence_segments(_aiter([]))] == []
 
 
+# MiMo and MiniMax routing.
 # ── MiMo/MiniMax 工厂路由 ────────────────────────────────────────────────────
 
 def test_factory_mimo_needs_key(monkeypatch):
@@ -213,6 +234,7 @@ def test_factory_minimax_needs_key(monkeypatch):
     assert prov.voice == "male-qn-qingse" and prov.sample_rate == 24000
 
 
+# Fake HTTP verifies sentence splitting and SSE audio decoding offline.
 # ── FakeHTTP 驱动 MiMo/MiniMax SSE 解析（离线验证按句切分 + 音频解码）─────────────
 
 class _FakeStreamResp:
@@ -234,7 +256,10 @@ class _FakeStreamResp:
 
 
 class _FakeHTTPClient:
-    """脚本化 httpx.AsyncClient：每次 stream() 回放一段 SSE 行；记录发出的 body。"""
+    """脚本化 httpx.AsyncClient：每次 stream() 回放一段 SSE 行；记录发出的 body。
+
+    Scripted HTTP client replays SSE lines and records request bodies.
+    """
 
     def __init__(self, lines_per_call):
         self._calls = list(lines_per_call)
@@ -256,6 +281,7 @@ class _FakeHTTPClient:
 async def test_mimo_stream_sse_parse(monkeypatch):
     pcm = b"\x11\x22" * 10
     line = "data: " + json.dumps({"choices": [{"delta": {"audio": {"data": base64.b64encode(pcm).decode()}}}]})
+    # Two sentences create two segments.
     fake = _FakeHTTPClient([[line, "data: [DONE]"], [line, "data: [DONE]"]])  # 两句两段
     monkeypatch.setattr(P.httpx, "AsyncClient", lambda *a, **k: fake)
     prov = MiMoStreamingTTSProvider("mk", voice="冰糖", sample_rate=24000)
@@ -263,8 +289,10 @@ async def test_mimo_stream_sse_parse(monkeypatch):
     metas = [x for x in out if isinstance(x, dict)]
     audio = [x for x in out if isinstance(x, (bytes, bytearray))]
     assert metas and metas[0]["type"] == "meta" and metas[0]["sample_rate"] == 24000
+    # Two sentences produce two audio segments.
     assert b"".join(audio) == pcm * 2                       # 两句 → 两段音频
     assert len(fake.bodies) == 2 and fake.bodies[0]["stream"] is True
+    # Feed one sentence at a time.
     assert fake.bodies[0]["messages"][0]["content"] == "你好。"  # 按句喂
     assert fake.bodies[0]["audio"]["format"] == "pcm16"
 
@@ -274,8 +302,10 @@ async def test_minimax_stream_sse_hex_parse(monkeypatch):
     c1, c2 = b"\x33\x44" * 8, b"\x55\x66" * 6
     full = c1 + c2
     lines = [
+        # Incremental audio chunk.
         "data:" + json.dumps({"data": {"audio": c1.hex(), "status": 1}}),  # 增量块
         "data:" + json.dumps({"data": {"audio": c2.hex(), "status": 1}}),
+        # The final summary repeats all MiniMax audio and must be skipped after deltas to prevent duplicate playback.
         # status=2 汇总帧把整段音频重发（MiniMax 真实行为）——必须跳过，否则双份播放（实机双播 bug）
         "data:" + json.dumps({"data": {"audio": full.hex(), "status": 2}}),
     ]
@@ -291,6 +321,7 @@ async def test_minimax_stream_sse_hex_parse(monkeypatch):
         )
     ]
     audio = b"".join(x for x in out if isinstance(x, (bytes, bytearray)))
+    # Concatenate deltas only and skip the repeated summary.
     assert audio == full                                    # 只增量拼接，status=2 汇总帧被跳过（非 full*2）
     assert fake.bodies[0]["text"] == "你好世界"
     assert fake.bodies[0]["voice_setting"]["voice_id"] == "female-tianmei"
@@ -299,6 +330,7 @@ async def test_minimax_stream_sse_hex_parse(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_minimax_stream_only_summary_frame(monkeypatch):
+    # Use the summary when short text produces no incremental chunks, otherwise playback would be silent.
     # 极短文本可能只发 status=2 汇总帧（无增量）→ 此时须用它，否则无声
     pcm = b"\x77\x88" * 4
     line = "data:" + json.dumps({"data": {"audio": pcm.hex(), "status": 2}})
@@ -310,6 +342,7 @@ async def test_minimax_stream_only_summary_frame(monkeypatch):
     assert audio == pcm
 
 
+# Fake WebSockets verify the full DashScope protocol state machine offline.
 # ── FakeWS 驱动 DashScope provider 全循环（离线验证协议状态机）────────────────
 
 class _FakeMsg(types.SimpleNamespace):
@@ -317,7 +350,10 @@ class _FakeMsg(types.SimpleNamespace):
 
 
 class _FakeWS:
-    """脚本化 aiohttp WS：receive() 顺序回放 scripted 消息；send_json 记录发出的帧。"""
+    """脚本化 aiohttp WS：receive() 顺序回放 scripted 消息；send_json 记录发出的帧。
+
+    Scripted WebSocket replays messages and records sent frames.
+    """
 
     def __init__(self, scripted):
         self._scripted = list(scripted)
@@ -331,6 +367,7 @@ class _FakeWS:
         self.sent.append(b)
 
     async def receive(self, timeout=None):
+        # Yield to the frame pump.
         await asyncio.sleep(0)  # 让 pump 任务有机会发帧
         if self._scripted:
             return self._scripted.pop(0)
@@ -382,11 +419,13 @@ async def test_cosyvoice_provider_full_loop(monkeypatch):
     prov = DashScopeCosyVoiceProvider("sk", "wss://x/inference", "cosyvoice-v3-flash",
                                       voice="longxiaochun_v3", sample_rate=22050)
     out = [x async for x in prov.stream(_aiter(["杭州", "天气"]), voice="", sample_rate=0)]
+    # The first nonbinary item is metadata.
     # 首个非二进制 yield 是 meta
     metas = [x for x in out if isinstance(x, dict)]
     audio = [x for x in out if isinstance(x, (bytes, bytearray))]
     assert metas and metas[0]["type"] == "meta" and metas[0]["sample_rate"] == 22050
     assert len(audio) == 2 and b"".join(audio) == b"\x11\x22" * 100 + b"\x33\x44" * 100
+    # Sent frames contain run-task, two continue-task events and finish-task.
     # 发出帧含 run-task + continue-task×2 + finish-task
     actions = [f["header"]["action"] for f in ws.sent if isinstance(f, dict) and "header" in f]
     assert actions[0] == "run-task"
@@ -433,6 +472,7 @@ async def test_qwen_provider_full_loop(monkeypatch):
     assert "session.finish" in types_sent
 
 
+# Session emotion tags map to synthesis instructions.
 # ── M2 P2：会话级情绪 → TTS 指令化措辞（记忆图谱子 RFC §2.3）────────────
 
 def test_emotion_instruct_maps_known_labels():
@@ -442,7 +482,10 @@ def test_emotion_instruct_maps_known_labels():
 
 
 def test_emotion_instruct_neutral_and_unknown_are_empty():
-    """中性/未知 → 空串 = 不发键 = 与情绪功能上线前字节级一致。"""
+    """中性/未知 → 空串 = 不发键 = 与情绪功能上线前字节级一致。
+
+    Neutral or unknown emotion omits the field, preserving previous request bytes.
+    """
     from embodied.providers.audio import emotion_instruct
     assert emotion_instruct("neutral") == ""
     assert emotion_instruct("") == ""
@@ -451,7 +494,10 @@ def test_emotion_instruct_neutral_and_unknown_are_empty():
 
 
 def test_emotion_instruct_lands_in_cosyvoice_frame():
-    """措辞真的进了 run-task 的 instruction 参数（M1b 留的接线口）。"""
+    """措辞真的进了 run-task 的 instruction 参数（M1b 留的接线口）。
+
+    The translated emotion wording reaches the actual instruction parameter.
+    """
     from embodied.providers.audio import _cosyvoice_run_task, emotion_instruct
     frame = _cosyvoice_run_task("t1", "m", "v", 22050,
                                 instruct=emotion_instruct("tired"))

@@ -6,6 +6,9 @@ which we must not require (global-config red line). Directory junctions are the
 privilege-free equivalent, so: try lerobot's original first, fall back to a
 junction. Everything that READS ``last`` (resume, export) sees a normal directory
 either way. scripts/train.py runs this module as its subprocess entry.
+
+
+LeRobot 训练启动器：Windows 创建 checkpoint 符号链接可能需要管理员或开发者模式，因此先尝试上游实现，失败时用无需特权的目录联接。读取 last 的恢复和导出流程仍看到普通目录；train.py 以本模块启动子进程。
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ def _install_windows_fallback() -> None:
 
             last = checkpoint_dir.parent / "last"
             if last.is_symlink() or last.exists():
+                # 联接或未完成链接按空目录解除；checkpoint_dir 中的真实检查点数据保持不变。
                 # A junction (or half-made link) unlinks like an empty dir; the
                 # checkpoint data itself lives in checkpoint_dir and is untouched.
                 try:
@@ -40,6 +44,7 @@ def _install_windows_fallback() -> None:
             _winapi.CreateJunction(str(checkpoint_dir.resolve()), str(last))
 
     tu.update_last_checkpoint = patched
+    # 训练模块直接导入了该名称，需同步重新绑定模块级引用。
     # lerobot_train imported the name directly; rebind its module-level reference too.
     lt.update_last_checkpoint = patched
 

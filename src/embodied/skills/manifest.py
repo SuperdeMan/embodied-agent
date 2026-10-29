@@ -3,6 +3,9 @@
 Adapted from car-agent's declarative AgentManifest philosophy (manifest.yaml drives
 capability registration; adding one never touches the orchestration core), reshaped
 for physical skills per docs/architecture.md §4.3.
+
+
+技能 manifest 是模型与物理执行的声明式契约；新增能力只注册，不改编排内核。
 """
 
 from __future__ import annotations
@@ -37,7 +40,10 @@ class ParamSpec(BaseModel):
         return self
 
     def validate_value(self, value: Any) -> None:
-        """Validate JSON values without coercion; bool is not a numeric command."""
+        """Validate JSON values without coercion; bool is not a numeric command.
+
+        不做隐式转换地校验 JSON 值，布尔值不能充当数值命令。
+        """
         types = {
             "string": (str,), "number": (int, float), "integer": (int,),
             "boolean": (bool,), "object": (dict,), "array": (list,),
@@ -73,6 +79,7 @@ def _validate_json(value: Any) -> None:
 
 class TerminationSpec(BaseModel):
     timeout_s: float = Field(default=30.0, gt=0, allow_inf_nan=False)
+    # 谓词描述在早期仅作说明，后续基于世界状态求值。
     # Predicate descriptions; informational in M0, evaluated against WorldState from M1 on.
     success: str = ""
     failure: str = ""
@@ -100,8 +107,10 @@ class SkillManifest(BaseModel):
     safety: SafetySpec = Field(default_factory=SafetySpec)
     require_confirm: bool = False
     impl: Literal["scripted", "policy"] = "scripted"
+    # 技能所需权限范围声明。
     # Permission scopes the skill needs (enforced by the executor from M1 on).
     scopes: list[str] = Field(default_factory=list)
+    # 执行后验证由 manifest 声明模式、期望、期限和恢复；参数支持实际值引用。引擎不分支匹配技能名，新增技能在此声明验证。
     # Post-execution reconciliation declaration, consumed by cognition/verify.py:
     # {"mode": "state_predicate"|"schema", "expect": {"predicate": ..., "args": {...}} |
     #  {"data_keys": [...]}, "timeout_ms": int, "on_fail": "report"|"retry",
@@ -119,12 +128,16 @@ class SkillManifest(BaseModel):
 
     @property
     def tool_name(self) -> str:
+        # 工具名不允许点号，映射为连字符；命名片段不含连字符，因此可逆。
         # LLM tool ids only allow [a-zA-Z0-9_-]; dots map to '-' (segments never contain '-',
         # so the mapping is reversible in SkillRegistry.resolve_tool).
         return self.name.replace(".", "-")
 
     def to_tool_schema(self) -> dict[str, Any]:
-        """OpenAI-style tool definition, the shape BaseProvider.complete_tools consumes."""
+        """OpenAI-style tool definition, the shape BaseProvider.complete_tools consumes.
+
+        生成模型提供方消费的 OpenAI 风格工具定义。
+        """
         props: dict[str, Any] = {}
         for pname, spec in self.params.items():
             p: dict[str, Any] = {"type": spec.type}

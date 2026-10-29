@@ -1,6 +1,10 @@
+# 保留移植来源；内存与标准库实现未改逻辑，仅整理导入。
 # Ported from car-agent llm-gateway/cache.py @ f0b08f8, changes: none (already in-memory,
 # pure stdlib; import order adjusted for ruff isort).
-"""LLM 响应缓存（按 messages 哈希）。减少重复调用、降成本。"""
+"""LLM 响应缓存（按 messages 哈希）。减少重复调用、降成本。
+
+Cache LLM responses by message hash to reduce duplicate calls and cost.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -13,7 +17,10 @@ logger = logging.getLogger("llm.cache")
 
 
 class LLMCache:
-    """LRU 缓存。key = messages 哈希，value = (content, model_used, ts)。"""
+    """LRU 缓存。key = messages 哈希，value = (content, model_used, ts)。
+
+    LRU entries map message hashes to content, model and timestamp.
+    """
 
     def __init__(self, max_size: int = 256, ttl_seconds: int = 300):
         self._cache: OrderedDict[str, tuple] = OrderedDict()

@@ -1,5 +1,8 @@
 """End-to-end M0 DoD test: text conversation drives mock skills through the planner,
-offline, deterministically — no keys, no network."""
+offline, deterministically — no keys, no network.
+
+无密钥、无网络的确定性端到端文本规划与模拟技能测试。
+"""
 
 from __future__ import annotations
 
@@ -24,6 +27,7 @@ async def test_home_command_executes_skill():
     turn = await planner.turn("让机械臂回零")
     assert [c.skill for c in turn.calls] == ["skill.arm.home"]
     assert turn.calls[0].result is not None and turn.calls[0].result.ok
+    # 回复基于实际工具结果。
     assert "arm homed" in turn.text  # reply is grounded in the actual tool result
 
 
@@ -42,7 +46,10 @@ async def test_params_flow_through():
 
 
 async def test_dangerous_skill_denied_by_default():
-    """No confirmation channel → dangerous skill must NOT run."""
+    """No confirmation channel → dangerous skill must NOT run.
+
+    无确认通道时危险技能不得执行。
+    """
     planner, _ = _setup(confirm=None)
     turn = await planner.turn("把机器人关机")
     assert turn.calls[0].skill == "skill.system.power_off"
@@ -81,7 +88,10 @@ async def test_multi_turn_history_grows():
 
 
 async def test_runaway_tool_loop_is_bounded():
-    """LoopController spirit: a provider that never stops calling tools cannot spin forever."""
+    """LoopController spirit: a provider that never stops calling tools cannot spin forever.
+
+    模型持续调用工具也必须受循环上限约束。
+    """
 
     class AlwaysCall:
         def __init__(self):
@@ -97,8 +107,11 @@ async def test_runaway_tool_loop_is_bounded():
     cfg = PlannerConfig(max_rounds=3, max_calls=2)
     planner = TextPlanner(provider, registry, cfg)
     turn = await planner.turn("loop")
+    # 模型循环有界。
     assert provider.n == 3  # LLM loop bounded
+    # 技能调用预算有界。
     assert len(turn.calls) == 2  # skill budget bounded
+    # 返回降级文本，不挂起或崩溃。
     assert turn.text  # fallback text, not a hang or crash
 
 

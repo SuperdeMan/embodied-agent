@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package embodied.common.v1;
 
+// 三进程共享的基础类型，部署边界见架构文档。
 // Shared primitives for the three-process topology
 // (agent-core / realtime-control / safety-guardian), docs/architecture.md §6.
 
@@ -10,11 +11,12 @@ message Timestamp {
 }
 
 message JointState {
-  repeated double position = 1; // rad (revolute) / m (prismatic), embodiment joint order
+  repeated double position = 1; // 本体关节顺序，转动用弧度、移动用米 / rad (revolute) / m (prismatic), embodiment joint order
   repeated double velocity = 2;
-  repeated double effort = 3;   // Nm / N
+  repeated double effort = 3;   // 力矩或力 / Nm / N
 }
 
+// 右手坐标系，位姿相对本体基座表达。
 // Right-handed, expressed in the embodiment base frame.
 message Pose {
   double x = 1;
@@ -29,9 +31,9 @@ message Pose {
 message RobotState {
   Timestamp stamp = 1;
   JointState joints = 2;
-  Pose ee_pose = 3;            // end-effector, from forward kinematics
-  double gripper_opening = 4;  // normalized 0..1
-  string embodiment_id = 5;    // e.g. "sim.mujoco.so_arm101" / "real.so_arm101"
+  Pose ee_pose = 3;            // 正运动学得到的末端位姿 / end-effector, from forward kinematics
+  double gripper_opening = 4;  // 归一化开度 / normalized 0..1
+  string embodiment_id = 5;    // 本体标识示例 / e.g. "sim.mujoco.so_arm101" / "real.so_arm101"
 }
 
 message Error {

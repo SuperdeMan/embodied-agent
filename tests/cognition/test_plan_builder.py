@@ -1,5 +1,8 @@
 """PlanBuilder contract tests: atomic rejection, authority chain, ref-derived edges,
-toolcall-with-salvage degradation."""
+toolcall-with-salvage degradation.
+
+计划构建契约覆盖原子拒绝、权威链、引用依赖与解析降级。
+"""
 
 from __future__ import annotations
 
@@ -38,6 +41,7 @@ def make_registry() -> SkillRegistry:
     r.register(
         SkillManifest(
             name="skill.test.strict", description="needs target",
+            # 必填且无默认值。
             params={"target": ParamSpec(type="string")},  # required, no default
         ),
         _ok,
@@ -46,7 +50,10 @@ def make_registry() -> SkillRegistry:
 
 
 class PlanOnce:
-    """Provider double: returns the given submit_plan args (or raw content) once per call."""
+    """Provider double: returns the given submit_plan args (or raw content) once per call.
+
+    提供方替身每次返回指定计划参数或原始正文。
+    """
 
     def __init__(self, responses):
         self.responses = list(responses)
@@ -77,19 +84,25 @@ async def test_valid_plan_carries_manifest_authority():
     assert [s.skill for s in plan.steps] == ["skill.manip.pick", "skill.system.power_off"]
     s1, s2 = plan.steps
     assert s1.timeout_s == 42.0 and s1.verification["mode"] == "schema"
+    # 填充 manifest 默认值。
     assert s1.params == {"object": "obj_cube"}  # manifest default filled in
+    # 来自 manifest，不来自模型。
     assert not s1.require_confirm and s2.require_confirm  # from manifest, not LLM
     assert plan.plan_mode == "toolcall"
 
 
 async def test_llm_cannot_grant_or_revoke_confirm():
     """Authority chain: require_confirm in LLM output is an unknown param → atomic reject;
-    it can never override the manifest."""
+    it can never override the manifest.
+
+    模型提供确认权限不能覆盖 manifest，非法参数使整个计划拒绝。
+    """
     plan = await builder(
         [("", {"steps": [{"id": "s1", "skill": "skill.system.power_off",
                           "params": {"require_confirm": False}}]}),
          ("", {"steps": []})]
     ).build("off")
+    # 计划被拒绝并降级。
     assert plan.steps == []  # rejected, degraded
 
 
@@ -101,6 +114,7 @@ async def test_atomic_rejection_unknown_skill():
         ]}),
          ("", {"steps": []})]
     ).build("x")
+    # 不能执行非法计划中剩余的合法部分。
     assert plan.steps == []  # the valid remainder must NOT execute
 
 
@@ -122,6 +136,7 @@ async def test_required_param_satisfied_by_ref_passes():
         ]})]
     ).build("x")
     assert len(plan.steps) == 2
+    # 根据引用推导依赖。
     assert plan.steps[1].depends_on == ["s1"]  # derived from the ref
 
 

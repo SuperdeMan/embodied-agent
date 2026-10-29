@@ -2,6 +2,9 @@
 
 Auto-skip when grpcio or generated stubs are absent (CI installs no rpc group; run
 locally via `uv run --group rpc pytest tests/rpc`). Mock skills only — no mujoco.
+
+
+三进程契约测试使用模拟技能验证控制、Guardian 和活性链；缺 grpc 或生成代码时跳过，本地 RPC 组必须运行。
 """
 
 from __future__ import annotations
@@ -131,6 +134,7 @@ async def test_halt_latches_until_reset(control):
         await stub.Halt(pb2.HaltRequest(reason="test_estop"))
         assert state.halted
         r = await reg.invoke("skill.test.echo")
+        # 闩锁后拒绝请求而非排队。
         assert not r.ok and "halted" in r.detail  # latched: rejected, not queued
         await stub.Reset(pb2.ResetRequest(reason="operator"))
         assert not state.halted
@@ -159,6 +163,7 @@ async def test_supervisor_link_enables_and_its_loss_latches(monkeypatch):
     link = asyncio.create_task(guardian_mod.supervisor_link_loop(gstate))
     reg, channel = await remote(port)
     try:
+        # 等待监督连接建立。
         for _ in range(40):  # wait for the link to come up
             if state.supervisor_connected:
                 break
@@ -167,6 +172,7 @@ async def test_supervisor_link_enables_and_its_loss_latches(monkeypatch):
         r = await reg.invoke("skill.test.echo")
         assert r.ok
 
+        # Guardian 退出导致链路断开，控制进程闩锁。
         link.cancel()  # guardian dies -> link drops -> control latches
         for _ in range(40):
             if state.halted:
@@ -196,6 +202,7 @@ async def test_agent_heartbeat_loss_triggers_guardian_halt(monkeypatch):
         assert gstate.agent_connected
         assert not cstate.halted
 
+        # 模拟 Agent 核心退出。
         beat.cancel()  # agent-core dies
         for _ in range(60):
             if cstate.halted:
@@ -232,9 +239,13 @@ async def test_validate_command_fence():
 
 
 async def test_stale_supervisor_watchdog(monkeypatch):
-    """Frozen guardian: stream stays up, pings stop -> watchdog latches."""
+    """Frozen guardian: stream stays up, pings stop -> watchdog latches.
+
+    监督连接仍在但心跳停止时，看门狗必须闩锁。
+    """
     monkeypatch.setattr(control_service, "SUPERVISOR_STALE_S", 0.3)
     state, server, port = await start_control(require_supervisor=True)
+    # 模拟连接未断但心跳冻结。
     state.supervisor_connected = True  # simulate an open-but-frozen link
     state.last_supervisor_ping = __import__("time").monotonic()
     wd = asyncio.create_task(watchdog_loop(state, interval_s=0.05))
