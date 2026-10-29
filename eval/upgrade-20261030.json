@@ -1,0 +1,3918 @@
+{
+  "code_commit": "d35c0113a3bea4d0be1048a9d4048e566ecb1bff",
+  "python": "3.13.12 (main, Mar 24 2026, 22:56:40) [MSC v.1944 64 bit (AMD64)]",
+  "packages": {
+    "mujoco": "3.11.0",
+    "numpy": "2.5.1",
+    "pydantic": "2.13.4",
+    "lerobot": "0.4.4",
+    "torch": "2.10.0",
+    "onnx": "1.22.0",
+    "onnxruntime": "1.28.0",
+    "grpcio": "1.83.0",
+    "grpcio-tools": "1.81.1",
+    "pytest": "9.1.1",
+    "ruff": "0.16.1"
+  },
+  "files": {
+    "uv.lock": "226d7d13f79771c31143b417c87723efde8ca15c4e3b7e378cf1e49daec38acf",
+    "eval/tasks/tabletop_pick_place_v1.yaml": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+    "sim/tabletop.xml": "6b02548b7b39b29001662002a9a207b435d9f1c75f9a227ce4d1c5c12cc071e3",
+    "outputs/policies/pick-v1.onnx": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+    "outputs/policies/place-v1.onnx": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d"
+  },
+  "assets": {
+    "assets/menagerie/trs_so_arm100/.source": "https://github.com/google-deepmind/mujoco_menagerie.git @ 71f066a : trs_so_arm100\n"
+  },
+  "eval_results": [
+    {
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml",
+      "mode": "scripted_truth",
+      "execution_context": "clean original baseline",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261029-150037.json",
+      "sha256": "605fab86523ae25465f0d7450e9c9480def17b589017ff474119e2431f77dbf4",
+      "result": {
+        "schema": "eval.result/v1",
+        "task": {
+          "id": "tabletop_pick_place@v1",
+          "file": "eval\\tasks\\tabletop_pick_place_v1.yaml",
+          "command": "把红色方块放进盒子",
+          "judge": {
+            "predicate": "object_in_region",
+            "object": "obj_cube",
+            "region": "bin_region",
+            "margin_m": 0.005
+          },
+          "randomization": {
+            "object": "obj_cube",
+            "radial_m": [
+              0.18,
+              0.27
+            ],
+            "angle_deg": [
+              230,
+              310
+            ],
+            "keepout": "0.10 m around bin center"
+          },
+          "pass_threshold": 0.8
+        },
+        "commit": "24d780a",
+        "finished_at": "2026-10-29T15:00:37.859071+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": [],
+        "episodes": [
+          {
+            "index": 1,
+            "seed": 0,
+            "start_pos": [
+              -0.075,
+              -0.2252,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 2,
+            "seed": 0,
+            "start_pos": [
+              -0.1148,
+              -0.1434,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 3,
+            "seed": 0,
+            "start_pos": [
+              -0.1622,
+              -0.1948,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 4,
+            "seed": 0,
+            "start_pos": [
+              -0.1559,
+              -0.2045,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 5,
+            "seed": 0,
+            "start_pos": [
+              -0.1075,
+              -0.2209,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 6,
+            "seed": 0,
+            "start_pos": [
+              0.0149,
+              -0.2573,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 7,
+            "seed": 0,
+            "start_pos": [
+              -0.0223,
+              -0.2058,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 8,
+            "seed": 0,
+            "start_pos": [
+              -0.0914,
+              -0.158,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 9,
+            "seed": 0,
+            "start_pos": [
+              0.049,
+              -0.2353,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 10,
+            "seed": 0,
+            "start_pos": [
+              -0.0381,
+              -0.2323,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 11,
+            "seed": 1,
+            "start_pos": [
+              -0.0222,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 12,
+            "seed": 1,
+            "start_pos": [
+              -0.0322,
+              -0.2525,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 13,
+            "seed": 1,
+            "start_pos": [
+              -0.1406,
+              -0.1813,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 15,
+            "seed": 1,
+            "start_pos": [
+              -0.0134,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 16,
+            "seed": 1,
+            "start_pos": [
+              -0.0259,
+              -0.1903,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 17,
+            "seed": 1,
+            "start_pos": [
+              -0.0646,
+              -0.1875,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 18,
+            "seed": 1,
+            "start_pos": [
+              -0.0747,
+              -0.236,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 19,
+            "seed": 1,
+            "start_pos": [
+              0.0823,
+              -0.2535,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 20,
+            "seed": 1,
+            "start_pos": [
+              -0.0701,
+              -0.2177,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 21,
+            "seed": 2,
+            "start_pos": [
+              -0.0565,
+              -0.1955,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 22,
+            "seed": 2,
+            "start_pos": [
+              -0.1366,
+              -0.2133,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 23,
+            "seed": 2,
+            "start_pos": [
+              -0.1146,
+              -0.1601,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 24,
+            "seed": 2,
+            "start_pos": [
+              0.0446,
+              -0.1998,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 25,
+            "seed": 2,
+            "start_pos": [
+              -0.1082,
+              -0.2036,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 26,
+            "seed": 2,
+            "start_pos": [
+              0.0513,
+              -0.2128,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 27,
+            "seed": 2,
+            "start_pos": [
+              0.0403,
+              -0.2143,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 28,
+            "seed": 2,
+            "start_pos": [
+              0.0675,
+              -0.2584,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 29,
+            "seed": 2,
+            "start_pos": [
+              -0.091,
+              -0.195,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 30,
+            "seed": 2,
+            "start_pos": [
+              0.0033,
+              -0.2111,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml",
+      "mode": "scripted_truth",
+      "execution_context": "clean functional commit",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261029-151735.json",
+      "sha256": "cf2882297ebe48f068c1b1921c52c1419e7323d124aec66f772626a169b7e587",
+      "result": {
+        "schema": "eval.result/v1",
+        "task": {
+          "id": "tabletop_pick_place@v1",
+          "file": "eval\\tasks\\tabletop_pick_place_v1.yaml",
+          "command": "把红色方块放进盒子",
+          "judge": {
+            "predicate": "object_in_region",
+            "object": "obj_cube",
+            "region": "bin_region",
+            "margin_m": 0.005
+          },
+          "randomization": {
+            "object": "obj_cube",
+            "radial_m": [
+              0.18,
+              0.27
+            ],
+            "angle_deg": [
+              230,
+              310
+            ],
+            "keepout": "0.10 m around bin center"
+          },
+          "pass_threshold": 0.8
+        },
+        "commit": "df36427",
+        "finished_at": "2026-10-29T15:17:35.213986+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": [],
+        "episodes": [
+          {
+            "index": 1,
+            "seed": 0,
+            "start_pos": [
+              -0.075,
+              -0.2252,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 2,
+            "seed": 0,
+            "start_pos": [
+              -0.1148,
+              -0.1434,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 3,
+            "seed": 0,
+            "start_pos": [
+              -0.1622,
+              -0.1948,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 4,
+            "seed": 0,
+            "start_pos": [
+              -0.1559,
+              -0.2045,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 5,
+            "seed": 0,
+            "start_pos": [
+              -0.1075,
+              -0.2209,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 6,
+            "seed": 0,
+            "start_pos": [
+              0.0149,
+              -0.2573,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 7,
+            "seed": 0,
+            "start_pos": [
+              -0.0223,
+              -0.2058,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 8,
+            "seed": 0,
+            "start_pos": [
+              -0.0914,
+              -0.158,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 9,
+            "seed": 0,
+            "start_pos": [
+              0.049,
+              -0.2353,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 10,
+            "seed": 0,
+            "start_pos": [
+              -0.0381,
+              -0.2323,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 11,
+            "seed": 1,
+            "start_pos": [
+              -0.0222,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 12,
+            "seed": 1,
+            "start_pos": [
+              -0.0322,
+              -0.2525,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 13,
+            "seed": 1,
+            "start_pos": [
+              -0.1406,
+              -0.1813,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 15,
+            "seed": 1,
+            "start_pos": [
+              -0.0134,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 16,
+            "seed": 1,
+            "start_pos": [
+              -0.0259,
+              -0.1903,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 17,
+            "seed": 1,
+            "start_pos": [
+              -0.0646,
+              -0.1875,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 18,
+            "seed": 1,
+            "start_pos": [
+              -0.0747,
+              -0.236,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 19,
+            "seed": 1,
+            "start_pos": [
+              0.0823,
+              -0.2535,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 20,
+            "seed": 1,
+            "start_pos": [
+              -0.0701,
+              -0.2177,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 21,
+            "seed": 2,
+            "start_pos": [
+              -0.0565,
+              -0.1955,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 22,
+            "seed": 2,
+            "start_pos": [
+              -0.1366,
+              -0.2133,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 23,
+            "seed": 2,
+            "start_pos": [
+              -0.1146,
+              -0.1601,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 24,
+            "seed": 2,
+            "start_pos": [
+              0.0446,
+              -0.1998,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 25,
+            "seed": 2,
+            "start_pos": [
+              -0.1082,
+              -0.2036,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 26,
+            "seed": 2,
+            "start_pos": [
+              0.0513,
+              -0.2128,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 27,
+            "seed": 2,
+            "start_pos": [
+              0.0403,
+              -0.2143,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 28,
+            "seed": 2,
+            "start_pos": [
+              0.0675,
+              -0.2584,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 29,
+            "seed": 2,
+            "start_pos": [
+              -0.091,
+              -0.195,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 30,
+            "seed": 2,
+            "start_pos": [
+              0.0033,
+              -0.2111,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --perception color",
+      "mode": "scripted_color",
+      "execution_context": "started clean; comments edited later; timeout cause unresolved",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261029-222929.json",
+      "sha256": "6426a4288a974073e7d50f36fadb4eed932aafe36f69c51101b3fb1546712919",
+      "result": {
+        "schema": "eval.result/v1",
+        "task": {
+          "id": "tabletop_pick_place@v1",
+          "file": "eval\\tasks\\tabletop_pick_place_v1.yaml",
+          "command": "把红色方块放进盒子",
+          "judge": {
+            "predicate": "object_in_region",
+            "object": "obj_cube",
+            "region": "bin_region",
+            "margin_m": 0.005
+          },
+          "randomization": {
+            "object": "obj_cube",
+            "radial_m": [
+              0.18,
+              0.27
+            ],
+            "angle_deg": [
+              230,
+              310
+            ],
+            "keepout": "0.10 m around bin center"
+          },
+          "pass_threshold": 0.8
+        },
+        "commit": "df36427",
+        "finished_at": "2026-10-29T22:29:29.782398+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 3,
+            "seed": 0,
+            "start_pos": [
+              -0.1622,
+              -0.1948,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "timeout after 60.0s"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：timeout after 60.0s\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ],
+        "episodes": [
+          {
+            "index": 1,
+            "seed": 0,
+            "start_pos": [
+              -0.075,
+              -0.2252,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 2,
+            "seed": 0,
+            "start_pos": [
+              -0.1148,
+              -0.1434,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 3,
+            "seed": 0,
+            "start_pos": [
+              -0.1622,
+              -0.1948,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "timeout after 60.0s"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：timeout after 60.0s\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          },
+          {
+            "index": 4,
+            "seed": 0,
+            "start_pos": [
+              -0.1559,
+              -0.2045,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 5,
+            "seed": 0,
+            "start_pos": [
+              -0.1075,
+              -0.2209,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 6,
+            "seed": 0,
+            "start_pos": [
+              0.0149,
+              -0.2573,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 7,
+            "seed": 0,
+            "start_pos": [
+              -0.0223,
+              -0.2058,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 8,
+            "seed": 0,
+            "start_pos": [
+              -0.0914,
+              -0.158,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 9,
+            "seed": 0,
+            "start_pos": [
+              0.049,
+              -0.2353,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 10,
+            "seed": 0,
+            "start_pos": [
+              -0.0381,
+              -0.2323,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 11,
+            "seed": 1,
+            "start_pos": [
+              -0.0222,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 12,
+            "seed": 1,
+            "start_pos": [
+              -0.0322,
+              -0.2525,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 13,
+            "seed": 1,
+            "start_pos": [
+              -0.1406,
+              -0.1813,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 15,
+            "seed": 1,
+            "start_pos": [
+              -0.0134,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 16,
+            "seed": 1,
+            "start_pos": [
+              -0.0259,
+              -0.1903,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 17,
+            "seed": 1,
+            "start_pos": [
+              -0.0646,
+              -0.1875,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 18,
+            "seed": 1,
+            "start_pos": [
+              -0.0747,
+              -0.236,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 19,
+            "seed": 1,
+            "start_pos": [
+              0.0823,
+              -0.2535,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 20,
+            "seed": 1,
+            "start_pos": [
+              -0.0701,
+              -0.2177,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 21,
+            "seed": 2,
+            "start_pos": [
+              -0.0565,
+              -0.1955,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 22,
+            "seed": 2,
+            "start_pos": [
+              -0.1366,
+              -0.2133,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 23,
+            "seed": 2,
+            "start_pos": [
+              -0.1146,
+              -0.1601,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 24,
+            "seed": 2,
+            "start_pos": [
+              0.0446,
+              -0.1998,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 25,
+            "seed": 2,
+            "start_pos": [
+              -0.1082,
+              -0.2036,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 26,
+            "seed": 2,
+            "start_pos": [
+              0.0513,
+              -0.2128,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 27,
+            "seed": 2,
+            "start_pos": [
+              0.0403,
+              -0.2143,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 28,
+            "seed": 2,
+            "start_pos": [
+              0.0675,
+              -0.2584,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 29,
+            "seed": 2,
+            "start_pos": [
+              -0.091,
+              -0.195,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 30,
+            "seed": 2,
+            "start_pos": [
+              0.0033,
+              -0.2111,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "command": "uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --pick-policy outputs/policies/pick-v1.onnx",
+      "mode": "learned_pick_truth",
+      "execution_context": "bilingual comment worktree; executable AST checked equivalent to df36427; not a clean-SHA run",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261029-230433.json",
+      "sha256": "28e245d5a6186637f4accea612fc412604619871baabe84af94da671c0fbe8d2",
+      "result": {
+        "schema": "eval.result/v1",
+        "task": {
+          "id": "tabletop_pick_place@v1",
+          "file": "eval\\tasks\\tabletop_pick_place_v1.yaml",
+          "command": "把红色方块放进盒子",
+          "judge": {
+            "predicate": "object_in_region",
+            "object": "obj_cube",
+            "region": "bin_region",
+            "margin_m": 0.005
+          },
+          "randomization": {
+            "object": "obj_cube",
+            "radial_m": [
+              0.18,
+              0.27
+            ],
+            "angle_deg": [
+              230,
+              310
+            ],
+            "keepout": "0.10 m around bin center"
+          },
+          "pass_threshold": 0.8
+        },
+        "commit": "df36427",
+        "finished_at": "2026-10-29T23:04:34.054175+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ],
+        "episodes": [
+          {
+            "index": 1,
+            "seed": 0,
+            "start_pos": [
+              -0.075,
+              -0.2252,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 2,
+            "seed": 0,
+            "start_pos": [
+              -0.1148,
+              -0.1434,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 3,
+            "seed": 0,
+            "start_pos": [
+              -0.1622,
+              -0.1948,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 4,
+            "seed": 0,
+            "start_pos": [
+              -0.1559,
+              -0.2045,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 5,
+            "seed": 0,
+            "start_pos": [
+              -0.1075,
+              -0.2209,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 6,
+            "seed": 0,
+            "start_pos": [
+              0.0149,
+              -0.2573,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 7,
+            "seed": 0,
+            "start_pos": [
+              -0.0223,
+              -0.2058,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 8,
+            "seed": 0,
+            "start_pos": [
+              -0.0914,
+              -0.158,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 9,
+            "seed": 0,
+            "start_pos": [
+              0.049,
+              -0.2353,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 10,
+            "seed": 0,
+            "start_pos": [
+              -0.0381,
+              -0.2323,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 11,
+            "seed": 1,
+            "start_pos": [
+              -0.0222,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 12,
+            "seed": 1,
+            "start_pos": [
+              -0.0322,
+              -0.2525,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 13,
+            "seed": 1,
+            "start_pos": [
+              -0.1406,
+              -0.1813,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          },
+          {
+            "index": 15,
+            "seed": 1,
+            "start_pos": [
+              -0.0134,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 16,
+            "seed": 1,
+            "start_pos": [
+              -0.0259,
+              -0.1903,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 17,
+            "seed": 1,
+            "start_pos": [
+              -0.0646,
+              -0.1875,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 18,
+            "seed": 1,
+            "start_pos": [
+              -0.0747,
+              -0.236,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 19,
+            "seed": 1,
+            "start_pos": [
+              0.0823,
+              -0.2535,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 20,
+            "seed": 1,
+            "start_pos": [
+              -0.0701,
+              -0.2177,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 21,
+            "seed": 2,
+            "start_pos": [
+              -0.0565,
+              -0.1955,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 22,
+            "seed": 2,
+            "start_pos": [
+              -0.1366,
+              -0.2133,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 23,
+            "seed": 2,
+            "start_pos": [
+              -0.1146,
+              -0.1601,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 24,
+            "seed": 2,
+            "start_pos": [
+              0.0446,
+              -0.1998,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 25,
+            "seed": 2,
+            "start_pos": [
+              -0.1082,
+              -0.2036,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 26,
+            "seed": 2,
+            "start_pos": [
+              0.0513,
+              -0.2128,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 27,
+            "seed": 2,
+            "start_pos": [
+              0.0403,
+              -0.2143,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 28,
+            "seed": 2,
+            "start_pos": [
+              0.0675,
+              -0.2584,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 29,
+            "seed": 2,
+            "start_pos": [
+              -0.091,
+              -0.195,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 30,
+            "seed": 2,
+            "start_pos": [
+              0.0033,
+              -0.2111,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped by policy\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --perception color",
+      "mode": "scripted_color",
+      "execution_context": "clean comment-only follow-up; no executable change from df36427",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261029-230915.json",
+      "sha256": "bd578aed4c633667f4d3ab15d42b048725940f75c4a9ad7b0cd5841a410c30e4",
+      "result": {
+        "schema": "eval.result/v1",
+        "task": {
+          "id": "tabletop_pick_place@v1",
+          "file": "eval\\tasks\\tabletop_pick_place_v1.yaml",
+          "command": "把红色方块放进盒子",
+          "judge": {
+            "predicate": "object_in_region",
+            "object": "obj_cube",
+            "region": "bin_region",
+            "margin_m": 0.005
+          },
+          "randomization": {
+            "object": "obj_cube",
+            "radial_m": [
+              0.18,
+              0.27
+            ],
+            "angle_deg": [
+              230,
+              310
+            ],
+            "keepout": "0.10 m around bin center"
+          },
+          "pass_threshold": 0.8
+        },
+        "commit": "d35c011",
+        "finished_at": "2026-10-29T23:09:15.587986+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": [],
+        "episodes": [
+          {
+            "index": 1,
+            "seed": 0,
+            "start_pos": [
+              -0.075,
+              -0.2252,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 2,
+            "seed": 0,
+            "start_pos": [
+              -0.1148,
+              -0.1434,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 3,
+            "seed": 0,
+            "start_pos": [
+              -0.1622,
+              -0.1948,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 4,
+            "seed": 0,
+            "start_pos": [
+              -0.1559,
+              -0.2045,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 5,
+            "seed": 0,
+            "start_pos": [
+              -0.1075,
+              -0.2209,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 6,
+            "seed": 0,
+            "start_pos": [
+              0.0149,
+              -0.2573,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 7,
+            "seed": 0,
+            "start_pos": [
+              -0.0223,
+              -0.2058,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 8,
+            "seed": 0,
+            "start_pos": [
+              -0.0914,
+              -0.158,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 9,
+            "seed": 0,
+            "start_pos": [
+              0.049,
+              -0.2353,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 10,
+            "seed": 0,
+            "start_pos": [
+              -0.0381,
+              -0.2323,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 11,
+            "seed": 1,
+            "start_pos": [
+              -0.0222,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 12,
+            "seed": 1,
+            "start_pos": [
+              -0.0322,
+              -0.2525,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 13,
+            "seed": 1,
+            "start_pos": [
+              -0.1406,
+              -0.1813,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 15,
+            "seed": 1,
+            "start_pos": [
+              -0.0134,
+              -0.2069,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 16,
+            "seed": 1,
+            "start_pos": [
+              -0.0259,
+              -0.1903,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 17,
+            "seed": 1,
+            "start_pos": [
+              -0.0646,
+              -0.1875,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 18,
+            "seed": 1,
+            "start_pos": [
+              -0.0747,
+              -0.236,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 19,
+            "seed": 1,
+            "start_pos": [
+              0.0823,
+              -0.2535,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 20,
+            "seed": 1,
+            "start_pos": [
+              -0.0701,
+              -0.2177,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 21,
+            "seed": 2,
+            "start_pos": [
+              -0.0565,
+              -0.1955,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 22,
+            "seed": 2,
+            "start_pos": [
+              -0.1366,
+              -0.2133,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 23,
+            "seed": 2,
+            "start_pos": [
+              -0.1146,
+              -0.1601,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 24,
+            "seed": 2,
+            "start_pos": [
+              0.0446,
+              -0.1998,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 25,
+            "seed": 2,
+            "start_pos": [
+              -0.1082,
+              -0.2036,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 26,
+            "seed": 2,
+            "start_pos": [
+              0.0513,
+              -0.2128,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 27,
+            "seed": 2,
+            "start_pos": [
+              0.0403,
+              -0.2143,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 28,
+            "seed": 2,
+            "start_pos": [
+              0.0675,
+              -0.2584,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 29,
+            "seed": 2,
+            "start_pos": [
+              -0.091,
+              -0.195,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          },
+          {
+            "index": 30,
+            "seed": 2,
+            "start_pos": [
+              0.0033,
+              -0.2111,
+              0.015
+            ],
+            "success": true,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped and lifted"
+              },
+              {
+                "id": "s2",
+                "status": "ok",
+                "detail": "obj_cube placed in bin_region"
+              }
+            ],
+            "report": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region",
+            "episode_dir": ""
+          }
+        ]
+      }
+    }
+  ],
+  "test_runs": [
+    {
+      "commit": "df36427",
+      "command": "uv run pytest -q -o addopts=",
+      "passed": 474,
+      "skipped": 0,
+      "warnings": 4
+    },
+    {
+      "commit": "4a9fff3",
+      "command": "uv run pytest -q -o addopts= --junitxml=outputs/upgrade-20261030-tests.xml",
+      "passed": 474,
+      "skipped": 0,
+      "warnings": 4,
+      "note": "started at 4a9fff3; docstring whitespace-only cleanup committed during run; no executable changes"
+    }
+  ],
+  "scope_limits": [
+    "No real-device, remote-provider, DINO or NPU validation",
+    "No operation ledger, full control lease/epoch or observed physical stopping yet",
+    "One color run timed out at episode 3; later clean run passed, root cause unproven",
+    "Task YAML and sim XML comments translated without changing parsed values",
+    "Nightly workflow comment translation pending explicit permission"
+  ]
+}
