@@ -2,6 +2,8 @@
 
 > 2026-10-30；功能提交 `c6392de`。本页描述当前实现，不代表完整 P1 或真机停止能力。
 
+> 后续 D019 已补远端仿真快照时效，见 [remote-world-state.md](remote-world-state.md)；本页 D018 验证数字仅属于原提交。
+
 ## 已接入的执行链
 
 PlannerEngine 每轮生成 task_id；步骤获得运行时 operation_id，RPC 保留相同身份。Registry 先校验确认、参数与 manifest，再根据本体、技能、参数和 manifest 计算请求摘要。首次调用在 SQLite 事务中保存意图、attempt_id、boot_id、资源 epoch 和事件，事务成功后才启动 handler。
