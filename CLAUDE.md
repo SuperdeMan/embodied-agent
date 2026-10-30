@@ -8,6 +8,8 @@
 
 本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。本轮 commit/push、D018 新 SQLite 五表及 nightly 注释补齐已获用户明确授权；后续不同范围的敏感变更仍按红线确认。
 
+云端仿真参考入口已按用户授权激活：应用 `212f912`、私网 HTTPS 8449，当前为离线规划/模拟音频。准确配置、运行证据与升级接线见 `docs/cloud-deployment.md`；Git 主线前进不等于云端已更新。
+
 ## 目录结构
 
 完整结构定义与理由见 `docs/architecture.md` §10，本节只列约定要点：

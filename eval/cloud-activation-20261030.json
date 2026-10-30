@@ -1,0 +1,69 @@
+{
+  "status": "activated",
+  "activation_id": "20261030T133438Z",
+  "commit": "212f912d067d933a12949c12d507db493b0a9f13",
+  "config_commit": "cfb5997025fa77c1a89ab1e9fe2878c09db58cdd",
+  "compose_sha256": "9b1c4be840f31b21bf4fa54c4e77a4c5530db1ced4e93d48c32b53becbed6b5b",
+  "compose_path": "~/embodied-agent/runtime/compose-9b1c4be840f31b21.yaml",
+  "image_id": "sha256:4f91b02ee5a724907339dde4c38bb0d7ca66567e39aa8db5d7b2f0dc4a67ba3a",
+  "container_id": "d621e043eaad4f9c4416a3c6777168993b9a5cd06d9dc6e97d1a6b85296abe25",
+  "health": {
+    "status": "ok",
+    "release": "212f912d067d933a12949c12d507db493b0a9f13",
+    "runtime": {
+      "environment": "simulation",
+      "planner": "offline",
+      "audio": "mock"
+    }
+  },
+  "target": "http://<observed-container-ip>:8390",
+  "volume": "embodied-agent-cloud_runtime",
+  "persistent_marker_survived_restart": true,
+  "jpeg_bytes": 31053,
+  "other_containers_unchanged": true,
+  "other_container_count": 39,
+  "existing_serve_mappings_unchanged": true,
+  "funnel": false,
+  "runtime_limits": {
+    "memory_bytes": 1610612736,
+    "nano_cpus": 1000000000,
+    "pids_limit": 128,
+    "read_only": true,
+    "cap_drop": [
+      "ALL"
+    ],
+    "network_internal": true,
+    "host_port_bindings": {}
+  },
+  "url_template": "https://<tailnet-host>:8449/",
+  "target_matches_inspected_container": true,
+  "protocol_checks": {
+    "https_health": {
+      "status": "ok",
+      "release": "212f912d067d933a12949c12d507db493b0a9f13",
+      "runtime": {
+        "environment": "simulation",
+        "planner": "offline",
+        "audio": "mock"
+      }
+    },
+    "html_loaded": true,
+    "jpeg_bytes": 31088,
+    "wss_origin_verified": true,
+    "offline_reply": "[offline] 你好",
+    "browser_visual_check": "unavailable_no_connected_browser"
+  },
+  "scene_sha256": "0882399560750d370185b7f3a01f67af83ac1adf674cb18bc20578c3d6703dc8",
+  "scene_visual_inspected": true,
+  "first_activation_attempt": {
+    "id": "20261030T132416Z",
+    "result": "rolled_back_new_service",
+    "cause": "internal network did not publish the declared loopback mapping; direct internal address was healthy",
+    "other_serve_mappings_changed": false
+  },
+  "final_service_check": {
+    "container_health": "healthy",
+    "restart_policy": "unless-stopped",
+    "stats": "0.00% 307.9MiB / 1.5GiB"
+  }
+}

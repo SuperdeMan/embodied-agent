@@ -33,7 +33,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID
 uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID --cancel
 ```
 
-**远端状态与云端候选**：D019 已接入有时效的仿真快照，用于远端规划和效果验证；丢失、过期或旧代次不按成功处理。云端候选 `212f912` 已在共享服务器的隔离容器内完成渲染、WebSocket 抓放与账本验收，当前尚未激活常驻私网入口。范围与状态见[云端部署记录](docs/cloud-deployment.md)。
+**远端状态与云端入口**：D019 已接入有时效的仿真快照，用于远端规划和效果验证；丢失、过期或旧代次不按成功处理。云端应用 `212f912` 已激活为私网 HTTPS 8449 仿真控制台，使用离线规划和模拟音频；真实地址从服务器 `current-release.json` 读取。范围、配置版本和实际验收见[云端部署记录](docs/cloud-deployment.md)。
 
 ## 现在就能跑的（M1 · 仿真闭环）
 
