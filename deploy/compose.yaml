@@ -1,0 +1,24 @@
+name: embodied-agent-cloud
+services:
+  console:
+    image: embodied-agent:${EMBODIED_RELEASE:?set the tested commit SHA}
+    pull_policy: never
+    restart: unless-stopped
+    cpus: 1.0
+    mem_limit: 1536m
+    pids_limit: 128
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports: ["127.0.0.1:8390:8390"]
+    volumes: ["runtime:/app/outputs"]
+    tmpfs: ["/tmp:size=536870912,mode=1777"]
+    environment:
+      ASR_PROVIDER: mock
+      TTS_STREAM_PROVIDER: mock
+      LLM_PROVIDER: mock
+volumes:
+  runtime:
+networks:
+  default:
+    internal: true

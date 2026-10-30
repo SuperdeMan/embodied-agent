@@ -19,6 +19,8 @@ service ControlService {
   rpc GetOperation(OperationRequest) returns (OperationReply);
   // 请求取消不等于停止已观测。 / Cancellation acceptance is not observed physical stopping.
   rpc CancelOperation(OperationRequest) returns (OperationReply);
+  // 低频世界快照，校验版本与新鲜度。 / Low-rate world snapshot with version and freshness validation.
+  rpc GetWorldState(WorldStateRequest) returns (WorldStateReply);
   rpc StreamState(StateRequest) returns (stream embodied.common.v1.RobotState);
   // 停止闩锁急停状态，仅显式重置释放。
   // Halt latches the estop state; only an explicit Reset releases it.
@@ -33,6 +35,14 @@ service ControlService {
 }
 
 message ListSkillsRequest {}
+
+message WorldStateRequest {}
+
+message WorldStateReply {
+  bool available = 1;
+  string reason = 2;
+  string envelope_json = 3;
+}
 
 message ListSkillsReply {
   repeated SkillInfo skills = 1;

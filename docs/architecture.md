@@ -77,6 +77,12 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 八类契约字段与接线位置以[执行计划 §3](platform-upgrade.md#3-八类契约与冻结顺序)为迁移清单。纯契约不依赖适配器、ROS、GPU；跨进程 proto 先行，未知版本不静默接受。
 
+### 5.2 D019 远端世界状态的新鲜度
+
+远端规划与效果验证通过 `GetWorldState` 请求有版本的 ObservationEnvelope，包含本体、服务 boot_id、场景 epoch、序号、仿真时钟、坐标/单位、标定版本、来源、关节和对象/区域。服务端当前仅提供仿真观测，不能把 sim_truth 声称为真实感知。客户端用本机单调时钟测量往返耗时，并加上服务端读快照耗时作为保守新鲜度界限，不比较跨机 monotonic 值。
+
+未知版本、非有限值、时钟倒退而 epoch 未变、乱序、过期、断连或缺快照都返回 UNKNOWN。场景 reset 改变 epoch；服务重启改变 boot_id；已被替代的 epoch 不得被迟到回复恢复。规划上下文与 verifier 支持异步读取，远端验证不再固定退化 UNKNOWN。状态请求的新鲜度不等于所有对象检测的新鲜度；当前控制服务的 reference profile 只发布实时仿真真值。
+
 ### 5.1 D018 操作账本与资源准入
 
 新增纯类型 `contracts/operation.py` 和 `runtime/operations.py`，区别于既有内存任务账本。操作身份包含 task_id、operation_id、plan_revision，尝试 ID、boot_id 与资源 epoch 由执行端生成。`RETURNED` 仅表示 handler 成功返回；`FAILED` 为明确调用失败；`OUTCOME_UNKNOWN` 不释放资源、不接受自动新尝试。效果仍由独立 verifier 判定。
@@ -112,6 +118,8 @@ Python/uv 与 MuJoCo/ACT/ONNX 参考链保留。ROS、MoveIt、Nav2 走可选适
 ## 10. 目录与迁移
 
 当前保留 `src/embodied/{hri,cognition,skills,control,safety,data_engine,providers,runtime}`，以及 console/proto/assets/sim/eval/scripts。按消费路径增加 `contracts`、`perception`、`deployment` 子模块；adapters/profiles/deploy 顶层目录在相应实施批次建立并记录 ADR。权重/数据/录制仅存指针与摘要；生成的 RPC stubs 在 gen，不进 Git。
+
+D020 增加 `deploy/` 存放云端仿真参考镜像与受限 Compose 配置；部署规划与资源边界见 [cloud-deployment.md](cloud-deployment.md)。首版只承载仿真控制台，真实控制和停止监督仍属现场职责。
 
 ## 设计来源
 

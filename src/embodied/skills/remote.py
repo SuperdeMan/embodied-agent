@@ -12,13 +12,16 @@ control process still re-checks require_confirm at its own registry (defense in 
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from typing import Any
 
 import grpc
 
+from embodied.contracts.observation import ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
 from embodied.runtime.rpcgen import import_control
+from embodied.runtime.world_state import SnapshotAdmission
 from embodied.skills.manifest import SkillManifest
 from embodied.skills.registry import ConfirmationRequired, SkillNotFound, SkillRegistry, SkillResult
 
@@ -29,6 +32,7 @@ class RemoteSkillRegistry:
         self._pb2, _ = import_control()
         self._stub = pb2_grpc.ControlServiceStub(channel)
         self._manifests: dict[str, SkillManifest] = {}
+        self._snapshot_admission = SnapshotAdmission()
 
     async def connect(self) -> "RemoteSkillRegistry":
         reply = await self._stub.ListSkills(self._pb2.ListSkillsRequest(), timeout=5.0)
@@ -112,3 +116,23 @@ class RemoteSkillRegistry:
 
     async def cancel_operation(self, operation_id: str):
         return await self._stub.CancelOperation(self._pb2.OperationRequest(operation_id=operation_id), timeout=5)
+
+    async def world_snapshot(self):
+        started = time.monotonic()
+        try:
+            reply = await self._stub.GetWorldState(
+                self._pb2.WorldStateRequest(), timeout=self._snapshot_admission.max_age_s,
+            )
+            if not reply.available:
+                return None
+            envelope = ObservationEnvelope.model_validate_json(reply.envelope_json)
+            return self._snapshot_admission.accept(envelope, time.monotonic() - started, started)
+        except (grpc.aio.AioRpcError, ValueError):
+            return None
+
+    async def world_context(self) -> str:
+        snapshot = await self.world_snapshot()
+        if snapshot is None:
+            return "World state unavailable or stale; do not assume physical effects."
+        objects = ", ".join(f"{name}@{pose.pos}" for name, pose in snapshot.objects.items())
+        return f"simulated world: objects={objects}; regions={','.join(snapshot.regions)}"

@@ -17,6 +17,7 @@ submit_plan protocol.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import os
 import time
@@ -98,7 +99,7 @@ class PlannerEngine:
 
     async def turn(self, user_text: str) -> EngineTurn:
         ctx = PlanContext(raw_text=user_text)
-        context_block = self._render_context()
+        context_block = await self._render_context()
         plan = await self.builder.build(user_text, context_block)
 
         if not plan.steps:
@@ -127,7 +128,7 @@ class PlannerEngine:
                 break
             if replans >= max_iters or time.monotonic() >= deadline:
                 break
-            nxt = await self.builder.replan(plan.goal or user_text, observations, self._render_context())
+            nxt = await self.builder.replan(plan.goal or user_text, observations, await self._render_context())
             replans += 1
             if nxt.steps:
                 # 保留完成结果，供跨轮参数引用和指纹去重，避免重复执行。
@@ -194,11 +195,13 @@ class PlannerEngine:
             logger.warning("chat reply failed: %s", e)
             return "（暂时无法回复。）"
 
-    def _render_context(self) -> str:
+    async def _render_context(self) -> str:
         parts = []
         if self._context_fn is not None:
             try:
                 world = self._context_fn()
+                if inspect.isawaitable(world):
+                    world = await world
                 if world:
                     parts.append(f"当前世界状态:\n{world}")
             except Exception as e:

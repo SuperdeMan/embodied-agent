@@ -36,6 +36,15 @@ def test_spec_shape(sim):
     assert spec.gripper_joint is not None
 
 
+def test_reference_state_changes_epoch_on_reset(sim):
+    epoch, observation = sim.read_reference_state()
+    assert observation.qpos == sim.read().qpos
+    sim.reset()
+    reset_epoch, reset_observation = sim.read_reference_state()
+    assert reset_epoch != epoch
+    assert reset_observation.t >= 0
+
+
 def test_reset_places_objects_not_at_origin(sim):
     obs = sim.reset()
     cube = obs.objects["obj_cube"].pos

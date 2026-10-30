@@ -236,7 +236,8 @@ async def _serve_control(args: argparse.Namespace) -> int:
 
         sim = TabletopSim(seed=int(args.seed))
         register_sim_skills(registry, sim)
-    state = ControlState(registry, sim, require_supervisor=bool(args.require_supervisor))
+    state = ControlState(registry, sim, require_supervisor=bool(args.require_supervisor),
+                         world_reader=sim.read_reference_state if sim is not None else None)
     server, bound = await serve(state, port=int(args.port))
     print(f"realtime-control on 127.0.0.1:{bound} (skills={len(registry.catalog())}, "
           f"require_supervisor={state.require_supervisor})")
@@ -287,11 +288,9 @@ async def _serve_guardian(args: argparse.Namespace) -> int:
 
 
 async def _sim_remote(args: argparse.Namespace) -> int:
-    """agent-core against a serve-control process. World-state context/verification are
-    local-sim features; remotely the verifier reads UNKNOWN (never convicts) until a
-    world streaming channel exists (noted in roadmap).
+    """Use bounded remote snapshots for planning and verification.
 
-    连接控制服务的 Agent 核心；远端世界状态流尚缺，验证结果为 UNKNOWN，不能据此认定失败或放行效果依赖。
+    使用有时效界限的远端快照进行规划与验证。
     """
     import grpc
 
@@ -303,7 +302,8 @@ async def _sim_remote(args: argparse.Namespace) -> int:
     provider, pname = _build_provider(args.provider, plan_rules=SIM_PLAN_RULES)
     channel = grpc.aio.insecure_channel(str(args.remote))
     registry = await RemoteSkillRegistry(channel).connect()
-    engine = PlannerEngine(provider, registry, confirm=_make_confirm(bool(args.yes)))
+    engine = PlannerEngine(provider, registry, confirm=_make_confirm(bool(args.yes)),
+                           world_fn=registry.world_snapshot, context_fn=registry.world_context)
     beat = None
     if args.guardian:
         beat = asyncio.create_task(agent_heartbeat_loop(str(args.guardian)))
@@ -544,6 +544,7 @@ def _console(args: argparse.Namespace) -> int:
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.hri.server import AppContext, run_console
     from embodied.providers.audio import (
+        MockASRProvider,
         MockStreamingTTSProvider,
         build_asr_provider,
         build_tts_stream_provider,
@@ -565,7 +566,9 @@ def _console(args: argparse.Namespace) -> int:
     # Factory returns None when streaming TTS is unconfigured (origin semantics: off);
     # the console always speaks, so fall back to the silent mock.
     tts = build_tts_stream_provider() or MockStreamingTTSProvider()
-    ctx = AppContext(sim, registry, make_engine, asr, tts)
+    ctx = AppContext(sim, registry, make_engine, asr, tts,
+                     runtime_info={"environment": "simulation", "planner": args.provider,
+                                   "audio": "mock" if isinstance(asr, MockASRProvider) else "configured"})
     try:
         run_console(ctx, host=str(args.host), port=int(args.port))
     finally:

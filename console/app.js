@@ -31,7 +31,7 @@ function addStep(s) {
 }
 
 function connect() {
-  ws = new WebSocket(`ws://${location.host}/ws/session`);
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/session`);
   ws.binaryType = "arraybuffer";
   ws.onopen = () => (statusEl.textContent = "已连接");
   ws.onclose = () => { statusEl.textContent = "连接断开，3s 后重连…"; setTimeout(connect, 3000); };
@@ -41,6 +41,8 @@ function connect() {
     switch (m.type) {
       case "hello":
         statusEl.textContent = `已连接 · ${m.embodiment} · ${m.skills.length} skills`;
+        if (m.runtime?.planner === "offline") statusEl.textContent += " · 仿真 / 离线规划";
+        if (m.runtime?.audio === "mock") statusEl.textContent += " · 模拟音频（请用文本）";
         break;
       case "asr": logMsg("you (voice)", m.text, "user"); break;
       case "turn_start": break;

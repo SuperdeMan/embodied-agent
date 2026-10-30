@@ -217,3 +217,32 @@ async def test_bad_json_yields_error_frame(client):
         await ws.send_str("{not json")
         err = await recv_json(ws, "error")
         assert "bad json" in err["message"]
+
+
+async def test_health_reports_mode_and_rejects_cross_origin_socket(client):
+    response = await client.get("/healthz")
+    body = await response.json()
+    assert response.status == 200 and body["status"] == "ok"
+    assert body["runtime"]["environment"] == "simulation"
+    response = await client.get("/ws/session", headers={"Origin": "https://unrelated.invalid"})
+    assert response.status == 403
+    async with client.ws_connect("/ws/session", headers={"Origin": str(client.make_url("/")).rstrip("/")}) as ws:
+        assert (await recv_json(ws, "hello"))["runtime"]["environment"] == "simulation"
+
+
+async def test_render_and_cleanup_use_the_same_thread():
+    import threading
+
+    ctx = make_ctx()
+    seen = []
+
+    def render(camera):
+        seen.append(threading.get_ident())
+        return np.zeros((32, 48, 3), dtype=np.uint8)
+
+    ctx.sim.render = render
+    ctx.sim.close_renderers = lambda: seen.append(threading.get_ident())
+    await ctx.render_jpeg()
+    await ctx.render_jpeg()
+    await ctx.close()
+    assert len(seen) == 3 and len(set(seen)) == 1

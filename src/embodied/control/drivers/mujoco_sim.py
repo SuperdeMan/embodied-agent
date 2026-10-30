@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import math
 import threading
+from functools import wraps
 from typing import Any, Callable
+from uuid import uuid4
 
 import mujoco
 import numpy as np
@@ -44,6 +46,15 @@ JAW_OPEN_Q = 1.2
 StepHook = Callable[[Observation, ActionCommand | None], None]
 
 
+def _state_locked(method):
+    """Keep observation and scene epoch consistent. 保持观测与场景代次一致。"""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._state_lock:
+            return method(self, *args, **kwargs)
+    return wrapped
+
+
 class TabletopSim:
     """Implements the Embodiment protocol plus reach-solving for scripted skills.
 
@@ -60,6 +71,7 @@ class TabletopSim:
         spawn_radial: tuple[float, float] = (0.18, 0.27),
         spawn_angle_deg: tuple[float, float] = (230.0, 310.0),
     ) -> None:
+        self._state_lock = threading.RLock()
         scene = stage_tabletop()
         self.model = mujoco.MjModel.from_xml_path(str(scene))
         self.data = mujoco.MjData(self.model)
@@ -127,6 +139,7 @@ class TabletopSim:
         jaw = JointSpec(name=JAW_JOINT, lower=JAW_CLOSED_Q, upper=JAW_OPEN_Q)
         return EmbodimentSpec(embodiment_id="sim.mujoco.so_arm100", joints=joints, gripper_joint=jaw)
 
+    @_state_locked
     def read(self) -> Observation:
         d = self.data
         qpos = tuple(float(v) for v in d.qpos[self._qpos_idx])
@@ -148,6 +161,11 @@ class TabletopSim:
             extras={"regions": self.regions()},
         )
 
+    @_state_locked
+    def read_reference_state(self) -> tuple[str, Observation]:
+        return self.state_epoch, self.read()
+
+    @_state_locked
     def write(self, cmd: ActionCommand) -> WriteResult:
         with invocation_access() as allowed:
             if not allowed:
@@ -161,6 +179,7 @@ class TabletopSim:
             self._last_cmd = applied
             return result
 
+    @_state_locked
     def step(self, n: int = 1) -> None:
         for _ in range(n):
             with invocation_access() as allowed:
@@ -170,7 +189,9 @@ class TabletopSim:
         if self._on_step is not None:
             self._on_step(self.read(), self._last_cmd)
 
+    @_state_locked
     def reset(self, *, randomize: bool = False) -> Observation:
+        self.state_epoch = uuid4().hex
         # 上游 home 关键帧没有新增物体自由关节；仅对机械臂和夹爪应用关键帧，物体使用生成位姿，避免零填充导致传送到基座。
         # The upstream "home" keyframe predates our scene objects (MuJoCo zero-pads the
         # extra free-joint slots, which would teleport objects into the arm base), so
@@ -265,11 +286,13 @@ class TabletopSim:
             cache[key] = r
         return r
 
+    @_state_locked
     def render(self, camera: str = "side", width: int = 640, height: int = 480) -> np.ndarray:
         r = self._renderer_for(width, height, depth=False)
         r.update_scene(self.data, camera=camera)
         return r.render()
 
+    @_state_locked
     def render_rgbd(self, camera: str = "side", width: int = 640, height: int = 480):
         """RGB frame + metric depth map (meters along the view axis) — perception input.
 
@@ -280,10 +303,18 @@ class TabletopSim:
         d.update_scene(self.data, camera=camera)
         return rgb, d.render()
 
+    @_state_locked
     def camera_model(self, camera: str = "side", width: int = 640, height: int = 480):
         from embodied.control.camera import CameraModel
 
         return CameraModel.from_mujoco(self.model, self.data, camera, width, height)
+
+    @_state_locked
+    def close_renderers(self) -> None:
+        """Destroy GL resources on their owning thread. 在拥有者线程释放 GL 资源。"""
+        cache = self.__dict__.get("_renderers", {})
+        for key in [key for key in cache if key[0] == threading.get_ident()]:
+            cache.pop(key).close()
 
     # 内部实现。
     # -- internals -------------------------------------------------------------

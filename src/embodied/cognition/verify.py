@@ -19,6 +19,7 @@ Three-state semantics, inherited verbatim in spirit:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import math
 import os
@@ -201,6 +202,8 @@ async def _eval_state_with_wait(
     while True:
         try:
             snapshot = world_fn()
+            if inspect.isawaitable(snapshot):
+                snapshot = await snapshot
         except Exception as e:
             logger.warning("world_fn errored (ignored): %s", e)
             return UNKNOWN

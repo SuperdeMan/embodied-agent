@@ -16,10 +16,11 @@ import asyncio
 import json
 import logging
 import time
-from typing import Any
+from typing import Any, Callable
 
 import grpc
 
+from embodied.contracts.observation import ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
 from embodied.runtime.rpcgen import import_common, import_control
 from embodied.skills.registry import ConfirmationRequired, SkillRegistry
@@ -31,7 +32,8 @@ SUPERVISOR_STALE_S = 1.5
 
 
 class ControlState:
-    def __init__(self, registry: SkillRegistry, sim: Any = None, *, require_supervisor: bool = False):
+    def __init__(self, registry: SkillRegistry, sim: Any = None, *, require_supervisor: bool = False,
+                 world_reader: Callable | None = None):
         self.registry = registry
         self.sim = sim
         self.require_supervisor = require_supervisor
@@ -39,6 +41,8 @@ class ControlState:
         self.halt_reason = ""
         self.last_supervisor_ping = 0.0
         self.supervisor_connected = False
+        self.world_reader = world_reader
+        self.world_sequence = 0
 
     def halt(self, reason: str) -> None:
         if not self.halted:
@@ -68,6 +72,27 @@ def build_servicer(state: ControlState):
     common = import_common()
 
     class Servicer(pb2_grpc.ControlServiceServicer):
+        async def GetWorldState(self, request, context):
+            if state.world_reader is None:
+                return pb2.WorldStateReply(available=False, reason="world_state_unavailable")
+            started = time.monotonic()
+            try:
+                epoch, obs = state.world_reader()
+                state.world_sequence += 1
+                envelope = ObservationEnvelope(
+                    robot_id=state.registry.robot_id, boot_id=state.registry.ledger.boot_id,
+                    epoch=epoch, sequence=state.world_sequence, capture_timestamp=obs.t,
+                    capture_duration_s=time.monotonic() - started, calibration_version="mujoco_reference_v1",
+                    qpos=list(obs.qpos), qvel=list(obs.qvel),
+                    ee_pose={"pos": obs.ee_pose.pos, "quat": obs.ee_pose.quat},
+                    gripper_opening=obs.gripper_opening,
+                    objects={name: {"pos": pose.pos, "quat": pose.quat} for name, pose in obs.objects.items()},
+                    regions=obs.extras.get("regions", {}),
+                )
+                return pb2.WorldStateReply(available=True, envelope_json=envelope.model_dump_json())
+            except Exception:
+                return pb2.WorldStateReply(available=False, reason="invalid_world_state")
+
         def _operation_reply(self, record):
             if record is None:
                 return pb2.OperationReply(found=False)

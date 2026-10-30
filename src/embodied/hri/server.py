@@ -34,9 +34,12 @@ import asyncio
 import io
 import json
 import logging
+import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from aiohttp import WSMsgType, web
 
@@ -220,6 +223,7 @@ class AppContext:
     def __init__(
         self, sim: Any, registry: Any, make_engine, asr: Any, tts_stream: Any,
         tts_sample_rate: int = 24000,
+        runtime_info: dict[str, str] | None = None,
     ):
         self.sim = sim
         self.registry = registry
@@ -229,6 +233,8 @@ class AppContext:
         self._tts_stream = tts_stream
         self.tts_sample_rate = tts_sample_rate
         self._render_lock = asyncio.Lock()
+        self._render_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="console-render")
+        self.runtime_info = runtime_info or {"environment": "simulation", "planner": "configured", "audio": "configured"}
 
     async def transcribe(self, pcm: bytes) -> str:
         from embodied.providers.audio import _wav_header
@@ -252,10 +258,15 @@ class AppContext:
         from PIL import Image
 
         async with self._render_lock:
-            frame = await asyncio.to_thread(self.sim.render, "side")
+            frame = await asyncio.get_running_loop().run_in_executor(self._render_thread, self.sim.render, "side")
         buf = io.BytesIO()
         Image.fromarray(frame).save(buf, format="JPEG", quality=80)
         return buf.getvalue()
+
+    async def close(self) -> None:
+        cleanup = getattr(self.sim, "close_renderers", lambda: None)
+        await asyncio.get_running_loop().run_in_executor(self._render_thread, cleanup)
+        self._render_thread.shutdown(wait=True)
 
 
 # aiohttp 服务接线。
@@ -263,6 +274,14 @@ class AppContext:
 
 
 async def ws_handler(request: web.Request) -> web.WebSocketResponse:
+    origin = request.headers.get("Origin")
+    if origin:
+        try:
+            parsed = urlsplit(origin)
+            if parsed.scheme not in {"http", "https"} or parsed.netloc != request.host:
+                raise ValueError("origin mismatch")
+        except ValueError:
+            raise web.HTTPForbidden(text="cross-origin websocket denied") from None
     ws = web.WebSocketResponse(heartbeat=30)
     await ws.prepare(request)
     ctx: AppContext = request.app[CTX_KEY]  # type: ignore[assignment]
@@ -274,6 +293,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
     await session.send({
         "type": "hello", "skills": skills,
         "embodiment": ctx.sim.spec().embodiment_id, "pcm_sample_rate": PCM_SAMPLE_RATE,
+        "runtime": ctx.runtime_info,
     })
     try:
         async for msg in ws:
@@ -302,13 +322,27 @@ async def index_handler(request: web.Request) -> web.FileResponse:
     return web.FileResponse(CONSOLE_DIR / "index.html")
 
 
+async def health_handler(request: web.Request) -> web.Response:
+    ctx: AppContext = request.app[CTX_KEY]
+    try:
+        ctx.registry.get_operation("health-check")
+    except Exception:
+        return web.json_response({"status": "unavailable"}, status=503)
+    return web.json_response({"status": "ok", "release": os.getenv("EMBODIED_RELEASE", "development"),
+                              "runtime": ctx.runtime_info})
+
+
 def build_app(ctx: AppContext) -> web.Application:
     app = web.Application()
     app[CTX_KEY] = ctx
     app.router.add_get("/ws/session", ws_handler)
     app.router.add_get("/api/scene.jpg", scene_handler)
     app.router.add_get("/", index_handler)
+    app.router.add_get("/healthz", health_handler)
     app.router.add_static("/console", CONSOLE_DIR)
+    async def cleanup(app):
+        await ctx.close()
+    app.on_cleanup.append(cleanup)
     return app
 
 
