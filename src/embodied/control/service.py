@@ -16,12 +16,14 @@ import asyncio
 import json
 import logging
 import time
+from dataclasses import asdict
 from typing import Any, Callable
 
 import grpc
 
 from embodied.contracts.observation import ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
+from embodied.contracts.stopping import StopRejected
 from embodied.runtime.rpcgen import import_common, import_control
 from embodied.skills.registry import ConfirmationRequired, SkillRegistry
 
@@ -100,7 +102,9 @@ def build_servicer(state: ControlState):
                 found=True, operation_id=record.operation_id, attempt_id=record.attempt_id,
                 state=record.state, stop_state=record.stop_state, boot_id=record.boot_id,
                 lease_epoch=record.lease_epoch,
-                result_json=json.dumps(record.result, ensure_ascii=False, allow_nan=False) if record.result else "",
+                result_json=json.dumps(asdict(state.registry._from_record(record)), ensure_ascii=False, allow_nan=False),
+                stop_evidence_json=json.dumps(record.stop_evidence, ensure_ascii=False, allow_nan=False)
+                if record.stop_evidence else "",
             )
 
         async def GetOperation(self, request, context):
@@ -108,6 +112,22 @@ def build_servicer(state: ControlState):
 
         async def CancelOperation(self, request, context):
             return self._operation_reply(state.registry.cancel_operation(request.operation_id))
+
+        async def ReconcileStop(self, request, context):
+            try:
+                record = await state.registry.reconcile_stop(
+                    request.operation_id, request.attempt_id, confirmed=request.confirmed,
+                )
+                return self._operation_reply(record)
+            except ConfirmationRequired:
+                reason = "confirmation_required"
+            except StopRejected as exc:
+                reason = str(exc)
+            except Exception:
+                reason = "stop_reconciliation_failed"
+            reply = self._operation_reply(state.registry.get_operation(request.operation_id))
+            reply.reconciliation_error = reason
+            return reply
 
         async def ListSkills(self, request, context):
             reply = pb2.ListSkillsReply()

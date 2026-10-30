@@ -10,10 +10,12 @@ be observed separately by an embodiment adapter.
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, copy_context
+from functools import partial
 from typing import Callable, Iterator
 
 
@@ -23,6 +25,23 @@ class InvocationPermit:
         self._lock = threading.RLock()
         self._revoked = False
         self._authority = authority
+        self._workers = 0
+        self.handler_task: asyncio.Task | None = None
+
+    def reserve_worker(self) -> None:
+        with self._lock:
+            if self._revoked or time.monotonic() >= self.deadline:
+                raise RuntimeError("invocation_revoked_or_expired")
+            self._workers += 1
+
+    def finish_worker(self) -> None:
+        with self._lock:
+            self._workers -= 1
+
+    @property
+    def drained(self) -> bool:
+        with self._lock:
+            return self._workers == 0 and (self.handler_task is None or self.handler_task.done())
 
     def revoke(self) -> None:
         # 同步覆盖实际设备写入，不只做事前检查。
@@ -52,3 +71,32 @@ def invocation_access() -> Iterator[bool]:
     else:
         with permit.access() as allowed:
             yield allowed
+
+
+async def run_blocking(function, *args, **kwargs):
+    """Track actual worker completion even after coroutine cancellation.
+
+    协程取消后仍追踪实际工作线程完成，排队任务也不能丢失退出记录。
+    """
+    permit = CURRENT_INVOCATION.get()
+    if permit is None:
+        return await asyncio.to_thread(function, *args, **kwargs)
+    permit.reserve_worker()
+    call = partial(function, *args, **kwargs)
+
+    def worker():
+        try:
+            with permit.access() as allowed:
+                if not allowed:
+                    raise RuntimeError("invocation_revoked_or_expired")
+            return call()
+        finally:
+            permit.finish_worker()
+
+    try:
+        future = asyncio.get_running_loop().run_in_executor(None, copy_context().run, worker)
+    except BaseException:
+        permit.finish_worker()
+        raise
+    future.add_done_callback(lambda done: None if done.cancelled() else done.exception())
+    return await asyncio.shield(future)

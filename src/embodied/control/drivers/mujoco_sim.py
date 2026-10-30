@@ -72,7 +72,10 @@ class TabletopSim:
         spawn_angle_deg: tuple[float, float] = (230.0, 310.0),
     ) -> None:
         self._state_lock = threading.RLock()
+        self._stop_fence: str | None = None
+        self._stop_controller = None
         scene = stage_tabletop()
+        self._scene_path = scene
         self.model = mujoco.MjModel.from_xml_path(str(scene))
         self.data = mujoco.MjData(self.model)
         self._rng = np.random.default_rng(seed)
@@ -93,6 +96,7 @@ class TabletopSim:
         self._upper = m.jnt_range[self._jids, 1].copy()
         jaw_jid = self._name2id(mujoco.mjtObj.mjOBJ_JOINT, JAW_JOINT)
         self._jaw_qpos_adr = int(m.jnt_qposadr[jaw_jid])
+        self._jaw_dof_adr = int(m.jnt_dofadr[jaw_jid])
         self._act_ids = np.array([self._name2id(mujoco.mjtObj.mjOBJ_ACTUATOR, n) for n in ARM_JOINTS])
         self._jaw_act = self._name2id(mujoco.mjtObj.mjOBJ_ACTUATOR, JAW_JOINT)
         self._site_id = self._name2id(mujoco.mjtObj.mjOBJ_SITE, GRASP_SITE)
@@ -167,6 +171,8 @@ class TabletopSim:
 
     @_state_locked
     def write(self, cmd: ActionCommand) -> WriteResult:
+        if self._stop_fence:
+            return WriteResult(applied=False, reason="stop_reconciliation_pending")
         with invocation_access() as allowed:
             if not allowed:
                 return WriteResult(applied=False, reason="invocation_revoked_or_expired")
@@ -181,6 +187,8 @@ class TabletopSim:
 
     @_state_locked
     def step(self, n: int = 1) -> None:
+        if self._stop_fence:
+            return
         for _ in range(n):
             with invocation_access() as allowed:
                 if not allowed:
@@ -191,6 +199,8 @@ class TabletopSim:
 
     @_state_locked
     def reset(self, *, randomize: bool = False) -> Observation:
+        if self._stop_fence:
+            raise RuntimeError("stop_reconciliation_pending")
         self.state_epoch = uuid4().hex
         # 上游 home 关键帧没有新增物体自由关节；仅对机械臂和夹爪应用关键帧，物体使用生成位姿，避免零填充导致传送到基座。
         # The upstream "home" keyframe predates our scene objects (MuJoCo zero-pads the
@@ -219,6 +229,14 @@ class TabletopSim:
     @property
     def timestep(self) -> float:
         return float(self.model.opt.timestep)
+
+    @property
+    def stop_controller(self):
+        if self._stop_controller is None:
+            from embodied.control.stopping import SimStopController
+
+            self._stop_controller = SimStopController(self)
+        return self._stop_controller
 
     def set_hooks(
         self,

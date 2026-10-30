@@ -17,7 +17,6 @@ self-reports success (D009). Guard vetoes fail the rollout closed.
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any, Callable
 
 import numpy as np
@@ -30,6 +29,7 @@ from embodied.cognition.world_state import (
 )
 from embodied.control.hal import ActionCommand
 from embodied.providers.policy import BasePolicyProvider
+from embodied.runtime.invocation import run_blocking
 from embodied.skills.registry import SkillRegistry, SkillResult
 from embodied.skills.scripted.manip import PICK, PLACE
 
@@ -156,18 +156,21 @@ def register_policy_sim_skills(
 
     注册学习实现时跳过同名脚本技能，Registry 禁止重复注册。
     """
+    controller = getattr(emb, "stop_controller", None)
+    if controller is not None:
+        registry.configure_stop_controller(controller)
     if pick is not None:
         # 注册时验证维度，不延迟到首次调用。
         PolicyRunner(emb, pick)  # validate dims at registration, not first call
 
         async def pick_handler(object: str = "obj_cube") -> SkillResult:
-            return await asyncio.to_thread(_pick_policy_sync, emb, pick, object)
+            return await run_blocking(_pick_policy_sync, emb, pick, object)
 
-        registry.register(PICK, pick_handler)
+        registry.register(PICK, pick_handler, tracked_workers=True)
     if place is not None:
         PolicyRunner(emb, place)
 
         async def place_handler(region: str = "bin_region") -> SkillResult:
-            return await asyncio.to_thread(_place_policy_sync, emb, place, region)
+            return await run_blocking(_place_policy_sync, emb, place, region)
 
-        registry.register(PLACE, place_handler)
+        registry.register(PLACE, place_handler, tracked_workers=True)

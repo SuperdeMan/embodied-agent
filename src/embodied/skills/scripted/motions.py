@@ -2,10 +2,10 @@
 
 Joint-space interpolation with guard-checked writes; a single denied write aborts
 the whole motion (the guard latches on breach — motions never fight it). These run
-synchronously and are wrapped in asyncio.to_thread by the skill handlers.
+synchronously and are wrapped in tracked run_blocking calls by the skill handlers.
 
 
-阻塞运动原语进行关节插值，每次写入经 Guard；任一次拒绝终止整段运动，由技能线程调用。
+阻塞运动原语进行关节插值，每次写入经 Guard；任一次拒绝终止整段运动，由技能的受跟踪线程调用。
 """
 
 from __future__ import annotations

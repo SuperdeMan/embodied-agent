@@ -3,20 +3,20 @@
 Every skill verifies its declared effect against a fresh WorldSnapshot before
 claiming success (car-agent's outcome-verification discipline: motion finishing
 ≠ task done — a slipped grasp must report ok=False so the planner can react).
-Handlers wrap blocking sim motion in asyncio.to_thread to keep the agent loop live.
+Handlers use run_blocking to keep the loop live and track actual worker completion.
 
 
-桌面脚本技能回零、抓取和放置在报告成功前核对新世界快照；阻塞运动用线程执行，保持 Agent 循环响应。
+桌面脚本技能回零、抓取和放置在报告成功前核对新世界快照；阻塞运动使用受跟踪线程，保持 Agent 循环响应并确认线程实际退出。
 """
 
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import numpy as np
 
 from embodied.cognition.world_state import WorldSnapshot, held_object, object_in_region
+from embodied.runtime.invocation import run_blocking
 from embodied.skills.manifest import ParamSpec, SkillManifest, TerminationSpec
 from embodied.skills.registry import SkillRegistry, SkillResult
 from embodied.skills.scripted import motions
@@ -170,16 +170,20 @@ def register_sim_skills(registry: SkillRegistry, emb: Any, *, skip: tuple[str, .
     按 skip 排除将由学习实现占用的 manifest，保留名称与契约不变。
     """
 
+    controller = getattr(emb, "stop_controller", None)
+    if controller is not None:
+        registry.configure_stop_controller(controller)
+
     async def home() -> SkillResult:
-        ok = await asyncio.to_thread(motions.move_to_q, emb, emb.home_qpos(), seconds=1.5)
+        ok = await run_blocking(motions.move_to_q, emb, emb.home_qpos(), seconds=1.5)
         return SkillResult(ok=ok, detail="arm homed" if ok else "guard denied motion")
 
     async def pick(object: str = "obj_cube") -> SkillResult:
-        return await asyncio.to_thread(_pick_sync, emb, object)
+        return await run_blocking(_pick_sync, emb, object)
 
     async def place(region: str = "bin_region") -> SkillResult:
-        return await asyncio.to_thread(_place_sync, emb, region)
+        return await run_blocking(_place_sync, emb, region)
 
     for manifest, handler in ((HOME, home), (PICK, pick), (PLACE, place)):
         if manifest.name not in skip:
-            registry.register(manifest, handler)
+            registry.register(manifest, handler, tracked_workers=True)

@@ -77,6 +77,18 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 八类契约字段与接线位置以[执行计划 §3](platform-upgrade.md#3-八类契约与冻结顺序)为迁移清单。纯契约不依赖适配器、ROS、GPU；跨进程 proto 先行，未知版本不静默接受。
 
+### 5.3 D021 停止观测与受信解除隔离
+
+停止对账是独立维护操作，不是 LLM 技能。调用者必须明确确认 operation_id 与 attempt_id；服务端使用已绑定的停止控制器，拒收客户端提供的“已停止”布尔值或证据。当前仅实现 MuJoCo 参考控制器，不为真机出具证明。
+
+脚本和学习技能的阻塞工作改用可跟踪执行器：取消后保留实际线程完成信息，线程未退出不进入停止对账；未声明受跟踪执行的旧操作保持隔离。账本准入事件保存停止 profile 摘要和跟踪能力；不新增表、不改变 schema 版本、不迁移云端数据。
+
+仿真维护操作先阻断普通写入/步进/reset，再在关节限位内保持机械臂当前位置；夹爪检测到双侧接触时保持已接受的闭合目标，否则保持当前位置，实际推进物理仿真并连续观测所有受控关节（含夹爪）速度。不能直接清零 qvel 伪造停止。证据绑定本体、资产/profile、操作/尝试、原 boot 与当前观察 boot、资源 epoch、场景代次、一次性凭据、样本与时间窗；非有限值、过期、错代次、错身份或后台工作未结束均不释放。
+
+提交时在控制器维护锁内先事务记录停止证据和 `MOTION_STOPPED_OBSERVED`，再释放对应资源并撤销维护围栏。失败保持隔离。原调用与任务效果仍是 OUTCOME_UNKNOWN，旧 operation_id 不重放，只有新的显式操作可占用已释放资源。停止对账不清除 Guard 闩锁。重复对账只返回历史结果，不再次停止可能已被新任务使用的设备。
+
+重启仅恢复合法、完整且身份匹配的已提交停止证据；没有准入元数据的历史未知操作不被自动放行。模型、stop profile 或本体变化时拒绝套用旧证据。具体实现与边界见 [stop-reconciliation.md](stop-reconciliation.md)。
+
 ### 5.2 D019 远端世界状态的新鲜度
 
 远端规划与效果验证通过 `GetWorldState` 请求有版本的 ObservationEnvelope，包含本体、服务 boot_id、场景 epoch、序号、仿真时钟、坐标/单位、标定版本、来源、关节和对象/区域。服务端当前仅提供仿真观测，不能把 sim_truth 声称为真实感知。客户端用本机单调时钟测量往返耗时，并加上服务端读快照耗时作为保守新鲜度界限，不比较跨机 monotonic 值。
@@ -85,7 +97,7 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 ### 5.1 D018 操作账本与资源准入
 
-新增纯类型 `contracts/operation.py` 和 `runtime/operations.py`，区别于既有内存任务账本。操作身份包含 task_id、operation_id、plan_revision，尝试 ID、boot_id 与资源 epoch 由执行端生成。`RETURNED` 仅表示 handler 成功返回；`FAILED` 为明确调用失败；`OUTCOME_UNKNOWN` 不释放资源、不接受自动新尝试。效果仍由独立 verifier 判定。
+新增纯类型 `contracts/operation.py` 和 `runtime/operations.py`，区别于既有内存任务账本。操作身份包含 task_id、operation_id、plan_revision，尝试 ID、boot_id 与资源 epoch 由执行端生成。`RETURNED` 仅表示 handler 成功返回；`FAILED` 为明确调用失败；`OUTCOME_UNKNOWN` 默认隔离资源；只有 D021 停止证据提交后才可释放，仍不接受自动新尝试。效果仍由独立 verifier 判定。
 
 SQLite 五表保存任务、操作、尝试、事件和 schema 版本；结果与事件在一个事务写入，未知 schema 拒绝打开。一个数据库只允许一个执行进程持有（OS 文件锁），避免第二进程把仍活着的运行误判为重启遗留。部署必须让同一本体使用同一账本；不同文件不能提供跨进程硬件互斥保证。
 

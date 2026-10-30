@@ -117,6 +117,13 @@ class RemoteSkillRegistry:
     async def cancel_operation(self, operation_id: str):
         return await self._stub.CancelOperation(self._pb2.OperationRequest(operation_id=operation_id), timeout=5)
 
+    async def reconcile_stop(self, operation_id: str, attempt_id: str, *, confirmed: bool = False):
+        if confirmed is not True:
+            raise ConfirmationRequired("maintenance.reconcile_stop")
+        return await self._stub.ReconcileStop(self._pb2.StopReconciliationRequest(
+            operation_id=operation_id, attempt_id=attempt_id, confirmed=True,
+        ), timeout=5)
+
     async def world_snapshot(self):
         started = time.monotonic()
         try:

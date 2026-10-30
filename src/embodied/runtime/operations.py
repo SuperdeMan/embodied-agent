@@ -10,12 +10,13 @@ import json
 import os
 import sqlite3
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from embodied.contracts.operation import OperationIdentity
+from embodied.contracts.stopping import StopEvidence, StopProfile, StopRejected, StopRequest, validate_stop_evidence
 
 SCHEMA_VERSION = 1
 MAX_RESULT_BYTES = 1_048_576
@@ -73,6 +74,9 @@ class OperationRecord:
     stop_state: str
     resources: tuple[str, ...]
     result: dict[str, Any] | None
+    robot_id: str = ""
+    stop_context: dict[str, Any] = field(default_factory=dict)
+    stop_evidence: dict[str, Any] | None = None
 
 
 class OperationLedger:
@@ -143,18 +147,57 @@ class OperationLedger:
 
     def get(self, operation_id: str) -> OperationRecord | None:
         row = self._db.execute("""
-            SELECT o.*, a.attempt_id, a.boot_id, a.lease_epoch, a.stop_state, a.resources_json
-            FROM operations o JOIN attempts a USING(operation_id) WHERE o.operation_id=?
+            SELECT o.*, a.attempt_id, a.boot_id, a.lease_epoch, a.stop_state, a.resources_json, t.robot_id
+            FROM operations o JOIN attempts a USING(operation_id) JOIN tasks t ON t.task_id=o.task_id
+            WHERE o.operation_id=?
         """, (operation_id,)).fetchone()
         if row is None:
             return None
-        return OperationRecord(
+        admitted = self._event_payload(operation_id, row["attempt_id"], "admitted") or {}
+        evidence = self._event_payload(operation_id, row["attempt_id"], "stop_observed")
+        stop_context = admitted.get("stop_context", {})
+        record = OperationRecord(
             operation_id=row["operation_id"], task_id=row["task_id"], request_digest=row["request_digest"],
             skill_id=row["skill_id"], state=row["state"], attempt_id=row["attempt_id"], boot_id=row["boot_id"],
             lease_epoch=row["lease_epoch"], stop_state=row["stop_state"],
             resources=tuple(json.loads(row["resources_json"])),
             result=json.loads(row["evidence_json"]) if row["evidence_json"] else None,
+            robot_id=row["robot_id"], stop_context=stop_context if isinstance(stop_context, dict) else {},
+            stop_evidence=evidence,
         )
+        if record.stop_state == "MOTION_STOPPED_OBSERVED" and not self._valid_stored_stop(record):
+            return replace(record, stop_state="STOP_UNCONFIRMED", stop_evidence=None)
+        return record
+
+    def _event_payload(self, operation_id: str, attempt_id: str, kind: str) -> dict | None:
+        row = self._db.execute("""
+            SELECT payload_json FROM operation_events WHERE operation_id=? AND attempt_id=? AND event_type=?
+            ORDER BY rowid DESC LIMIT 1
+        """, (operation_id, attempt_id, kind)).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = json.loads(row[0])
+            return payload if isinstance(payload, dict) else None
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _valid_stored_stop(record: OperationRecord, *, historical: bool = True) -> bool:
+        try:
+            if record.stop_context.get("tracked_workers") is not True or record.stop_evidence is None:
+                return False
+            profile = StopProfile.model_validate_json(json.dumps(record.stop_context["stop_profile"]))
+            evidence = StopEvidence.model_validate_json(json.dumps(record.stop_evidence))
+            request = StopRequest(
+                operation_id=record.operation_id, attempt_id=record.attempt_id, attempt_boot_id=record.boot_id,
+                observer_boot_id=evidence.observer_boot_id, robot_id=record.robot_id, lease_epoch=record.lease_epoch,
+                resources=record.resources, nonce=evidence.nonce, deadline_monotonic=evidence.deadline_monotonic,
+            )
+            validate_stop_evidence(evidence, request, profile, historical=historical)
+            return True
+        except (ValueError, TypeError, KeyError, AttributeError, StopRejected):
+            return False
 
     def lookup(self, identity: OperationIdentity, digest: str) -> OperationRecord | None:
         record = self.get(identity.operation_id)
@@ -166,7 +209,7 @@ class OperationLedger:
         return self._db.execute("SELECT COALESCE(MAX(lease_epoch),0)+1 FROM attempts").fetchone()[0]
 
     def begin(self, identity: OperationIdentity, robot_id: str, skill: str, digest: str,
-              resources: tuple[str, ...], epoch: int) -> OperationRecord:
+              resources: tuple[str, ...], epoch: int, *, stop_context: dict | None = None) -> OperationRecord:
         now = time.time()
         attempt = uuid4().hex
         with self._db:
@@ -186,7 +229,8 @@ class OperationLedger:
             self._db.execute("INSERT INTO attempts VALUES(?,?,?,?, 'RUNNING','NOT_REQUESTED',?,?,NULL)",
                              (attempt, identity.operation_id, self.boot_id, epoch,
                               json.dumps(resources), now))
-            self._event(identity.operation_id, attempt, "admitted", {"request_digest": digest})
+            self._event(identity.operation_id, attempt, "admitted",
+                        {"request_digest": digest, "stop_context": stop_context or {}})
         return self.get(identity.operation_id)
 
     def finish(self, operation_id: str, state: str, result: dict | None, stop_state: str,
@@ -218,7 +262,38 @@ class OperationLedger:
                          (uuid4().hex, operation_id, attempt_id, kind, json.dumps(payload), time.time()))
 
     def quarantined(self) -> dict[str, tuple[str, ...]]:
-        return {
-            row["operation_id"]: tuple(json.loads(row["resources_json"]))
-            for row in self._db.execute("SELECT operation_id,resources_json FROM attempts WHERE state='OUTCOME_UNKNOWN'")
-        }
+        quarantined = {}
+        for row in self._db.execute("SELECT operation_id FROM attempts WHERE state='OUTCOME_UNKNOWN'"):
+            record = self.get(row["operation_id"])
+            if record.stop_state != "MOTION_STOPPED_OBSERVED":
+                quarantined[record.operation_id] = record.resources
+        return quarantined
+
+    def record_stop(self, evidence: StopEvidence) -> OperationRecord:
+        with self._db:
+            self._db.execute("BEGIN IMMEDIATE")
+            record = self.get(evidence.operation_id)
+            if record is None or record.state != "OUTCOME_UNKNOWN":
+                raise StopRejected("operation_not_unknown")
+            if record.stop_state == "MOTION_STOPPED_OBSERVED":
+                return record
+            candidate = replace(record, stop_evidence=evidence.model_dump(mode="json"))
+            if evidence.observer_boot_id != self.boot_id or not self._valid_stored_stop(candidate, historical=False):
+                raise StopRejected("invalid_stop_evidence")
+            # 调用结果仍未知；只更新停止子状态并追加证据。 / Preserve unknown outcome; update only stop state and append evidence.
+            self._db.execute("UPDATE attempts SET stop_state='MOTION_STOPPED_OBSERVED' WHERE attempt_id=?",
+                             (record.attempt_id,))
+            self._event(record.operation_id, record.attempt_id, "stop_observed", evidence.model_dump(mode="json"))
+        return self.get(evidence.operation_id)
+
+    def note_stop_request(self, request: StopRequest, profile: StopProfile) -> None:
+        with self._db:
+            self._db.execute("BEGIN IMMEDIATE")
+            record = self.get(request.operation_id)
+            if (record is None or record.state != "OUTCOME_UNKNOWN" or record.attempt_id != request.attempt_id
+                    or request.observer_boot_id != self.boot_id):
+                raise StopRejected("stop_attempt_mismatch")
+            self._event(record.operation_id, record.attempt_id, "stop_reconciliation_requested", {
+                "nonce": request.nonce, "profile_digest": profile.digest,
+                "observer_boot_id": request.observer_boot_id, "confirmation": "explicit_true",
+            })

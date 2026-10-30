@@ -97,13 +97,19 @@ def main(argv: list[str] | None = None) -> int:
     operation = sub.add_parser("operation", help="query or request cancellation of an existing remote operation")
     operation.add_argument("--remote", required=True)
     operation.add_argument("--id", required=True)
-    operation.add_argument("--cancel", action="store_true")
+    maintenance = operation.add_mutually_exclusive_group()
+    maintenance.add_argument("--cancel", action="store_true")
+    maintenance.add_argument("--reconcile-stop", action="store_true")
+    operation.add_argument("--attempt", default="")
+    operation.add_argument("--confirm", action="store_true")
 
     sg = sub.add_parser("serve-guardian", help="safety-guardian process (gRPC SafetyService)")
     sg.add_argument("--port", type=int, default=8392)
     sg.add_argument("--control", default="127.0.0.1:8391", metavar="ADDR")
 
     args = parser.parse_args(argv)
+    if args.cmd == "operation" and args.reconcile_stop and (not args.attempt or not args.confirm):
+        parser.error("--reconcile-stop requires --attempt and --confirm")
     if args.cmd in (None, "chat"):
         return asyncio.run(_chat(getattr(args, "provider", "auto"), bool(getattr(args, "yes", False))))
     if args.cmd == "sim":
@@ -262,10 +268,13 @@ async def _operation(args: argparse.Namespace) -> int:
 
     async with grpc.aio.insecure_channel(args.remote) as channel:
         registry = RemoteSkillRegistry(channel)
-        action = registry.cancel_operation if args.cancel else registry.get_operation
-        result = await action(args.id)
+        if args.reconcile_stop:
+            result = await registry.reconcile_stop(args.id, args.attempt, confirmed=args.confirm)
+        else:
+            action = registry.cancel_operation if args.cancel else registry.get_operation
+            result = await action(args.id)
         print(json.dumps(MessageToDict(result, preserving_proto_field_name=True), ensure_ascii=False, indent=2))
-        return 0 if result.found else 1
+        return 0 if result.found and not result.reconciliation_error else 1
 
 
 async def _serve_guardian(args: argparse.Namespace) -> int:

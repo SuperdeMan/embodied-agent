@@ -57,3 +57,18 @@ class ResourceArbiter:
         # 隔离不释放资源；只有未来受信停止对账才能解除。 / Quarantine retains claims until trusted reconciliation exists.
         with self._lock:
             self._quarantined.add(lease.owner)
+
+    def resolve(self, owner: str, resources: tuple[str, ...], persist):
+        """Commit proof before clearing exactly this owner's quarantine.
+
+        先提交证明，再精确清除此 owner 的隔离。
+        """
+        with self._lock:
+            actual = {name for name, lease in self._owners.items() if lease.owner == owner}
+            if owner not in self._quarantined or actual != set(resources):
+                raise ResourceBusy("quarantine_owner_mismatch")
+            result = persist()
+            for name in actual:
+                del self._owners[name]
+            self._quarantined.remove(owner)
+            return result
