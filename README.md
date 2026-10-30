@@ -33,6 +33,8 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID
 uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID --cancel
 ```
 
+**远端状态与云端候选**：D019 已接入有时效的仿真快照，用于远端规划和效果验证；丢失、过期或旧代次不按成功处理。云端候选 `212f912` 已在共享服务器的隔离容器内完成渲染、WebSocket 抓放与账本验收，当前尚未激活常驻私网入口。范围与状态见[云端部署记录](docs/cloud-deployment.md)。
+
 ## 现在就能跑的（M1 · 仿真闭环）
 
 - **语音/文本 → 规划 → 执行 → 验证 → 汇报**全链路：Web 控制台按住说话或文本下令，LLM 产出结构化计划（DAG of skills），确定性执行器逐步执行并**对账世界状态**（动作完成 ≠ 任务完成：夹取滑落会被如实报告），最终汇报由代码从真实执行结果生成——结构性杜绝「嘴上说做了」。

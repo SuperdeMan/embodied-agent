@@ -23,4 +23,6 @@ PlannerEngine 上下文读取和 verifier 兼容同步/异步函数。远端 CLI
 
 本批完整测试 511 passed、4 条既有 ONNX 导出警告；新增覆盖非法包络、时效边界、旧代次/迟到响应、真实本机 RPC 效果放行与缺态阻断、reset 代次变化、控制台同源 WebSocket 和渲染线程清理。`fde3247` 干净提交原仿真任务为 30/30，脚本+真值+离线规划器，记录见评测账本。
 
+本地测试与原始仿真结果保存在 [remote-world-20261030.json](../eval/remote-world-20261030.json)；完整测试运行于随后提交为 `fde3247` 的应用工作树，云端验收脚本在另一证据链中验证。
+
 云端候选与部署边界单独见 [cloud-deployment.md](cloud-deployment.md)，不把本地结果转借为云端或真机结果。

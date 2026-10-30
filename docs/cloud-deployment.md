@@ -1,6 +1,6 @@
 # 云端仿真控制台候选
 
-> 2026-10-30，D020。当前为部署准备，不是已上线声明。
+> 2026-10-30，D020。Linux 候选 `212f912` 已验收，当前 `validated_not_activated`；未新增常驻入口。
 
 ## 可部署内容
 
@@ -22,3 +22,15 @@
 - 激活前验证健康、JPEG 场景、WebSocket 文本任务、账本与资源限额。失败只停止本项目候选，不重启共享 Docker，不删除其他项目对象。
 
 常驻应用激活和 Tailscale 映射属于服务器变更，候选验收完成后对这组具体操作请求确认。候选构建和验收使用无网络、无发布端口的临时运行配置，结束后停止并保留日志；未经授权不新增公网入口或共享主机配置。
+
+## Linux 候选验收
+
+镜像 `embodied-agent:212f912d067d933a12949c12d507db493b0a9f13`，image ID 为 `sha256:4f91b02ee5a724907339dde4c38bb0d7ca66567e39aa8db5d7b2f0dc4a67ba3a`。源码和固定 Menagerie 资产作为独立 bundle 上传后逐文件核对 SHA-256；构建没有读取其他项目 .env。
+
+候选在真实 Linux Docker 主机中通过：健康接口报告准确 release、离屏 JPEG 渲染（31053 字节）、WebSocket 文本指令完成 pick/place、两条操作身份与 RETURNED 账本结果。只验证了这一条云端正常任务，不称为云端全套 30/30。
+
+Docker inspect 实际确认：1 CPU、1610612736 字节内存、128 PID、用户 10001:10001、只读根、drop ALL capabilities、no-new-privileges、network none、无宿主端口。候选已停止；前后其他运行容器的 ID 和名称保持一致。目标 Compose 配置解析通过，激活配置将改用独立内部桥接网络、持久卷及回环端口；这一常驻配置仍需激活后独立核验。
+
+首次 `fde3247` 候选在 Debian HTTP 包索引下载停滞时中止，只终止匹配该候选 SHA 的 Docker build 进程，未操作共享 daemon。后续镜像内改用已验证可达的 HTTPS 镜像源及有限下载超时，第二候选构建成功。失败日志与两个源码包均保留。
+
+机器可读验收见 [cloud-candidate-20261030.json](../eval/cloud-candidate-20261030.json)。服务器日志位于本项目 `artifacts/<SHA>/`；持久激活尚待用户对已展示的容器和 HTTPS 8449 映射方案确认。

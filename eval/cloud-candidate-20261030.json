@@ -1,0 +1,216 @@
+{
+  "candidate": {
+    "passed": true,
+    "health": {
+      "status": "ok",
+      "release": "212f912d067d933a12949c12d507db493b0a9f13",
+      "runtime": {
+        "environment": "simulation",
+        "planner": "offline",
+        "audio": "mock"
+      }
+    },
+    "jpeg_bytes": 31053,
+    "steps": [
+      {
+        "type": "step",
+        "step_id": "s1",
+        "skill": "skill.manip.pick",
+        "status": "ok",
+        "detail": "obj_cube grasped and lifted",
+        "operation_id": "b61a1a9cdc895b3abee15280d536f221",
+        "attempt_id": "571b6d0d0a9544008b855fbb35ef10e0",
+        "invocation_state": "RETURNED",
+        "stop_state": "NOT_REQUESTED"
+      },
+      {
+        "type": "step",
+        "step_id": "s2",
+        "skill": "skill.manip.place",
+        "status": "ok",
+        "detail": "obj_cube placed in bin_region",
+        "operation_id": "1857c5d096225c0d815d893c88e2b014",
+        "attempt_id": "97162206ecd54155a1166fe0898f9902",
+        "invocation_state": "RETURNED",
+        "stop_state": "NOT_REQUESTED"
+      }
+    ],
+    "operation_states": [
+      "RETURNED",
+      "RETURNED"
+    ],
+    "commit": "212f912d067d933a12949c12d507db493b0a9f13",
+    "image_id": "sha256:4f91b02ee5a724907339dde4c38bb0d7ca66567e39aa8db5d7b2f0dc4a67ba3a",
+    "published": false,
+    "runtime_limits": {
+      "cpus": 1,
+      "memory_mib": 1536,
+      "ports": [],
+      "network": "none"
+    }
+  },
+  "observed_limits": {
+    "memory_bytes": 1610612736,
+    "nano_cpus": 1000000000,
+    "pids_limit": 128,
+    "read_only": true,
+    "cap_drop": [
+      "ALL"
+    ],
+    "security_opt": [
+      "no-new-privileges"
+    ],
+    "ports": {},
+    "network": "none",
+    "user": "10001:10001",
+    "state": "exited"
+  },
+  "host_containers": {
+    "before": [
+      "ce584726303e 4c1f479-hmi-1",
+      "77a8e0b13692 4c1f479-dashboard-1",
+      "bf966f843f37 4c1f479-edge-gateway-1",
+      "71d38905b588 4c1f479-edge-orchestrator-1",
+      "7e2ae16ac9e0 4c1f479-parking-payment-agent-1",
+      "335e91cf54ba 4c1f479-mcp-bridge-1",
+      "6ae1cb5194ba 4c1f479-payment-gateway-1",
+      "84599a831edf 4c1f479-nearby-agent-1",
+      "f5c447d9ed02 4c1f479-cloud-gateway-1",
+      "2e660bbee7bc 4c1f479-cloud-planner-1",
+      "21b48c16a680 4c1f479-manual-rag-agent-1",
+      "c599b90492bf 4c1f479-scene-orchestrator-agent-1",
+      "b379ced33688 4c1f479-reminder-agent-1",
+      "93ed67aa51db 4c1f479-deep-research-agent-1",
+      "dcd58fc77f55 4c1f479-info-agent-1",
+      "1a06b1067e40 4c1f479-road-safety-agent-1",
+      "c869425c057c 4c1f479-charging-planner-agent-1",
+      "6a31a046b978 4c1f479-trip-planner-agent-1",
+      "ea68be8123a4 4c1f479-vision-agent-1",
+      "6af071886970 4c1f479-navigation-agent-1",
+      "cd7f0c10b3e3 4c1f479-chitchat-agent-1",
+      "fb625b1d411b 4c1f479-http-proxy-1",
+      "bf9cd2ac263e 4c1f479-llm-gateway-1",
+      "baa1e6b7e1c0 4c1f479-memory-1",
+      "2552d988ad03 4c1f479-registry-1",
+      "6c7dbe057d37 4c1f479-observability-collector-1",
+      "830b830d3272 4c1f479-proactive-1",
+      "06bd84af2096 drone-agent-cloud-desk-service-1",
+      "fe19a3830998 drone-agent-cloud-desk-uplink-1",
+      "75e7b28c355d drone-agent-cloud-desk-1",
+      "70dd5ac4147a drone-agent-cloud-desk-fleet-1",
+      "9cf241506d0d drone-agent-cloud-desk-vendor-1",
+      "b4141ebb5b42 drone-agent-cloud-desk-dock-1",
+      "7d93db1388c2 drone-agent-cloud-desk-model-proxy-1",
+      "e082b2cc4a54 drone-agent-cloud-console-1",
+      "62da1b78d69a drone-agent-cloud-sitl-1",
+      "e824c3d92bf7 4c1f479-redis-1",
+      "5da74bdb412d 4c1f479-postgres-1",
+      "78f9994ef52a 4c1f479-nats-1"
+    ],
+    "after": [
+      "ce584726303e 4c1f479-hmi-1",
+      "77a8e0b13692 4c1f479-dashboard-1",
+      "bf966f843f37 4c1f479-edge-gateway-1",
+      "71d38905b588 4c1f479-edge-orchestrator-1",
+      "7e2ae16ac9e0 4c1f479-parking-payment-agent-1",
+      "335e91cf54ba 4c1f479-mcp-bridge-1",
+      "6ae1cb5194ba 4c1f479-payment-gateway-1",
+      "84599a831edf 4c1f479-nearby-agent-1",
+      "f5c447d9ed02 4c1f479-cloud-gateway-1",
+      "2e660bbee7bc 4c1f479-cloud-planner-1",
+      "21b48c16a680 4c1f479-manual-rag-agent-1",
+      "c599b90492bf 4c1f479-scene-orchestrator-agent-1",
+      "b379ced33688 4c1f479-reminder-agent-1",
+      "93ed67aa51db 4c1f479-deep-research-agent-1",
+      "dcd58fc77f55 4c1f479-info-agent-1",
+      "1a06b1067e40 4c1f479-road-safety-agent-1",
+      "c869425c057c 4c1f479-charging-planner-agent-1",
+      "6a31a046b978 4c1f479-trip-planner-agent-1",
+      "ea68be8123a4 4c1f479-vision-agent-1",
+      "6af071886970 4c1f479-navigation-agent-1",
+      "cd7f0c10b3e3 4c1f479-chitchat-agent-1",
+      "fb625b1d411b 4c1f479-http-proxy-1",
+      "bf9cd2ac263e 4c1f479-llm-gateway-1",
+      "baa1e6b7e1c0 4c1f479-memory-1",
+      "2552d988ad03 4c1f479-registry-1",
+      "6c7dbe057d37 4c1f479-observability-collector-1",
+      "830b830d3272 4c1f479-proactive-1",
+      "06bd84af2096 drone-agent-cloud-desk-service-1",
+      "fe19a3830998 drone-agent-cloud-desk-uplink-1",
+      "75e7b28c355d drone-agent-cloud-desk-1",
+      "70dd5ac4147a drone-agent-cloud-desk-fleet-1",
+      "9cf241506d0d drone-agent-cloud-desk-vendor-1",
+      "b4141ebb5b42 drone-agent-cloud-desk-dock-1",
+      "7d93db1388c2 drone-agent-cloud-desk-model-proxy-1",
+      "e082b2cc4a54 drone-agent-cloud-console-1",
+      "62da1b78d69a drone-agent-cloud-sitl-1",
+      "e824c3d92bf7 4c1f479-redis-1",
+      "5da74bdb412d 4c1f479-postgres-1",
+      "78f9994ef52a 4c1f479-nats-1"
+    ],
+    "unchanged": true
+  },
+  "compose": {
+    "name": "embodied-agent-cloud",
+    "networks": {
+      "default": {
+        "name": "embodied-agent-cloud_default",
+        "ipam": {},
+        "internal": true
+      }
+    },
+    "services": {
+      "console": {
+        "cap_drop": [
+          "ALL"
+        ],
+        "cpus": 1,
+        "command": null,
+        "entrypoint": null,
+        "environment": {
+          "ASR_PROVIDER": "mock",
+          "LLM_PROVIDER": "mock",
+          "TTS_STREAM_PROVIDER": "mock"
+        },
+        "image": "embodied-agent:212f912d067d933a12949c12d507db493b0a9f13",
+        "mem_limit": "1610612736",
+        "networks": {
+          "default": null
+        },
+        "pids_limit": 128,
+        "ports": [
+          {
+            "mode": "ingress",
+            "host_ip": "127.0.0.1",
+            "target": 8390,
+            "published": "8390",
+            "protocol": "tcp"
+          }
+        ],
+        "pull_policy": "never",
+        "read_only": true,
+        "restart": "unless-stopped",
+        "security_opt": [
+          "no-new-privileges:true"
+        ],
+        "tmpfs": [
+          "/tmp:size=536870912,mode=1777"
+        ],
+        "volumes": [
+          {
+            "type": "volume",
+            "source": "runtime",
+            "target": "/app/outputs",
+            "volume": {}
+          }
+        ]
+      }
+    },
+    "volumes": {
+      "runtime": {
+        "name": "embodied-agent-cloud_runtime"
+      }
+    }
+  },
+  "status": "validated_not_activated"
+}
