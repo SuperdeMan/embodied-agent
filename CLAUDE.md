@@ -6,7 +6,7 @@
 
 **平台升级 P0/P1 进行中（2026-10-29）**。按用户指定完整方案原仓演进，先补可信执行，再做真机、本体和算力扩展。当前优先级与批次状态见 `docs/platform-upgrade.md` 和 `docs/roadmap.md`；历史 M0–M2 进展见 `docs/roadmap-milestones.md`。脚本/感知/ACT、评测任务及历史负结果保留；旧学习策略 29/30 尚未完成“不劣于脚本”目标。硬件、模型、RPC 结果必须绑定实际运行配置与提交，不跨版本借用证据。
 
-本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。新 SQLite schema、CI/CD 与生产发布仍按红线单独确认；本轮 commit/push 已获用户授权。
+本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。本轮 commit/push、D018 新 SQLite 五表及 nightly 注释补齐已获用户明确授权；后续不同范围的敏感变更仍按红线确认。
 
 ## 目录结构
 

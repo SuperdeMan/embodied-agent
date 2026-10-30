@@ -24,6 +24,15 @@
 
 项目在原仓向跨本体、跨算力的具身应用开发与运行平台演进。当前先推进 **P0 基线与契约 / P1 可信执行内核**；真机、ROS、NPU 与完整发布回滚仍为后续目标。优先级与验收见[平台执行计划](docs/platform-upgrade.md)，当前架构见[architecture.md](docs/architecture.md)。下方 M1/M2 数字保留原评测条件，不代表本次重构或真机结果。
 
+**D018 持久调用链已接入**：交互 sim、console 和 serve-control 默认使用 `outputs/runtime/operations.sqlite3`（`--ledger` 可指定），同库只允许一个执行进程。相同 operation_id 重发不重复动作；超时、取消或重启遗留保持 `OUTCOME_UNKNOWN / STOP_UNCONFIRMED`，相关资源继续隔离。`Reset` 不会清除这类未知结果，目前尚不开放自动恢复。评测和采集参考路径使用内存账本。
+
+运行控制服务后，可查询或请求取消已有操作（ID 来自步骤事件；取消受理不等于物理停止）：
+
+```bash
+uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID
+uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID --cancel
+```
+
 ## 现在就能跑的（M1 · 仿真闭环）
 
 - **语音/文本 → 规划 → 执行 → 验证 → 汇报**全链路：Web 控制台按住说话或文本下令，LLM 产出结构化计划（DAG of skills），确定性执行器逐步执行并**对账世界状态**（动作完成 ≠ 任务完成：夹取滑落会被如实报告），最终汇报由代码从真实执行结果生成——结构性杜绝「嘴上说做了」。

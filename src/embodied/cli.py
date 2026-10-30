@@ -37,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     sim.add_argument("--eval", type=int, default=0, metavar="N", help="quick eval: N episodes on --seed (ad-hoc, not versioned)")
     sim.add_argument("--task", default="", metavar="YAML", help="versioned eval task file (eval/tasks/*.yaml); overrides --eval")
     sim.add_argument("--seed", type=int, default=0)
+    sim.add_argument("--ledger", default="outputs/runtime/operations.sqlite3", help="durable ledger for interactive mode")
     sim.add_argument("--record", action="store_true", help="record episodes to outputs/episodes (EPISODES_DIR)")
     sim.add_argument("--snapshot", default="", help="save a scene PNG to this path on exit")
     sim.add_argument("--remote", default="", metavar="ADDR", help="drive a serve-control process instead of a local sim")
@@ -83,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     console.add_argument("--host", default="127.0.0.1")
     console.add_argument("--port", type=int, default=8390)
     console.add_argument("--seed", type=int, default=0)
+    console.add_argument("--ledger", default="outputs/runtime/operations.sqlite3")
 
     sc = sub.add_parser("serve-control", help="realtime-control process (gRPC ControlService)")
     sc.add_argument("--port", type=int, default=8391)
@@ -90,6 +92,12 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--require-supervisor", action="store_true",
                     help="halt unless the safety guardian holds SupervisorLink (production topology)")
     sc.add_argument("--mock", action="store_true", help="serve mock skills instead of the sim (no mujoco)")
+    sc.add_argument("--ledger", default="outputs/runtime/operations.sqlite3")
+
+    operation = sub.add_parser("operation", help="query or request cancellation of an existing remote operation")
+    operation.add_argument("--remote", required=True)
+    operation.add_argument("--id", required=True)
+    operation.add_argument("--cancel", action="store_true")
 
     sg = sub.add_parser("serve-guardian", help="safety-guardian process (gRPC SafetyService)")
     sg.add_argument("--port", type=int, default=8392)
@@ -112,6 +120,8 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_serve_control(args))
     if args.cmd == "serve-guardian":
         return asyncio.run(_serve_guardian(args))
+    if args.cmd == "operation":
+        return asyncio.run(_operation(args))
     parser.error(f"unknown command {args.cmd!r}")
     return 2
 
@@ -209,10 +219,12 @@ async def _serve_control(args: argparse.Namespace) -> int:
     import logging
 
     from embodied.control.service import ControlState, serve, watchdog_loop
+    from embodied.runtime.operations import OperationLedger
     from embodied.skills.registry import SkillRegistry
 
     logging.basicConfig(level=logging.INFO)
-    registry = SkillRegistry()
+    registry = SkillRegistry(ledger=OperationLedger(args.ledger),
+                             robot_id="mock" if args.mock else "sim.mujoco.so_arm100")
     sim = None
     if args.mock:
         from embodied.skills.builtin.mock import register_builtin
@@ -233,7 +245,26 @@ async def _serve_control(args: argparse.Namespace) -> int:
         await server.wait_for_termination()
     finally:
         wd.cancel()
+        registry.cancel_all()
+        await server.stop(None)
+        registry.close()
     return 0
+
+
+async def _operation(args: argparse.Namespace) -> int:
+    import json
+
+    import grpc
+    from google.protobuf.json_format import MessageToDict
+
+    from embodied.skills.remote import RemoteSkillRegistry
+
+    async with grpc.aio.insecure_channel(args.remote) as channel:
+        registry = RemoteSkillRegistry(channel)
+        action = registry.cancel_operation if args.cancel else registry.get_operation
+        result = await action(args.id)
+        print(json.dumps(MessageToDict(result, preserving_proto_field_name=True), ensure_ascii=False, indent=2))
+        return 0 if result.found else 1
 
 
 async def _serve_guardian(args: argparse.Namespace) -> int:
@@ -339,13 +370,15 @@ def _register_skills(registry: Any, sim: Any, *, pick_policy: str = "", place_po
 async def _sim(args: argparse.Namespace) -> int:
     from embodied.cognition.offline import SIM_PLAN_RULES
     from embodied.control.drivers.mujoco_sim import TabletopSim
+    from embodied.runtime.operations import OperationLedger
     from embodied.skills.registry import SkillRegistry
 
     if args.remote:
         return await _sim_remote(args)
 
     sim = _wrap_perception(TabletopSim(seed=int(args.seed)), str(args.perception))
-    registry = SkillRegistry()
+    ledger = OperationLedger() if args.task or args.eval > 0 else OperationLedger(args.ledger)
+    registry = SkillRegistry(ledger=ledger, robot_id=sim.spec().embodiment_id)
     _register_skills(registry, sim, pick_policy=str(args.pick_policy), place_policy=str(args.place_policy))
 
     code: int
@@ -367,6 +400,7 @@ async def _sim(args: argparse.Namespace) -> int:
             Image.fromarray(sim.render("side")).save(args.snapshot)
             print(f"snapshot -> {args.snapshot}")
     finally:
+        registry.close()
         close = getattr(sim, "close", None)
         if callable(close):
             close()
@@ -514,11 +548,12 @@ def _console(args: argparse.Namespace) -> int:
         build_asr_provider,
         build_tts_stream_provider,
     )
+    from embodied.runtime.operations import OperationLedger
     from embodied.skills.registry import SkillRegistry
     from embodied.skills.scripted.manip import register_sim_skills
 
     sim = TabletopSim(seed=int(args.seed))
-    registry = SkillRegistry()
+    registry = SkillRegistry(ledger=OperationLedger(args.ledger), robot_id=sim.spec().embodiment_id)
     register_sim_skills(registry, sim)
 
     def make_engine(confirm):
@@ -531,7 +566,10 @@ def _console(args: argparse.Namespace) -> int:
     # the console always speaks, so fall back to the silent mock.
     tts = build_tts_stream_provider() or MockStreamingTTSProvider()
     ctx = AppContext(sim, registry, make_engine, asr, tts)
-    run_console(ctx, host=str(args.host), port=int(args.port))
+    try:
+        run_console(ctx, host=str(args.host), port=int(args.port))
+    finally:
+        registry.close()
     return 0
 
 

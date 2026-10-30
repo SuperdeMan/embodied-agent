@@ -15,6 +15,10 @@ service ControlService {
   // 执行一个技能并持续返回进度，直至终态。
   // Execute one skill; server streams progress until a terminal phase.
   rpc InvokeSkill(SkillCommand) returns (stream SkillEvent);
+  // 查询持久调用结果，不重复执行。 / Query durable call state without executing again.
+  rpc GetOperation(OperationRequest) returns (OperationReply);
+  // 请求取消不等于停止已观测。 / Cancellation acceptance is not observed physical stopping.
+  rpc CancelOperation(OperationRequest) returns (OperationReply);
   rpc StreamState(StateRequest) returns (stream embodied.common.v1.RobotState);
   // 停止闩锁急停状态，仅显式重置释放。
   // Halt latches the estop state; only an explicit Reset releases it.
@@ -52,6 +56,25 @@ message SkillCommand {
   string params_json = 3; // 执行前按技能声明校验 / validated against the skill manifest before execution
   bool confirmed = 4;     // 危险技能需为真，下游再次校验 / require_confirm skills must carry true (re-checked downstream)
   string trace_id = 5;
+  string task_id = 6;
+  string operation_id = 7;
+  uint32 plan_revision = 8;
+  string api_version = 9;
+}
+
+message OperationRequest {
+  string operation_id = 1;
+}
+
+message OperationReply {
+  bool found = 1;
+  string operation_id = 2;
+  string attempt_id = 3;
+  string state = 4;
+  string stop_state = 5;
+  string result_json = 6;
+  string boot_id = 7;
+  uint64 lease_epoch = 8;
 }
 
 message SkillEvent {
@@ -69,6 +92,10 @@ message SkillEvent {
   embodied.common.v1.RobotState state = 4;
   embodied.common.v1.Error error = 5;
   string data_json = 6; // 终态结构化结果供上游参数引用 / SkillResult.data on terminal events (param_refs need it upstream)
+  string operation_id = 7;
+  string attempt_id = 8;
+  string invocation_state = 9;
+  string stop_state = 10;
 }
 
 message StateRequest {

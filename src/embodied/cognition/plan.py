@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from uuid import uuid4
 
 
 class StepStatus(str, Enum):
@@ -50,6 +51,7 @@ class Step:
     # manifest.verification; empty = don't verify). Consumed by cognition/verify.py.
     verification: dict = field(default_factory=dict)
     status: StepStatus = StepStatus.PENDING
+    operation_id: str = ""
 
 
 @dataclass
@@ -64,6 +66,10 @@ class StepResult:
     # Side-effect dedup fingerprint (M2 P2 discipline from origin): set on OK results and on
     # timeouts (timeout ≠ didn't happen — never blindly re-issue the same action in-turn).
     fingerprint: str = ""
+    operation_id: str = ""
+    attempt_id: str = ""
+    invocation_state: str = ""
+    stop_state: str = ""
 
 
 @dataclass
@@ -102,6 +108,8 @@ class PlanContext:
     trace_id: str = ""
     session_id: str = ""
     raw_text: str = ""
+    task_id: str = field(default_factory=lambda: uuid4().hex)
+    plan_revision: int = 1
 
 
 class CyclicPlan(Exception):

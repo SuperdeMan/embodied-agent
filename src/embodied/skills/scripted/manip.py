@@ -40,6 +40,7 @@ DROP_Z = 0.09
 
 HOME = SkillManifest(
     name="skill.arm.home",
+    resources=["arm", "gripper", "workspace"],
     description="Move the arm to its home rest pose.",
     effects=["arm at home pose"],
     scopes=["arm.home"],
@@ -48,6 +49,7 @@ HOME = SkillManifest(
 
 PICK = SkillManifest(
     name="skill.manip.pick",
+    resources=["arm", "gripper", "workspace"],
     description="Pick up a named object from the table with a top grasp.",
     params={"object": ParamSpec(type="string", description="object id, e.g. obj_cube", required=False, default="obj_cube")},
     preconditions=["object visible on table", "gripper empty"],
@@ -64,6 +66,7 @@ PICK = SkillManifest(
 
 PLACE = SkillManifest(
     name="skill.manip.place",
+    resources=["arm", "gripper", "workspace"],
     description="Place the currently held object into a named region (e.g. the bin).",
     params={"region": ParamSpec(type="string", description="target region id", required=False, default="bin_region")},
     preconditions=["an object is grasped"],

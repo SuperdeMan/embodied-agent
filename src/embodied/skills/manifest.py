@@ -107,6 +107,14 @@ class SkillManifest(BaseModel):
     safety: SafetySpec = Field(default_factory=SafetySpec)
     require_confirm: bool = False
     impl: Literal["scripted", "policy"] = "scripted"
+    resources: list[str] = Field(default_factory=list)
+
+    @field_validator("resources")
+    @classmethod
+    def _check_resources(cls, values: list[str]) -> list[str]:
+        if len(set(values)) != len(values) or any(not re.fullmatch(r"[a-z][a-z0-9_.:-]*", v) for v in values):
+            raise ValueError("resources must be distinct nonempty resource identifiers")
+        return values
     # 技能所需权限范围声明。
     # Permission scopes the skill needs (enforced by the executor from M1 on).
     scopes: list[str] = Field(default_factory=list)

@@ -83,3 +83,41 @@ async def test_replanning_passes_prior_results_to_executor():
     result = await PlannerEngine(Provider(), registry).turn("task")
     assert result.replans > 0
     assert calls == ["action"]
+
+
+async def test_disabling_verifier_cannot_release_required_effect(monkeypatch):
+    monkeypatch.setenv("VERIFY_OUTCOME", "off")
+    calls = []
+
+    async def action():
+        calls.append(1)
+        return SkillResult(ok=True, data={"object": "cube"})
+
+    registry = SkillRegistry()
+    registry.register(SkillManifest(name="skill.test.act", description="act"), action)
+    plan = Plan(steps=[
+        Step(id="a", skill="skill.test.act", verification={"mode": "schema", "expect": {"data_keys": ["object"]}}),
+        Step(id="b", skill="skill.test.act", depends_on=["a"]),
+    ])
+    results = [r async for r in DagExecutor(registry).run(plan, PlanContext())]
+    assert calls == [1]
+    assert results[0].data["_verify"]["verdict"] == "unknown"
+    assert results[1].status == StepStatus.SKIPPED
+
+
+async def test_explicit_operation_ids_allow_intentional_repeated_action():
+    calls = []
+
+    async def action():
+        calls.append(1)
+        return SkillResult(ok=True)
+
+    registry = SkillRegistry()
+    registry.register(SkillManifest(name="skill.test.act", description="act"), action)
+    plan = Plan(steps=[
+        Step(id="a", skill="skill.test.act", operation_id="first"),
+        Step(id="b", skill="skill.test.act", operation_id="second", depends_on=["a"]),
+    ])
+    results = [r async for r in DagExecutor(registry).run(plan, PlanContext())]
+    assert calls == [1, 1]
+    assert [r.operation_id for r in results] == ["first", "second"]

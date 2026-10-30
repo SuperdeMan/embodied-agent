@@ -114,6 +114,7 @@ class PlannerEngine:
         current: Plan | None = plan
 
         while current is not None:
+            ctx.plan_revision = replans + 1
             async for sr in self.executor.run(current, ctx, done={r.step_id: r for r in results}):
                 results.append(sr)
                 observations.append(summarize(sr))

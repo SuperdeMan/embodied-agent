@@ -14,14 +14,15 @@ import threading
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Iterator
+from typing import Callable, Iterator
 
 
 class InvocationPermit:
-    def __init__(self, timeout_s: float):
+    def __init__(self, timeout_s: float, authority: Callable[[], bool] | None = None):
         self.deadline = time.monotonic() + timeout_s
         self._lock = threading.RLock()
         self._revoked = False
+        self._authority = authority
 
     def revoke(self) -> None:
         # 同步覆盖实际设备写入，不只做事前检查。
@@ -32,7 +33,10 @@ class InvocationPermit:
     @contextmanager
     def access(self) -> Iterator[bool]:
         with self._lock:
-            yield not self._revoked and time.monotonic() < self.deadline
+            yield (
+                not self._revoked and time.monotonic() < self.deadline
+                and (self._authority is None or self._authority())
+            )
 
 
 CURRENT_INVOCATION: ContextVar[InvocationPermit | None] = ContextVar("invocation_permit", default=None)

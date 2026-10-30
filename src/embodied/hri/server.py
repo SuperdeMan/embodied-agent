@@ -175,6 +175,8 @@ class ConsoleSession:
                     "type": "step", "step_id": r.step_id,
                     "skill": plan_step.skill if plan_step else "",
                     "status": r.status.value, "detail": r.detail or r.error,
+                    "operation_id": r.operation_id, "attempt_id": r.attempt_id,
+                    "invocation_state": r.invocation_state, "stop_state": r.stop_state,
                 })
             await self.send({"type": "reply", "text": turn.text})
             await self._speak(turn.text)

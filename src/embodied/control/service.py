@@ -20,6 +20,7 @@ from typing import Any
 
 import grpc
 
+from embodied.contracts.operation import OperationIdentity
 from embodied.runtime.rpcgen import import_common, import_control
 from embodied.skills.registry import ConfirmationRequired, SkillRegistry
 
@@ -44,6 +45,7 @@ class ControlState:
             logger.warning("HALT latched: %s", reason)
         self.halted = True
         self.halt_reason = reason
+        self.registry.cancel_all()
         if self.sim is not None and hasattr(self.sim, "guard"):
             # 驱动层同时拒绝进行中的写入。
             self.sim.guard.estop(reason)  # deny in-flight writes at the driver path too
@@ -66,6 +68,22 @@ def build_servicer(state: ControlState):
     common = import_common()
 
     class Servicer(pb2_grpc.ControlServiceServicer):
+        def _operation_reply(self, record):
+            if record is None:
+                return pb2.OperationReply(found=False)
+            return pb2.OperationReply(
+                found=True, operation_id=record.operation_id, attempt_id=record.attempt_id,
+                state=record.state, stop_state=record.stop_state, boot_id=record.boot_id,
+                lease_epoch=record.lease_epoch,
+                result_json=json.dumps(record.result, ensure_ascii=False, allow_nan=False) if record.result else "",
+            )
+
+        async def GetOperation(self, request, context):
+            return self._operation_reply(state.registry.get_operation(request.operation_id))
+
+        async def CancelOperation(self, request, context):
+            return self._operation_reply(state.registry.cancel_operation(request.operation_id))
+
         async def ListSkills(self, request, context):
             reply = pb2.ListSkillsReply()
             for m in state.registry.catalog():
@@ -73,8 +91,14 @@ def build_servicer(state: ControlState):
             return reply
 
         async def InvokeSkill(self, request, context):
-            def ev(phase, detail="", error_code="", data=None):
+            def ev(phase, detail="", error_code="", data=None, result=None):
                 e = pb2.SkillEvent(command_id=request.command_id, phase=phase, detail=detail)
+                e.operation_id = request.operation_id or request.command_id
+                if result is not None:
+                    e.operation_id = result.operation_id or e.operation_id
+                    e.attempt_id = result.attempt_id
+                    e.invocation_state = result.invocation_state
+                    e.stop_state = result.stop_state
                 if error_code:
                     e.error.code = error_code
                     e.error.message = detail
@@ -91,14 +115,32 @@ def build_servicer(state: ControlState):
                 return
             try:
                 params = json.loads(request.params_json) if request.params_json else {}
-            except json.JSONDecodeError:
-                yield ev(pb2.SkillEvent.FAILED, "bad params_json", "bad_request")
+                identity = OperationIdentity(
+                    api_version=request.api_version or "embodied.dev/v1alpha1",
+                    task_id=request.task_id or request.command_id,
+                    operation_id=request.operation_id or request.command_id,
+                    plan_revision=request.plan_revision or 1,
+                )
+            except (ValueError, TypeError):
+                yield ev(pb2.SkillEvent.FAILED, "bad params or operation identity", "bad_request")
                 return
             yield ev(pb2.SkillEvent.ACCEPTED)
             try:
-                result = await state.registry.invoke(
-                    request.skill, params, confirmed=bool(request.confirmed)
-                )
+                # 独立任务承载调用取消，保留 RPC 协程发送终态。 / Cancel the invocation task while keeping RPC alive to report its terminal state.
+                invocation = asyncio.create_task(state.registry.invoke(
+                    request.skill, params, confirmed=bool(request.confirmed), operation=identity,
+                ))
+                result = await invocation
+            except asyncio.CancelledError:
+                if context.cancelled():
+                    raise
+                record = state.registry.get_operation(identity.operation_id)
+                if record is None:
+                    raise
+                result = state.registry._from_record(record)
+                yield ev(pb2.SkillEvent.HALTED if state.halted else pb2.SkillEvent.FAILED,
+                         "cancel requested; physical stop unconfirmed", "outcome_unknown", result.data, result)
+                return
             except ConfirmationRequired:
                 yield ev(pb2.SkillEvent.FAILED, "confirmation required", "need_confirm")
                 return
@@ -107,10 +149,11 @@ def build_servicer(state: ControlState):
                 return
             # 停止与运动竞争时如实报告停止。
             if state.halted:  # halt raced the motion: report honestly
-                yield ev(pb2.SkillEvent.HALTED, f"halted during execution: {state.halt_reason}", "halted")
+                yield ev(pb2.SkillEvent.HALTED, f"halted during execution: {state.halt_reason}", "halted",
+                         result.data, result)
                 return
             phase = pb2.SkillEvent.SUCCEEDED if result.ok else pb2.SkillEvent.FAILED
-            yield ev(phase, result.detail, "" if result.ok else "skill_failed", data=result.data)
+            yield ev(phase, result.detail, "" if result.ok else "skill_failed", data=result.data, result=result)
 
         async def StreamState(self, request, context):
             interval = max(0.02, float(request.min_interval_ms or 100) / 1000.0)

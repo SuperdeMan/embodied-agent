@@ -23,9 +23,11 @@ import os
 import re
 from collections import defaultdict
 from typing import Any, AsyncIterator, Awaitable, Callable
+from uuid import NAMESPACE_URL, uuid5
 
 from embodied.cognition import verify as _verify
 from embodied.cognition.plan import CyclicPlan, Plan, PlanContext, Step, StepResult, StepStatus
+from embodied.contracts.operation import OperationIdentity
 from embodied.skills.registry import SkillRegistry, SkillResult
 
 logger = logging.getLogger("cognition.executor")
@@ -105,7 +107,8 @@ class DagExecutor:
         self._resolve_param_refs(step, done)
 
         fingerprint = self._fingerprint(step)
-        prior = self._find_duplicate(fingerprint, done)
+        # 显式操作身份允许合法重复；旧计划保留保守指纹策略。 / Explicit operation IDs permit repeats; legacy plans retain conservative fingerprints.
+        prior = None if step.operation_id else self._find_duplicate(fingerprint, done)
         if prior is not None:
             return self._replay_prior(step, prior)
 
@@ -128,27 +131,38 @@ class DagExecutor:
                     error="confirm_denied", detail="user denied confirmation",
                 )
 
-        result = await self._invoke_once(step, confirmed)
+        identity = OperationIdentity(
+            task_id=ctx.task_id, operation_id=step.operation_id or uuid5(NAMESPACE_URL, f"{ctx.task_id}:{step.id}").hex,
+            plan_revision=ctx.plan_revision,
+        )
+        result = await self._invoke_once(step, confirmed, operation=identity)
         result = await self._verify_outcome(step, result)
         if result.status == StepStatus.OK:
             result.fingerprint = fingerprint
-        elif result.status == StepStatus.FAILED and result.error == "step_timeout":
+        elif result.status == StepStatus.FAILED and (
+            result.error == "step_timeout" or result.invocation_state in {"RUNNING", "OUTCOME_UNKNOWN"}
+        ):
             # 超时也保留指纹，因为动作可能已发生；重规划不得盲目重复执行。
             # Timeout also fingerprints: the motion may have completed with the response lost;
             # a replan re-issuing the same action must not re-execute it blindly.
             result.fingerprint = fingerprint
         return result
 
-    async def _invoke_once(self, step: Step, confirmed: bool) -> StepResult:
+    async def _invoke_once(
+        self, step: Step, confirmed: bool, *, operation: OperationIdentity | None = None,
+    ) -> StepResult:
         try:
-            r: SkillResult = await self._registry.invoke(step.skill, dict(step.params), confirmed=confirmed)
+            r: SkillResult = await self._registry.invoke(
+                step.skill, dict(step.params), confirmed=confirmed, operation=operation,
+            )
         except Exception as e:
             return StepResult(step_id=step.id, status=StepStatus.FAILED, error=f"{type(e).__name__}: {e}")
+        metadata = {key: getattr(r, key) for key in ("operation_id", "attempt_id", "invocation_state", "stop_state")}
         if r.ok:
-            return StepResult(step_id=step.id, status=StepStatus.OK, detail=r.detail, data=dict(r.data))
+            return StepResult(step_id=step.id, status=StepStatus.OK, detail=r.detail, data=dict(r.data), **metadata)
         error = "step_timeout" if r.detail.startswith("timeout") else (r.detail or "skill_failed")
         return StepResult(
-            step_id=step.id, status=StepStatus.FAILED, detail=r.detail, data=dict(r.data), error=error
+            step_id=step.id, status=StepStatus.FAILED, detail=r.detail, data=dict(r.data), error=error, **metadata,
         )
 
     # 效果验证。
@@ -164,7 +178,10 @@ class DagExecutor:
         成功调用按 manifest 期望验证；允许时对 UNSAT 重试一次，需确认动作永不重试。报告模式保留调用状态并附效果证据；传输不确定只补充状态证据，不翻转调用结果。
         """
         verification = step.verification or {}
-        if not verification.get("mode") or not _verify.enabled():
+        if not verification.get("mode"):
+            return result
+        if not _verify.enabled():
+            result.data["_verify"] = {"verdict": _verify.UNKNOWN, "reason": "verification_disabled"}
             return result
         if result.status != StepStatus.OK:
             return await self._verify_uncertain(step, result)
@@ -173,6 +190,7 @@ class DagExecutor:
         verdict = await self._evaluate(step, result)
         while (
             verdict == _verify.UNSAT
+            and not self._registry.get(step.skill).resources
             and _verify.retry_allowed(verification, step.require_confirm, attempts)
         ):
             attempts += 1
@@ -246,26 +264,34 @@ class DagExecutor:
                 continue
             if prior.status == StepStatus.OK:
                 return prior
-            if prior.status == StepStatus.FAILED and prior.error == "step_timeout":
+            if prior.status == StepStatus.FAILED and (
+                prior.error == "step_timeout" or prior.invocation_state in {"RUNNING", "OUTCOME_UNKNOWN"}
+            ):
                 return prior
         return None
 
     @staticmethod
     def _replay_prior(step: Step, prior: StepResult) -> StepResult:
-        timed_out = prior.status == StepStatus.FAILED and prior.error == "step_timeout"
+        timed_out = prior.status == StepStatus.FAILED and (
+            prior.error == "step_timeout" or prior.invocation_state in {"RUNNING", "OUTCOME_UNKNOWN"}
+        )
         logger.info(
             "step %s(%s): duplicate suppressed (fingerprint=%s%s)",
             step.id, step.skill, prior.fingerprint, ", prior=timeout" if timed_out else "",
         )
         if timed_out:
             return StepResult(
-                step_id=step.id, status=StepStatus.FAILED, error="step_timeout",
-                detail="prior identical action timed out; NOT re-executed — verify state before retrying",
+                step_id=step.id, status=StepStatus.FAILED, error=prior.error,
+                detail="prior identical action has uncertain outcome; NOT re-executed — reconcile before retrying",
                 fingerprint=prior.fingerprint, data=dict(prior.data or {}),
+                operation_id=prior.operation_id, attempt_id=prior.attempt_id,
+                invocation_state=prior.invocation_state, stop_state=prior.stop_state,
             )
         return StepResult(
             step_id=step.id, status=StepStatus.OK, detail=prior.detail,
             data=dict(prior.data or {}), fingerprint=prior.fingerprint,
+            operation_id=prior.operation_id, attempt_id=prior.attempt_id,
+            invocation_state=prior.invocation_state, stop_state=prior.stop_state,
         )
 
     # 参数引用解析。
