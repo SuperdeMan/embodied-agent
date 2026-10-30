@@ -10,6 +10,8 @@
 
 云端仿真参考入口已按用户授权激活：应用 `212f912`、私网 HTTPS 8449，当前为离线规划/模拟音频。准确配置、运行证据与升级接线见 `docs/cloud-deployment.md`；Git 主线前进不等于云端已更新。
 
+开发主线 D021 已补确认式仿真停止与隔离释放（`docs/stop-reconciliation.md`），仅适用于身份/profile 匹配且带线程跟踪元数据的操作。原 UNKNOWN 目标不因停止变成成功；旧版无元数据记录不靠猜测放行。P1 下一优先是统一遥操作与 ActionEnvelope。
+
 ## 目录结构
 
 完整结构定义与理由见 `docs/architecture.md` §10，本节只列约定要点：
