@@ -45,6 +45,10 @@ class ResourceArbiter:
                 self._owners.get(name) == lease for name in lease.resources
             )
 
+    def idle(self, resources: tuple[str, ...]) -> bool:
+        with self._lock:
+            return not any(name in self._owners for name in resources)
+
     def release(self, lease: Lease) -> None:
         with self._lock:
             if lease.owner in self._quarantined:

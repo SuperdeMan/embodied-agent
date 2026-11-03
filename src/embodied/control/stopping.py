@@ -106,6 +106,7 @@ class SimStopController:
             if sim._stop_fence and self._owner != request.operation_id:
                 raise StopRejected("other_stop_reconciliation_pending")
             sim._stop_fence = request.nonce
+            sim.action_controller.invalidate()
             self._owner = request.operation_id
             self._issued = None
             initial = self._sample()

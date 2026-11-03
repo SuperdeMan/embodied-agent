@@ -19,7 +19,9 @@ from uuid import uuid4
 import mujoco
 import numpy as np
 
+from embodied.contracts.action import ActionEnvelope, ControlObservationRef
 from embodied.control import kinematics
+from embodied.control.actions import ActionAuthority, ActionRejected
 from embodied.control.hal import (
     ActionCommand,
     EmbodimentSpec,
@@ -29,7 +31,7 @@ from embodied.control.hal import (
     WriteResult,
 )
 from embodied.control.simassets import stage_tabletop
-from embodied.runtime.invocation import invocation_access
+from embodied.runtime.invocation import CURRENT_INVOCATION, invocation_access
 from embodied.safety.guard import Guard, GuardEvent, GuardLimits
 
 ARM_JOINTS = ("Rotation", "Pitch", "Elbow", "Wrist_Pitch", "Wrist_Roll")
@@ -74,6 +76,7 @@ class TabletopSim:
         self._state_lock = threading.RLock()
         self._stop_fence: str | None = None
         self._stop_controller = None
+        self._action_controller = None
         scene = stage_tabletop()
         self._scene_path = scene
         self.model = mujoco.MjModel.from_xml_path(str(scene))
@@ -144,7 +147,7 @@ class TabletopSim:
         return EmbodimentSpec(embodiment_id="sim.mujoco.so_arm100", joints=joints, gripper_joint=jaw)
 
     @_state_locked
-    def read(self) -> Observation:
+    def _read_state(self) -> Observation:
         d = self.data
         qpos = tuple(float(v) for v in d.qpos[self._qpos_idx])
         qvel = tuple(float(v) for v in d.qvel[self._dof_idx])
@@ -166,17 +169,36 @@ class TabletopSim:
         )
 
     @_state_locked
+    def read(self) -> Observation:
+        observation = self._read_state()
+        observation.reference = self.action_controller.observe(observation.t)
+        return observation
+
+    @_state_locked
+    def read_control_feedback(self) -> Observation:
+        observation = self.read()
+        observation.objects = {}
+        observation.extras = {}
+        return observation
+
+    @_state_locked
     def read_reference_state(self) -> tuple[str, Observation]:
         return self.state_epoch, self.read()
 
     @_state_locked
     def write(self, cmd: ActionCommand) -> WriteResult:
+        if self.action_controller.runtime is not None:
+            try:
+                envelope = cmd.envelope or self.prepare_action(cmd)
+                return self.write_envelope(envelope)
+            except (ActionRejected, ValueError) as exc:
+                return self.reject_action(str(exc))
         if self._stop_fence:
             return WriteResult(applied=False, reason="stop_reconciliation_pending")
         with invocation_access() as allowed:
             if not allowed:
                 return WriteResult(applied=False, reason="invocation_revoked_or_expired")
-            applied, result = self.guard.gate(cmd, self.read())
+            applied, result = self.guard.gate(cmd, self._read_state())
             if applied is None:
                 return result
             self.data.ctrl[self._act_ids] = np.asarray(applied.joint_targets)
@@ -186,12 +208,51 @@ class TabletopSim:
             return result
 
     @_state_locked
-    def step(self, n: int = 1) -> None:
+    def prepare_action(self, cmd: ActionCommand, reference: ControlObservationRef | None = None) -> ActionEnvelope:
+        return self.action_controller.make(cmd, reference)
+
+    @_state_locked
+    def reject_action(self, reason: str) -> WriteResult:
+        permit = CURRENT_INVOCATION.get()
+        if permit is not None:
+            permit.reject(reason)
+        return WriteResult(applied=False, reason=reason)
+
+    @_state_locked
+    def write_envelope(self, envelope: ActionEnvelope) -> WriteResult:
         if self._stop_fence:
+            return self.reject_action("stop_reconciliation_pending")
+        with invocation_access() as allowed:
+            if not allowed:
+                return self.reject_action("invocation_revoked_or_expired")
+            try:
+                envelope = self.action_controller.validate(envelope, CURRENT_INVOCATION.get())
+            except (ActionRejected, ValueError) as exc:
+                return self.reject_action(str(exc))
+            cmd = ActionCommand(joint_targets=envelope.joint_targets, gripper=envelope.gripper, source=envelope.source)
+            applied, result = self.guard.gate(cmd, self._read_state())
+            if applied is None:
+                return self.reject_action(result.reason)
+            self.data.ctrl[self._act_ids] = np.asarray(applied.joint_targets)
+            if applied.gripper is not None:
+                self.data.ctrl[self._jaw_act] = JAW_CLOSED_Q + applied.gripper * (JAW_OPEN_Q - JAW_CLOSED_Q)
+            applied.envelope = envelope
+            CURRENT_INVOCATION.get().action_deadline = envelope.valid_until_monotonic
+            self._last_cmd = applied
+            return result
+
+    @_state_locked
+    def step(self, n: int = 1) -> None:
+        if self._stop_fence or self.guard.halted:
+            permit = CURRENT_INVOCATION.get()
+            if permit is not None:
+                permit.reject("controller_halted_or_fenced")
             return
         for _ in range(n):
             with invocation_access() as allowed:
                 if not allowed:
+                    return
+                if self.action_controller.runtime is not None and not self.action_controller.can_step(CURRENT_INVOCATION.get()):
                     return
                 mujoco.mj_step(self.model, self.data)
         if self._on_step is not None:
@@ -201,6 +262,9 @@ class TabletopSim:
     def reset(self, *, randomize: bool = False) -> Observation:
         if self._stop_fence:
             raise RuntimeError("stop_reconciliation_pending")
+        if self._action_controller is not None:
+            self._action_controller.require_idle()
+            self._action_controller.invalidate()
         self.state_epoch = uuid4().hex
         # 上游 home 关键帧没有新增物体自由关节；仅对机械臂和夹爪应用关键帧，物体使用生成位姿，避免零填充导致传送到基座。
         # The upstream "home" keyframe predates our scene objects (MuJoCo zero-pads the
@@ -238,6 +302,13 @@ class TabletopSim:
             self._stop_controller = SimStopController(self)
         return self._stop_controller
 
+    @property
+    def action_controller(self):
+        if self._action_controller is None:
+            self._action_controller = ActionAuthority(self)
+        return self._action_controller
+
+    @_state_locked
     def set_hooks(
         self,
         on_step: StepHook | None = None,

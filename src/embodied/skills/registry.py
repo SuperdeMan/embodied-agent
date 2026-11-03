@@ -14,7 +14,9 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import threading
 import time
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass, field
 from typing import Any, Awaitable, Callable
 from uuid import uuid4
@@ -63,6 +65,13 @@ class SkillResult:
 SkillHandler = Callable[..., Awaitable[SkillResult]]
 
 
+@dataclass
+class _Dispatch:
+    record: OperationRecord
+    permit: InvocationPermit
+    lease: Lease
+
+
 class SkillRegistry:
     def __init__(self, *, ledger: OperationLedger | None = None, robot_id: str = "reference") -> None:
         self._skills: dict[str, tuple[SkillManifest, SkillHandler]] = {}
@@ -76,6 +85,25 @@ class SkillRegistry:
         self._stop_controller = None
         self._stop_lock = asyncio.Lock()
         self._stop_inflight: asyncio.Task | None = None
+        self._execution_controller = None
+        self._closed = False
+        self._thread_id = threading.get_ident()
+
+    def check_thread(self) -> None:
+        if threading.get_ident() != self._thread_id:
+            raise SkillError("runtime admission must run on its owner thread")
+
+    def configure_execution_controller(self, controller) -> None:
+        self.check_thread()
+        if self._execution_controller is not None and self._execution_controller is not controller:
+            raise SkillError("runtime already bound to another controller")
+        with controller.admission():
+            if self.robot_id == "reference" and not self.ledger.has_operations():
+                self.robot_id = controller.profile.robot_id
+            if self.robot_id != controller.profile.robot_id:
+                raise SkillError("controller robot identity mismatch")
+            controller.bind(self)
+            self._execution_controller = controller
 
     def register(self, manifest: SkillManifest, handler: SkillHandler, *, tracked_workers: bool = False) -> None:
         if manifest.name in self._skills:
@@ -121,59 +149,118 @@ class SkillRegistry:
             manifest, handler = self._skills[name]
         except KeyError:
             raise SkillNotFound(name) from None
+        merged = self._parameters(manifest, params, confirmed)
+        with self._dispatch(manifest, merged, operation, "skill", name in self._tracked_skills) as dispatch:
+            if isinstance(dispatch, SkillResult):
+                return dispatch
+            result = await self._execute(manifest, handler, merged, dispatch.permit)
+            return self._finish(dispatch, result)
+
+    def invoke_operator(self, manifest: SkillManifest, handler, params: dict | None = None, *,
+                        operation: OperationIdentity | None = None, confirmed: bool = False) -> SkillResult:
+        """Synchronous operator admission, excluded from the model catalog.
+
+        同步操作员准入，不加入模型工具目录。
+        """
+        merged = self._parameters(manifest, params, confirmed)
+        with self._dispatch(manifest, merged, operation, "teleop", True) as dispatch:
+            if isinstance(dispatch, SkillResult):
+                return dispatch
+            binding = CURRENT_INVOCATION.set(dispatch.permit)
+            try:
+                result = handler(**merged)
+                with dispatch.permit.access() as allowed:
+                    if not allowed:
+                        result = SkillResult(ok=False, detail=dispatch.permit.rejection_reason or "operator timeout",
+                                             data={"_execution": {"outcome": "OUTCOME_UNKNOWN"}})
+                return self._finish(dispatch, result)
+            finally:
+                CURRENT_INVOCATION.reset(binding)
+
+    def _parameters(self, manifest, params, confirmed):
+        self.check_thread()
+        if self._closed:
+            raise SkillError("runtime is closed")
         if manifest.require_confirm and confirmed is not True:
-            raise ConfirmationRequired(name)
-        merged = self._validate_params(manifest, {} if params is None else params)
+            raise ConfirmationRequired(manifest.name)
+        return self._validate_params(manifest, {} if params is None else params)
+
+    @contextmanager
+    def _dispatch(self, manifest, params, operation, source, tracked):
         identity = operation or OperationIdentity.fresh()
-        digest = request_digest(name, merged, manifest.model_dump(mode="json"), self.robot_id)
-        previous = self.ledger.lookup(identity, digest)
-        if previous:
-            return self._from_record(previous)
+        controller = self._execution_controller
+        with controller.admission() if controller is not None else nullcontext():
+            declaration = manifest.model_dump(mode="json")
+            if source != "skill":
+                declaration["execution_source"] = source
+            digest = request_digest(manifest.name, params, declaration, self.robot_id)
+            previous = self.ledger.lookup(identity, digest)
+            if previous:
+                outcome = self._from_record(previous)
+            else:
+                try:
+                    lease = self.arbiter.acquire(identity.operation_id, self.ledger.next_epoch(), manifest.resources)
+                except ResourceBusy as exc:
+                    outcome = SkillResult(ok=False, detail=str(exc), operation_id=identity.operation_id,
+                                          invocation_state="REJECTED")
+                else:
+                    try:
+                        stop = self._stop_controller
+                        context = {"tracked_workers": tracked, "stop_profile": None, "execution_source": source}
+                        if stop is not None and set(lease.resources) == set(stop.profile.resources):
+                            context["stop_profile"] = stop.profile.model_dump(mode="json")
+                        record = self.ledger.begin(identity, self.robot_id, manifest.name, digest,
+                                                   lease.resources, lease.epoch, stop_context=context)
+                    except BaseException:
+                        self.arbiter.release(lease)
+                        raise
+                    permit = InvocationPermit(manifest.termination.timeout_s, lambda: self.arbiter.valid(lease))
+                    permit.issuer = self
+                    permit.operation_id, permit.attempt_id = record.operation_id, record.attempt_id
+                    permit.runtime_boot_id, permit.lease_epoch = self.ledger.boot_id, lease.epoch
+                    permit.resources, permit.source = lease.resources, source
+                    if controller is not None:
+                        permit.scene_epoch, permit.control_epoch = controller.sim.state_epoch, controller.epoch
+                    self._stop_contexts[identity.operation_id] = permit
+                    try:
+                        task = asyncio.current_task()
+                    except RuntimeError:
+                        task = None
+                    self._active[identity.operation_id] = (task, permit, lease)
+                    outcome = _Dispatch(record, permit, lease)
+        if isinstance(outcome, SkillResult):
+            yield outcome
+            return
         try:
-            lease = self.arbiter.acquire(identity.operation_id, self.ledger.next_epoch(), manifest.resources)
-        except ResourceBusy as exc:
-            return SkillResult(ok=False, detail=str(exc), operation_id=identity.operation_id,
-                               invocation_state="REJECTED")
-        try:
-            controller = self._stop_controller
-            stop_context = {"tracked_workers": name in self._tracked_skills, "stop_profile": None}
-            if controller is not None and set(lease.resources) == set(controller.profile.resources):
-                stop_context["stop_profile"] = controller.profile.model_dump(mode="json")
-            record = self.ledger.begin(identity, self.robot_id, name, digest, lease.resources, lease.epoch,
-                                       stop_context=stop_context)
+            yield outcome
         except BaseException:
-            self.arbiter.release(lease)
-            raise
-        permit = InvocationPermit(manifest.termination.timeout_s, lambda: self.arbiter.valid(lease))
-        self._stop_contexts[identity.operation_id] = permit
-        self._active[identity.operation_id] = (asyncio.current_task(), permit, lease)
-        try:
-            result = await self._execute(manifest, handler, merged, permit)
-            unknown = result.data.get("_execution", {}).get("outcome") == "OUTCOME_UNKNOWN"
-            if not permit.drained:
-                if not unknown:
-                    result = SkillResult(ok=False, detail="handler exited before tracked work finished")
-                unknown = True
-            if unknown:
-                result.ok = False
-                result.data["_execution"] = {"outcome": "OUTCOME_UNKNOWN", "stop_state": "STOP_UNCONFIRMED"}
-            state = "OUTCOME_UNKNOWN" if unknown else "RETURNED" if result.ok else "FAILED"
-            stopped = "STOP_UNCONFIRMED" if unknown else "NOT_REQUESTED"
-            record = self.ledger.finish(identity.operation_id, state, asdict(result), stopped)
-            return self._from_record(record)
-        except BaseException:
-            permit.revoke()
-            self.arbiter.quarantine(lease)
+            outcome.permit.revoke()
+            self.arbiter.quarantine(outcome.lease)
             self.ledger.finish(identity.operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED")
             raise
         finally:
-            permit.revoke()
+            outcome.permit.revoke()
             self._active.pop(identity.operation_id, None)
-            if record.state in {"RETURNED", "FAILED"}:
+            if outcome.record.state in {"RETURNED", "FAILED"}:
                 self._stop_contexts.pop(identity.operation_id, None)
-                self.arbiter.release(lease)
+                self.arbiter.release(outcome.lease)
             else:
-                self.arbiter.quarantine(lease)
+                self.arbiter.quarantine(outcome.lease)
+
+    def _finish(self, dispatch, result):
+        permit = dispatch.permit
+        unknown = result.data.get("_execution", {}).get("outcome") == "OUTCOME_UNKNOWN"
+        if permit.rejection_reason or not permit.drained:
+            if not unknown:
+                result = SkillResult(ok=False, detail=permit.rejection_reason or "tracked work unfinished")
+            unknown = True
+        if unknown:
+            result.ok = False
+            result.data["_execution"] = {"outcome": "OUTCOME_UNKNOWN", "stop_state": "STOP_UNCONFIRMED"}
+        state = "OUTCOME_UNKNOWN" if unknown else "RETURNED" if result.ok else "FAILED"
+        dispatch.record = self.ledger.finish(dispatch.record.operation_id, state, asdict(result),
+                                             "STOP_UNCONFIRMED" if unknown else "NOT_REQUESTED")
+        return self._from_record(dispatch.record)
 
     @staticmethod
     def _from_record(record: OperationRecord) -> SkillResult:
@@ -196,6 +283,7 @@ class SkillRegistry:
         return self.ledger.get(operation_id)
 
     def cancel_operation(self, operation_id: str) -> OperationRecord | None:
+        self.check_thread()
         active = self._active.get(operation_id)
         if active:
             task, permit, lease = active
@@ -203,7 +291,8 @@ class SkillRegistry:
             self.arbiter.quarantine(lease)
             record = self.ledger.finish(operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED",
                                         event="cancel_requested")
-            task.cancel()
+            if task is not None:
+                task.cancel()
             return record
         return self.ledger.get(operation_id)
 
@@ -212,12 +301,15 @@ class SkillRegistry:
             self.cancel_operation(operation_id)
 
     def close(self) -> None:
+        self.check_thread()
         if (self._active or any(not permit.drained for permit in self._stop_contexts.values())
                 or self._stop_inflight is not None and not self._stop_inflight.done()):
             raise SkillError("cannot close registry with active operations or workers")
         self.ledger.close()
+        self._closed = True
 
     async def reconcile_stop(self, operation_id: str, attempt_id: str, *, confirmed: bool = False) -> OperationRecord:
+        self.check_thread()
         if confirmed is not True:
             raise ConfirmationRequired("maintenance.reconcile_stop")
         async with self._stop_lock:
@@ -290,7 +382,7 @@ class SkillRegistry:
                 timed_out = not done or not allowed
             if timed_out:
                 return SkillResult(
-                    ok=False, detail=f"timeout after {manifest.termination.timeout_s}s",
+                    ok=False, detail=permit.rejection_reason or f"timeout after {manifest.termination.timeout_s}s",
                     data={"_execution": {"outcome": "OUTCOME_UNKNOWN", "stop_state": "STOP_UNCONFIRMED"}},
                 )
             return task.result()

@@ -20,10 +20,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import numpy as np
 
+from embodied.contracts.operation import OperationIdentity
 from embodied.data_engine.recorder import EpisodeRecorder, EpisodeWriter
+from embodied.skills.manifest import ParamSpec, SkillManifest, TerminationSpec
+from embodied.skills.registry import SkillRegistry, SkillResult
 from embodied.skills.scripted import motions
 
 TELEOP_COLLECTOR_ID = "teleop/v1"
@@ -32,12 +36,25 @@ TELEOP_COLLECTOR_ID = "teleop/v1"
 GRIP_OPEN = 0.6  # matches the scripted skills' grasp opening: consistent demo data
 GRIP_CLOSED = 0.0
 
+_RESOURCES = ["arm", "gripper", "workspace"]
+_JOG = SkillManifest(name="skill.teleop.jog", description="Operator Cartesian jog", resources=_RESOURCES,
+                     params={axis: ParamSpec(type="number") for axis in ("dx", "dy", "dz")},
+                     termination=TerminationSpec(timeout_s=5.0))
+_GRIP = SkillManifest(name="skill.teleop.gripper", description="Operator gripper target", resources=_RESOURCES,
+                      params={"opening": ParamSpec(type="number")}, termination=TerminationSpec(timeout_s=5.0))
+_TOGGLE = SkillManifest(name="skill.teleop.toggle", description="Operator gripper toggle", resources=_RESOURCES,
+                        termination=TerminationSpec(timeout_s=5.0))
+_HOME = SkillManifest(name="skill.teleop.home", description="Operator home", resources=_RESOURCES,
+                      termination=TerminationSpec(timeout_s=5.0))
+
 
 @dataclass
 class JogResult:
     ok: bool
     # 原因区分越界、不可达、拒绝或无错误。
     reason: str = ""  # "fence" | "unreachable" | "denied" | ""
+    operation_id: str = ""
+    attempt_id: str = ""
 
 
 class TeleopSession:
@@ -55,8 +72,15 @@ class TeleopSession:
         jog_seconds: float = 0.12,
         max_pos_err: float = 0.008,
         record: bool = True,
+        registry: SkillRegistry | None = None,
     ) -> None:
         self.sim = sim
+        controller = sim.action_controller
+        self.registry = registry or controller.runtime or SkillRegistry(robot_id=sim.spec().embodiment_id)
+        self.registry.configure_execution_controller(controller)
+        self.registry.configure_stop_controller(sim.stop_controller)
+        self.last_result: SkillResult | None = None
+        self._task_id = uuid4().hex
         self.task = task
         self.jog_seconds = jog_seconds
         self.max_pos_err = max_pos_err
@@ -76,11 +100,17 @@ class TeleopSession:
 
         重置场景并开始新局，未结束旧局按失败收尾。
         """
+        self.registry.check_thread()
+        self.sim.action_controller.require_idle()
+        owner = getattr(self.sim.action_controller, "recording_owner", None)
+        if owner is not None and owner is not self:
+            raise RuntimeError("recording_session_busy")
         if self.writer is not None:
             self.abort_episode("superseded by new episode")
         self.sim.reset(randomize=randomize)
         if self.recorder is not None:
-            extra: dict[str, Any] = {"collector": TELEOP_COLLECTOR_ID, "episode_index": self.episodes}
+            extra: dict[str, Any] = {"collector": TELEOP_COLLECTOR_ID, "episode_index": self.episodes,
+                                     "task_id": self._task_id}
             if self._state_names:
                 extra["state_names"] = self._state_names
             self.writer = self.recorder.start(
@@ -90,6 +120,7 @@ class TeleopSession:
                 on_step=self.writer.on_step,
                 on_guard_event=lambda e, w=self.writer: w.on_event("safety", {"kind": e.kind, "reason": e.reason}),
             )
+            self.sim.action_controller.recording_owner = self
         self.episodes += 1
 
     def finish_episode(self, success: bool) -> Path | None:
@@ -99,17 +130,22 @@ class TeleopSession:
         """
         if self.writer is None:
             return None
+        self.registry.check_thread()
+        self.sim.action_controller.require_idle()
         self.sim.set_hooks(None, None)
         path = self.writer.finish(success, detail="operator-marked")
         self.writer = None
+        self.sim.action_controller.recording_owner = None
         return path
 
     def abort_episode(self, reason: str = "operator abort") -> None:
         if self.writer is None:
             return
+        self.registry.check_thread()
         self.sim.set_hooks(None, None)
         self.writer.abort(reason)
         self.writer = None
+        self.sim.action_controller.recording_owner = None
 
     def close(self) -> None:
         """End of session: a dangling episode is kept, labeled failed (data, not garbage).
@@ -130,26 +166,49 @@ class TeleopSession:
 
         保持俯向抓取姿态微调末端；越界或逆解误差超限时不产生运动。
         """
-        obs = self.sim.read()
+        result = self._invoke(_JOG, self._jog, {"dx": dx, "dy": dy, "dz": dz})
+        return JogResult(result.ok, "" if result.ok else result.detail, result.operation_id, result.attempt_id)
+
+    def _jog(self, dx: float, dy: float, dz: float) -> SkillResult:
+        obs = self.sim.read_control_feedback()
         target = np.asarray(obs.ee_pose.pos, dtype=float) + [dx, dy, dz]
         if hasattr(self.sim, "guard") and not self.sim.guard.check_target(tuple(target)):
-            return JogResult(ok=False, reason="fence")
+            return SkillResult(ok=False, detail="fence")
         res = self.sim.solve_reach(target)
         if res.pos_err > self.max_pos_err:
-            return JogResult(ok=False, reason="unreachable")
+            return SkillResult(ok=False, detail="unreachable")
         if not motions.move_to_q(self.sim, res.qpos, seconds=self.jog_seconds, settle_steps=10):
-            return JogResult(ok=False, reason="denied")
-        return JogResult(ok=True)
+            return SkillResult(ok=False, detail="denied")
+        return SkillResult(ok=True)
 
     def set_gripper(self, opening: float) -> bool:
-        return motions.set_gripper(self.sim, float(np.clip(opening, 0.0, 1.0)), seconds=0.3, settle_steps=30)
+        return self._invoke(_GRIP, self._gripper, {"opening": opening}).ok
+
+    def _gripper(self, opening: float) -> SkillResult:
+        ok = motions.set_gripper(self.sim, float(np.clip(opening, 0.0, 1.0)), seconds=0.3, settle_steps=30)
+        return SkillResult(ok=ok, detail="" if ok else "denied")
 
     def toggle_gripper(self) -> bool:
-        current = self.sim.read().gripper_opening
-        return self.set_gripper(GRIP_CLOSED if current > 0.3 else GRIP_OPEN)
+        def toggle():
+            current = self.sim.read_control_feedback().gripper_opening
+            return self._gripper(GRIP_CLOSED if current > 0.3 else GRIP_OPEN)
+        return self._invoke(_TOGGLE, toggle, {}).ok
 
     def home(self) -> bool:
-        return motions.move_to_q(self.sim, self.sim.home_qpos(), seconds=1.0)
+        def move():
+            ok = motions.move_to_q(self.sim, self.sim.home_qpos(), seconds=1.0)
+            return SkillResult(ok=ok, detail="" if ok else "denied")
+        return self._invoke(_HOME, move, {}).ok
+
+    def _invoke(self, manifest, handler, params) -> SkillResult:
+        identity = OperationIdentity(task_id=self._task_id, operation_id=uuid4().hex)
+        try:
+            result = self.registry.invoke_operator(manifest, handler, params, operation=identity)
+        except Exception as exc:
+            record = self.registry.get_operation(identity.operation_id)
+            result = self.registry._from_record(record) if record else SkillResult(ok=False, detail=str(exc))
+        self.last_result = result
+        return result
 
     # 状态查询。
     # -- introspection ------------------------------------------------------------

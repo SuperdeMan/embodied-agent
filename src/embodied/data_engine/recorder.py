@@ -156,6 +156,7 @@ class EpisodeWriter:
         self._ee_pos: list[tuple[float, ...]] = []
         self._objects: dict[str, list[tuple[float, ...]]] = {}
         self._state_dim: int | None = None
+        self._command_identity: tuple[str, str] | None = None
 
         # 开始即写元数据草稿，即使强杀也能关联任务与已写事件。
         # Meta stub on disk immediately: a hard kill (no chance to call abort())
@@ -178,6 +179,15 @@ class EpisodeWriter:
         缓冲一个控制周期：状态为关节加夹爪，动作为空沿用上一行，夹爪空值沿用目标；首动作前为零，同时存末端及物体位姿。
         """
         self._ensure_open("on_step")
+        envelope = action.envelope if action is not None else None
+        if envelope is not None:
+            identity = (envelope.operation_id, envelope.attempt_id)
+            if identity != self._command_identity:
+                self.on_event("note", {"kind": "action_authority", "sim_t": obs.t,
+                                       "operation_id": envelope.operation_id, "attempt_id": envelope.attempt_id,
+                                       "source": envelope.source, "lease_epoch": envelope.lease_epoch,
+                                       "profile_digest": envelope.profile_digest, "scene_epoch": envelope.scene_epoch})
+                self._command_identity = identity
         state = (*(float(v) for v in obs.qpos), float(obs.gripper_opening))
         if self._state_dim is None:
             self._state_dim = len(state)

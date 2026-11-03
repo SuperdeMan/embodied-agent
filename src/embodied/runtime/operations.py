@@ -208,6 +208,9 @@ class OperationLedger:
     def next_epoch(self) -> int:
         return self._db.execute("SELECT COALESCE(MAX(lease_epoch),0)+1 FROM attempts").fetchone()[0]
 
+    def has_operations(self) -> bool:
+        return self._db.execute("SELECT EXISTS(SELECT 1 FROM operations)").fetchone()[0] == 1
+
     def begin(self, identity: OperationIdentity, robot_id: str, skill: str, digest: str,
               resources: tuple[str, ...], epoch: int, *, stop_context: dict | None = None) -> OperationRecord:
         now = time.time()

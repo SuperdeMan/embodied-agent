@@ -170,6 +170,9 @@ def register_sim_skills(registry: SkillRegistry, emb: Any, *, skip: tuple[str, .
     按 skip 排除将由学习实现占用的 manifest，保留名称与契约不变。
     """
 
+    action_controller = getattr(emb, "action_controller", None)
+    if action_controller is not None:
+        registry.configure_execution_controller(action_controller)
     controller = getattr(emb, "stop_controller", None)
     if controller is not None:
         registry.configure_stop_controller(controller)

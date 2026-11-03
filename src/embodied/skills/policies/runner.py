@@ -27,6 +27,7 @@ from embodied.cognition.world_state import (
     held_object,
     object_in_region,
 )
+from embodied.control.actions import write_action
 from embodied.control.hal import ActionCommand
 from embodied.providers.policy import BasePolicyProvider
 from embodied.runtime.invocation import run_blocking
@@ -66,6 +67,7 @@ class PolicyRunner:
 
     def observe(self) -> tuple[np.ndarray, np.ndarray]:
         obs = self.emb.read()
+        self._input_observation = obs
         state = np.asarray([*obs.qpos, obs.gripper_opening], dtype=np.float32)
         if obs.objects:
             env = np.concatenate(
@@ -97,8 +99,9 @@ class PolicyRunner:
             for row in chunk:
                 if used >= budget:
                     break
-                result = self.emb.write(
-                    ActionCommand(joint_targets=tuple(float(v) for v in row[:-1]), gripper=float(row[-1]))
+                result = write_action(
+                    self.emb, ActionCommand(joint_targets=tuple(float(v) for v in row[:-1]), gripper=float(row[-1])),
+                    observation=self._input_observation,
                 )
                 if not result.applied:
                     return False, f"guard denied write: {result.reason}"
@@ -156,6 +159,9 @@ def register_policy_sim_skills(
 
     注册学习实现时跳过同名脚本技能，Registry 禁止重复注册。
     """
+    action_controller = getattr(emb, "action_controller", None)
+    if action_controller is not None:
+        registry.configure_execution_controller(action_controller)
     controller = getattr(emb, "stop_controller", None)
     if controller is not None:
         registry.configure_stop_controller(controller)

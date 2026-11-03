@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 
+from embodied.control.actions import write_action
 from embodied.control.hal import ActionCommand
 
 
@@ -36,7 +37,7 @@ def move_to_q(
     per = _phys_per_write(emb, hz)
     for k in range(1, steps + 1):
         q = q0 + (qt - q0) * (k / steps)
-        result = emb.write(ActionCommand(joint_targets=tuple(q), gripper=gripper))
+        result = write_action(emb, ActionCommand(joint_targets=tuple(q), gripper=gripper))
         if not result.applied:
             return False
         emb.step(per)
@@ -51,7 +52,7 @@ def set_gripper(emb: Any, opening: float, *, seconds: float = 0.5, hz: float = 5
     start = emb.read().gripper_opening
     for k in range(1, steps + 1):
         g = start + (opening - start) * (k / steps)
-        result = emb.write(ActionCommand(joint_targets=hold, gripper=g))
+        result = write_action(emb, ActionCommand(joint_targets=hold, gripper=g))
         if not result.applied:
             return False
         emb.step(per)

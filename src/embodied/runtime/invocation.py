@@ -27,6 +27,30 @@ class InvocationPermit:
         self._authority = authority
         self._workers = 0
         self.handler_task: asyncio.Task | None = None
+        self.issuer = None
+        self.operation_id = ""
+        self.attempt_id = ""
+        self.runtime_boot_id = ""
+        self.lease_epoch = 0
+        self.resources: tuple[str, ...] = ()
+        self.scene_epoch = ""
+        self.control_epoch = ""
+        self.source = "skill"
+        self.observations: dict = {}
+        self._sequence = 0
+        self.accepted_sequence = 0
+        self.action_deadline: float | None = None
+        self.rejection_reason = ""
+
+    def next_sequence(self) -> int:
+        with self._lock:
+            self._sequence += 1
+            return self._sequence
+
+    def reject(self, reason: str) -> None:
+        with self._lock:
+            self.rejection_reason = self.rejection_reason or reason
+            self._revoked = True
 
     def reserve_worker(self) -> None:
         with self._lock:
@@ -65,8 +89,8 @@ CURRENT_INVOCATION: ContextVar[InvocationPermit | None] = ContextVar("invocation
 def invocation_access() -> Iterator[bool]:
     permit = CURRENT_INVOCATION.get()
     if permit is None:
-        # Arbiter 迁移前，直接仿真和遥操作仍作为参考路径。
-        # Existing direct sim/teleop callers remain reference paths until Arbiter migration.
+        # 无上下文只允许未绑定的参考夹具；绑定驱动还须检查自己的执行权威。
+        # Unbound fixtures may run without context; bound drivers also check their own authority.
         yield True
     else:
         with permit.access() as allowed:

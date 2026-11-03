@@ -14,6 +14,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
+from embodied.contracts.action import ActionEnvelope, ControlObservationRef
+
 
 @dataclass(frozen=True)
 class JointSpec:
@@ -53,6 +55,7 @@ class Observation:
     # 物体位姿由仿真真值或 M2 感知填充。
     objects: dict[str, Pose] = field(default_factory=dict)  # sim ground truth; perception fills this from M2
     extras: dict[str, Any] = field(default_factory=dict)
+    reference: ControlObservationRef | None = None
 
 
 @dataclass
@@ -63,6 +66,7 @@ class ActionCommand:
     gripper: float | None = None  # normalized target opening; None = hold
     # 来源标签由安全白名单检查。
     source: str = "skill"  # provenance, checked against the safety whitelist
+    envelope: ActionEnvelope | None = None
 
 
 @dataclass

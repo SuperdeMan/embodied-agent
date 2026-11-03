@@ -4,6 +4,7 @@
 
 > 后续 D019 已补远端仿真快照时效，见 [remote-world-state.md](remote-world-state.md)；本页 D018 验证数字仅属于原提交。
 > 后续 D021 已增加确认式仿真停止对账，见 [stop-reconciliation.md](stop-reconciliation.md)；下方未开放恢复的描述是 D018 的历史边界。
+> 后续 D022 已统一遥操作与进程内动作包络，见 [action-admission.md](action-admission.md)；下方遥操作缺口同属 D018 历史边界。
 
 ## 已接入的执行链
 

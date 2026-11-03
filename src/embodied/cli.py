@@ -67,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
     tele.add_argument("--command", default="", help="task label for recorded episodes (defaults to the eval command)")
     tele.add_argument("--out", default="", help="episodes root (default outputs/episodes, or EPISODES_DIR)")
     tele.add_argument("--no-record", action="store_true")
+    tele.add_argument("--ledger", default="outputs/runtime/operations.sqlite3")
 
     conv = sub.add_parser("convert", help="convert recorded episodes into a LeRobotDataset (needs --group learn)")
     conv.add_argument("--root", default="", help="episodes root (default outputs/episodes, or EPISODES_DIR)")
@@ -466,6 +467,8 @@ def _teleop(args: argparse.Namespace) -> int:
     """
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.control.teleop import TeleopSession
+    from embodied.runtime.operations import OperationLedger
+    from embodied.skills.registry import SkillRegistry
 
     try:
         import msvcrt
@@ -487,11 +490,13 @@ def _teleop(args: argparse.Namespace) -> int:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
     sim = TabletopSim(seed=int(args.seed))
+    registry = SkillRegistry(ledger=OperationLedger(args.ledger), robot_id=sim.spec().embodiment_id)
     session = TeleopSession(
         sim,
         task=str(args.command) or EVAL_COMMAND,
         root=(str(args.out) or None),
         record=not bool(args.no_record),
+        registry=registry,
     )
     step = float(args.step)
     jogs = {"w": (step, 0, 0), "s": (-step, 0, 0), "a": (0, -step, 0), "d": (0, step, 0),
@@ -499,9 +504,9 @@ def _teleop(args: argparse.Namespace) -> int:
     print(f"embodied teleop · {sim.spec().embodiment_id} · step={step * 1000:.0f}mm · "
           f"record={'on' if session.recorder else 'off'}")
     print(TELEOP_KEYS)
-    session.start_episode(randomize=True)
-    print(session.status(), end="\r", flush=True)
     try:
+        session.start_episode(randomize=True)
+        print(session.status(), end="\r", flush=True)
         while True:
             ch = read_key()
             note = ""
@@ -528,6 +533,7 @@ def _teleop(args: argparse.Namespace) -> int:
         pass
     finally:
         session.close()
+        registry.close()
     print(f"\n[teleop] session over: {session.episodes} episode(s)")
     return 0
 
