@@ -1,0 +1,167 @@
+{
+  "date_local": "2026-11-03",
+  "timezone": "Asia/Singapore",
+  "feature_commit": "fed99f01da39c19998a5249869705ff193d2bef1",
+  "source_tree": "6b2e1961389a4a1546f7022644fdf7c57afb126d",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_ddl_unchanged": true,
+  "schema_version": 1,
+  "full_suite": {
+    "command": "uv run pytest -q -o addopts= --import-mode=importlib --junitxml=outputs/action-admission-20261103.xml",
+    "junit_file": "outputs/action-admission-20261103.xml",
+    "sha256": "f8b2b52bb22bc7d57d4bbdb21dde9abaa33e04656b1693a96d18d4732a68366c",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "579",
+      "time": "66.147",
+      "timestamp": "2026-11-03T23:48:10.823810+08:00"
+    },
+    "warnings": 4,
+    "new_action_tests": 40
+  },
+  "rpc_subset": {
+    "command": "uv run --group rpc pytest tests/rpc -q -o addopts= --import-mode=importlib --junitxml=outputs/action-admission-rpc-20261103.xml",
+    "junit_file": "outputs/action-admission-rpc-20261103.xml",
+    "sha256": "4081adf1b9f9acd9c02ec2300eb55b3030f9e38e63c3f1c6f9987a229f4904f9",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "16",
+      "time": "2.609",
+      "timestamp": "2026-11-03T23:50:35.624321+08:00"
+    },
+    "already_in_full_suite": true
+  },
+  "ruff": "uv run ruff check .: passed",
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261103-154940.json",
+      "sha256": "062eaffdeb6001ffc713319c6b65d244d93ebdda7a2046be8c4a1841e4a5bf10",
+      "result": {
+        "commit": "fed99f0",
+        "finished_at": "2026-11-03T15:49:40.768469+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "pick_v1_truth",
+      "command": "uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --pick-policy outputs/policies/pick-v1.onnx",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261103-155021.json",
+      "sha256": "bb175caf418b80507ccfae15088dc3efcacb06839f75e9964cc1595344399b2e",
+      "result": {
+        "commit": "fed99f0",
+        "finished_at": "2026-11-03T15:50:21.956422+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "scripted_color",
+      "command": "uv run --group sim --group perceive embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --perception color",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261103-155223.json",
+      "sha256": "d4ab729b9e45e0aeac1fa8a9d08cae9b8c16e1ec82cd9da85255899d3266df7a",
+      "result": {
+        "commit": "fed99f0",
+        "finished_at": "2026-11-03T15:52:23.313641+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "action_profile": {
+    "robot_id": "sim.mujoco.so_arm100",
+    "joint_names": [
+      "Rotation",
+      "Pitch",
+      "Elbow",
+      "Wrist_Pitch",
+      "Wrist_Roll"
+    ],
+    "calibration_id": "2ba78e6a4d302054d0c310cf56d6e54f296570a7bdec2736ddcfd09bc55f2715",
+    "limits_digest": "647cfc5c635575c8dfbd95acd2f5843d7e83e0e7b031bc59529bd687e882862e",
+    "resources": [
+      "arm",
+      "gripper",
+      "workspace"
+    ],
+    "max_command_age_s": 1.0,
+    "max_observation_age_s": 2.0
+  },
+  "action_profile_digest": "1634d2887b40dfa90f2d47db48eadf40c4ab5e2f4521ae7d61e91b15b19fe89b",
+  "artifacts": {
+    "uv.lock": "226d7d13f79771c31143b417c87723efde8ca15c4e3b7e378cf1e49daec38acf",
+    "eval/tasks/tabletop_pick_place_v1.yaml": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+    "outputs/policies/pick-v1.onnx": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd"
+  },
+  "dependencies": {
+    "mujoco": "3.11.0",
+    "numpy": "2.5.1",
+    "pydantic": "2.13.4",
+    "onnxruntime": "1.28.0",
+    "torch": "2.10.0",
+    "grpcio": "1.83.0"
+  },
+  "fault_coverage": [
+    "identity, source, epoch, lease, resources, joint order, units and mode mismatch",
+    "malformed and nonfinite action values",
+    "forged, missing, future and stale observation references",
+    "replayed and reversed sequence",
+    "command expiry and stepping without an accepted current action",
+    "forged permit with copied identity",
+    "late worker context after operation return",
+    "active and quarantined resources block teleop and reset",
+    "confirmed D021 stop releases only new operations",
+    "slow policy keeps original observation reference",
+    "operator operation identity persisted in recording events"
+  ],
+  "qualified_limits": [
+    "Simulation reference profile; local monotonic clock only",
+    "Unbound physics fixtures retain legacy reference mode",
+    "Idle simulation stepping is permitted; this is not proof of physical stopping",
+    "No raw-action RPC, device authentication or object-level semantic TTL",
+    "No database migration or cloud deployment",
+    "pick-v1 remains below the 30/30 scripted baseline"
+  ]
+}

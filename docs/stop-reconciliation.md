@@ -36,7 +36,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID 
 
 维护操作不在 SkillRegistry 的模型工具目录中，接口仍沿用本机控制服务信任边界；确认标志不是跨主机身份认证。本批没有增加浏览器维护按钮，也没有自动重试接口。
 
-Python 组装须使用与本体匹配的 `robot_id`，并通过 `register_sim_skills` / `register_policy_sim_skills` 绑定受信停止控制器与受跟踪线程。默认通用 `reference` 身份、未声明跟踪能力的扩展技能，以及旧版本没有准入 metadata 的未知记录，不可凭假设解除隔离。同 boot 缺失工作线程身份同样拒绝。
+Python 组装须使用与本体匹配的 `robot_id`，并通过 `register_sim_skills` / `register_policy_sim_skills` 绑定受信停止控制器与受跟踪线程。未绑定的通用 `reference` 身份、未声明跟踪能力的扩展技能，以及旧版本没有准入 metadata 的未知记录，不可凭假设解除隔离。同 boot 缺失工作线程身份同样拒绝。D022 允许尚无操作历史的通用 Registry 在首次绑定时归一化为本体身份，不改写已有记录。
 
 ## 参考 profile 与持久顺序
 

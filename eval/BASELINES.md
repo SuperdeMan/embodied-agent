@@ -23,3 +23,6 @@
 | 2026-10-30 | fde3247 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D019 远端快照与驱动一致性锁接入后，本地干净提交；脚本 + 真值 + 离线规划器，结果 061654。云端候选另行验收，不转借本条 |
 | 2026-10-31 | 01f18b7 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D021 受跟踪线程与停止对账后的干净提交回归；脚本 + 真值 + 离线规划器，原任务参数不变，UTC 文件 20261030-160845。停止故障证据单列，不冒充本任务正常路径结果 |
 | 2026-10-31 | 01f18b7 | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | pick-v1 ONNX + 脚本 place + 真值，干净提交；第 14 局 horizon reached 与原工况一致，UTC 文件 20261030-161359。*未达“不劣于脚本”DoD；模型摘要与各项证据见 `eval/stop-reconciliation-20261031.json` |
+| 2026-11-03 | fed99f0 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D022 统一动作包络与遥操作准入后的干净提交；脚本 + 真值 + 离线规划，原参数不变，UTC 文件 20261103-154940。完整测试 579 passed；证据见 `eval/action-admission-20261103.json` |
+| 2026-11-03 | fed99f0 | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | pick-v1 ONNX + 脚本 place + 真值，干净提交；第 14 局 horizon reached，模型 SHA256 与前批一致，UTC 文件 20261103-155021。*仍未达到“不劣于脚本”DoD |
+| 2026-11-03 | fed99f0 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + color 感知 + 独立真值裁判，干净提交，UTC 文件 20261103-155223。验证新增本体反馈/动作包络未破坏本参考感知链路；不推及 DINO 或真机 |
