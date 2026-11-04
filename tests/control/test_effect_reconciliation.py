@@ -186,7 +186,19 @@ async def test_unknown_predicate_is_persisted_as_unknown(env):
     assert result.data["_effect"]["verification_digest"] == effect_digest(manifest.verification)
 
 
-async def test_color_place_binding_and_effect_recheck_do_not_hold_render_lock():
+def test_color_place_binding_and_effect_recheck_do_not_hold_render_lock():
+    """Keep GLFW state out of other renderer fixtures. 隔离 GLFW 状态，避免干扰其他渲染夹具。"""
+    import subprocess
+    import sys
+    import textwrap
+
+    code = '''
+import asyncio
+from embodied.control.drivers.mujoco_sim import TabletopSim
+from embodied.skills.registry import SkillRegistry
+from embodied.skills.scripted.manip import register_sim_skills
+
+async def main():
     from embodied.cognition.perception import TABLETOP_OBJECTS, PerceivedSim, PerceptionPipeline
     from embodied.providers.perception import ColorBlobProvider
 
@@ -205,3 +217,10 @@ async def test_color_place_binding_and_effect_recheck_do_not_hold_render_lock():
     finally:
         wrapped.close()
         registry.close()
+    print("effect_recheck_passed")
+
+asyncio.run(main())
+'''
+    probe = subprocess.run([sys.executable, "-c", textwrap.dedent(code)], capture_output=True, text=True, timeout=45)
+    assert probe.returncode == 0, probe.stderr
+    assert "effect_recheck_passed" in probe.stdout
