@@ -8,7 +8,7 @@
 
 本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。本轮 commit/push、D018 新 SQLite 五表及 nightly 注释补齐已获用户明确授权；后续不同范围的敏感变更仍按红线确认。
 
-云端仿真参考入口已按用户授权激活：应用 `212f912`、私网 HTTPS 8449，当前为离线规划/模拟音频。准确配置、运行证据与升级接线见 `docs/cloud-deployment.md`；Git 主线前进不等于云端已更新。
+云端仿真参考入口已按用户授权升级：应用 `5e2311f`（2026-11-04）、私网 HTTPS 8449，当前为离线规划/模拟音频。原数据卷保留，抓放、效果落账及重启持久性已验证。准确配置与证据见 `docs/cloud-deployment.md`；后续 Git 主线前进不等于云端自动更新。
 
 开发主线 D021–D023 已接入仿真停止对账、统一动作准入与本地对象时效。D024 接入持久效果证据和受信重查（`docs/effect-reconciliation.md`），调用、效果与停止仍独立。后续优先核对 P1 剩余退出门禁与真实设备条件；多 attempt 自动恢复、跨机视觉时钟和真机停止尚未验收。用户已明确授权本轮必要云端部署，实际运行版本以 `docs/cloud-deployment.md` 与部署回执为准。
 

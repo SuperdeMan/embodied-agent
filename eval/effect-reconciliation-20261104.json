@@ -1,0 +1,158 @@
+{
+  "date_local": "2026-11-04",
+  "timezone": "Asia/Singapore",
+  "qualified_commit": "5e2311f355034d32d1fb9fa4241f79fe1c9c159d",
+  "source_tree": "734811d99b40f7cb0a86beba03ce67d3fad8dcad",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_version": 1,
+  "schema_ddl_unchanged": true,
+  "full_suite": {
+    "command": "uv run pytest -q -o addopts= --import-mode=importlib --junitxml=outputs/effect-reconciliation-5e2311f.xml",
+    "file": "outputs/effect-reconciliation-5e2311f.xml",
+    "sha256": "57a5dbcad9b21d9e952b4bb530ff248df2482abfcc73b90d22e98791a4489944",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "634",
+      "time": "39.113",
+      "timestamp": "2026-11-04T09:38:17.129403+08:00"
+    },
+    "warnings": 4,
+    "new_tests": 24
+  },
+  "rpc_suite": {
+    "command": "uv run --group rpc pytest tests/rpc -q -o addopts= --import-mode=importlib --junitxml=outputs/effect-rpc-5e2311f.xml",
+    "file": "outputs/effect-rpc-5e2311f.xml",
+    "sha256": "860e1f6103ddb6fe9f3669afd80035bc802c6a3b065d2303506036e9718abd7c",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "21",
+      "time": "3.412",
+      "timestamp": "2026-11-04T09:38:59.059748+08:00"
+    },
+    "included_in_full_suite": true
+  },
+  "ruff": "passed",
+  "proto_generation": "scripts/gen-proto.ps1: 3 files generated",
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-013913.json",
+      "sha256": "00076e768850c13cc9fd432699938a5bf2d7210327a2db9c1466d1dc10f8c1c3",
+      "result": {
+        "commit": "5e2311f",
+        "finished_at": "2026-11-04T01:39:14.029159+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "pick_v1_truth",
+      "command": "uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --pick-policy outputs/policies/pick-v1.onnx",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-013932.json",
+      "sha256": "a0f00f2235193667a8bedbaf14a211a3c4305113642496ae38e6a42747b7373f",
+      "result": {
+        "commit": "5e2311f",
+        "finished_at": "2026-11-04T01:39:32.676257+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "scripted_color",
+      "command": "uv run --group sim --group perceive embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --perception color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-014027.json",
+      "sha256": "d693f1fea12bf737b1e3bde000ea34f7a5281cc5e3649129e048a9d4c27e62bd",
+      "result": {
+        "commit": "5e2311f",
+        "finished_at": "2026-11-04T01:40:27.681702+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "artifacts": {
+    "uv.lock": "226d7d13f79771c31143b417c87723efde8ca15c4e3b7e378cf1e49daec38acf",
+    "eval/tasks/tabletop_pick_place_v1.yaml": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+    "outputs/policies/pick-v1.onnx": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+    "proto/embodiedrpc/control/v1/control.proto": "180914170530709c571ae8e574d8c0cfc0c6e571b966ff652949d05563f53eb2"
+  },
+  "effect_max_age_s": 2.0,
+  "fault_coverage": [
+    "mismatched attempt, receipt, declaration and boot",
+    "expired and future evidence",
+    "scene reset and later conflicting owner",
+    "replay blocks current dependent actions",
+    "unknown requires confirmed stop before read-only effect recheck",
+    "effect SAT never changes unknown call outcome",
+    "restart retains history but rejects new-controller certification",
+    "persist failure blocks dependent actions",
+    "corrupt stored evidence rejected",
+    "held-object binding at placement admission",
+    "real color rendering admission/recheck in isolated process",
+    "RPC age and receipt checks"
+  ],
+  "prequalification_failures": [
+    {
+      "commit": "2f547c75b579b464231bc21daf0234c50f770f68",
+      "scope": "isolated Linux candidate",
+      "issue": "only one effect event because place used legacy schema verification",
+      "resolution": "place now uses spatial verification with admission-time held-object binding; old candidate never activated"
+    },
+    {
+      "commit": "5ced0b0df5ad0abc5698ce9d72af8144e39f7e23",
+      "scope": "Windows full suite",
+      "issue": "GLFW create_window native access violation followed by stalled pytest",
+      "resolution": "new real-render regression isolated in bounded subprocess; final full suite passed"
+    }
+  ],
+  "qualified_limits": [
+    "Simulation reference only",
+    "No schema migration or automatic retry",
+    "Historical SAT is not a current effect or proof of action causality",
+    "Task-level multi-attempt recovery remains pending",
+    "Synchronous provider sampling is not hard real time",
+    "pick-v1 still below scripted 30/30 baseline",
+    "Cloud evidence recorded separately"
+  ]
+}

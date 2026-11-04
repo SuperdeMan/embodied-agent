@@ -1,0 +1,148 @@
+{
+  "date_local": "2026-11-04",
+  "commit": "5e2311f355034d32d1fb9fa4241f79fe1c9c159d",
+  "previous_commit": "212f912d067d933a12949c12d507db493b0a9f13",
+  "status": "activated",
+  "activation_id": "20261104T014232Z",
+  "image_id": "sha256:02ee4be924c811a7667e577161e3813fec07f314ad59be3169a94e4b2889eacc",
+  "container_id": "7ad74886e211813646a996482fdd3a660d5b28035ed35f47b58895738903c125",
+  "config_commit": "cfb5997025fa77c1a89ab1e9fe2878c09db58cdd",
+  "compose_path": "/home/ubuntu/embodied-agent/runtime/compose-9b1c4be840f31b21.yaml",
+  "compose_sha256": "9b1c4be840f31b21bf4fa54c4e77a4c5530db1ced4e93d48c32b53becbed6b5b",
+  "url_template": "https://<tailnet-host>:8449/",
+  "target": "http://172.30.0.2:8390",
+  "volume": "embodied-agent-cloud_runtime",
+  "candidate": {
+    "archive_sha256": "ff111a825bd3ddddc9c0f01934177b25580479c8ecfc8bff3be681f72e569972",
+    "passed": true,
+    "effect_verdicts": [
+      "sat",
+      "sat"
+    ],
+    "jpeg_bytes": 31053,
+    "other_containers_unchanged": true
+  },
+  "activation": {
+    "prior_operation_count": 0,
+    "backup_path": "/app/outputs/deployment-backups/pre-5e2311f355034d32d1fb9fa4241f79fe1c9c159d-20261104T014232Z.sqlite3",
+    "backup_sha256": "1c3e59c77fc7d0288ed9bf3ac7c46cccb4cf3dffc2984fedc441110ea96dfa36",
+    "effect_verdicts": [
+      "sat",
+      "sat"
+    ],
+    "restart_marker_survived": true,
+    "restart_rows_unchanged": true,
+    "other_container_count": 39,
+    "other_containers_unchanged": true,
+    "other_serve_mappings_unchanged": true,
+    "funnel": false
+  },
+  "external": {
+    "passed": true,
+    "health": {
+      "status": "ok",
+      "release": "5e2311f355034d32d1fb9fa4241f79fe1c9c159d",
+      "runtime": {
+        "environment": "simulation",
+        "planner": "offline",
+        "audio": "mock"
+      }
+    },
+    "tls_verified": true,
+    "origin_checked": true,
+    "html_bytes": 3263,
+    "jpeg_bytes": 31053,
+    "jpeg_sha256": "08c885ee0f5aa57c434ef7ec3391302a36869f93f8851eaaf903a70b19785488",
+    "steps": [
+      {
+        "type": "step",
+        "step_id": "s1",
+        "skill": "skill.manip.pick",
+        "status": "ok",
+        "detail": "obj_cube grasped and lifted",
+        "operation_id": "c8875dd3fce55679a3c179ebd8a77227",
+        "attempt_id": "4dcb30cc24464f2e8e467a43833b1ef5",
+        "invocation_state": "RETURNED",
+        "stop_state": "NOT_REQUESTED"
+      },
+      {
+        "type": "step",
+        "step_id": "s2",
+        "skill": "skill.manip.place",
+        "status": "ok",
+        "detail": "obj_cube placed in bin_region",
+        "operation_id": "177584f812f7573aba09dc9fbbb4d70a",
+        "attempt_id": "92fa68231824438590848133e5020e52",
+        "invocation_state": "RETURNED",
+        "stop_state": "NOT_REQUESTED"
+      }
+    ],
+    "reply": {
+      "type": "reply",
+      "text": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region"
+    }
+  },
+  "post_external": {
+    "commit": "5e2311f355034d32d1fb9fa4241f79fe1c9c159d",
+    "container_id": "7ad74886e211813646a996482fdd3a660d5b28035ed35f47b58895738903c125",
+    "image_id": "sha256:02ee4be924c811a7667e577161e3813fec07f314ad59be3169a94e4b2889eacc",
+    "health": "healthy",
+    "ledger": {
+      "states": {
+        "RETURNED": 4
+      },
+      "effect_events": 4
+    },
+    "volume": "embodied-agent-cloud_runtime",
+    "network_internal": true,
+    "limits": {
+      "Memory": 1610612736,
+      "NanoCpus": 1000000000,
+      "PidsLimit": 128,
+      "ReadonlyRootfs": true,
+      "CapDrop": [
+        "ALL"
+      ],
+      "SecurityOpt": [
+        "no-new-privileges:true"
+      ],
+      "PortBindings": {}
+    },
+    "user": "10001:10001",
+    "other_container_count": 39,
+    "activation_id": "20261104T014232Z"
+  },
+  "raw_artifacts": {
+    "activated-5e2311f.json": {
+      "file": "outputs\\cloud\\activated-5e2311f.json",
+      "sha256": "aa20691228af0f304aa1aaa4801ef71eee9bae92a3a3a644e7f77878e1290130"
+    },
+    "candidate-5e2311f.json": {
+      "file": "outputs\\cloud\\candidate-5e2311f.json",
+      "sha256": "161b1c76a6ed0d126276430dcd82c9931d03d08b31a43bd651bc597bd760e6ad"
+    },
+    "candidate-host-5e2311f.json": {
+      "file": "outputs\\cloud\\candidate-host-5e2311f.json",
+      "sha256": "716fd8f839b8e1f7d94d7fc18c9e8818eaab4d4b1e8ed4d4db6ed089c7d4ead9"
+    },
+    "external-5e2311f.json": {
+      "file": "outputs\\cloud\\external-5e2311f.json",
+      "sha256": "144265e487ecef3e0bbc12b1092e788140c268cd7f7213917526b725229eba21"
+    },
+    "post-external-5e2311f.json": {
+      "file": "outputs\\cloud\\post-external-5e2311f.json",
+      "sha256": "ec1468872e46e9b0922cb92ee31a70055335d587fa239bd84e46666a70e8f31d"
+    },
+    "activate_effect_candidate.py": {
+      "file": "outputs\\cloud\\activate_effect_candidate.py",
+      "sha256": "4c7db16fcafae1b1b5ce2b2cf3493df26507d0c39fe755708c38818b2f0ca3ec"
+    }
+  },
+  "limits": [
+    "Private simulation console only; offline planner and mock audio",
+    "No public Funnel or new host port",
+    "Original schema v1 and persistent volume retained; old ledger contained zero operations at upgrade",
+    "Cloud smoke tasks are not cloud 30/30 evaluation",
+    "No full browser interaction, microphone or real hardware qualification"
+  ]
+}

@@ -29,3 +29,6 @@
 | 2026-11-04 | 2f943a9 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D023 对象时效与消费点校验后的干净提交；脚本 + 真值 + 离线规划，原参数不变，UTC 文件 20261104-010658；完整测试 610 passed，证据见 `eval/object-freshness-20261104.json` |
 | 2026-11-04 | 2f943a9 | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | pick-v1 ONNX + 脚本 place + 真值，干净提交；模型摘要、失败详情均与 D022 一致，第 14 局 horizon reached，UTC 文件 20261104-010726。*仍未达到“不劣于脚本”DoD |
 | 2026-11-04 | 2f943a9 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + color + 独立真值裁判，干净提交，UTC 文件 20261104-010825；对象 TTL 保持 2 秒仿真/2 秒墙钟，未为回归放宽预算；不推及 DINO、跨机视觉或真机 |
+| 2026-11-04 | 5e2311f | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D024 持久效果、放置对象准入绑定后的干净提交；脚本 + 真值 + 离线规划，UTC 文件 20261104-013913；完整测试 634 passed，证据见 `eval/effect-reconciliation-20261104.json` |
+| 2026-11-04 | 5e2311f | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | pick-v1 ONNX + 脚本 place + 真值；模型摘要及第 14 局 horizon reached 失败详情与 D023 相同，UTC 文件 20261104-013932。*不劣于脚本目标仍未关闭 |
+| 2026-11-04 | 5e2311f | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + color + 独立真值裁判；持久效果重查与渲染锁回归后，UTC 文件 20261104-014027。云端该 SHA 的候选/常驻/真实 HTTPS 冒烟另见 `eval/cloud-upgrade-20261104.json`，不转借本地 30/30 |
