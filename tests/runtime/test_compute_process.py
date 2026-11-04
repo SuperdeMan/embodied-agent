@@ -185,6 +185,18 @@ def test_closed_client_cannot_be_reactivated_by_a_failed_call(tmp_path):
     assert worker.reaped
 
 
+def test_restart_configuration_is_a_snapshot_not_a_mutable_alias(tmp_path):
+    worker = fixture_worker(tmp_path)
+    inspected = worker.config
+    inspected["startup_hang"] = True
+    assert "startup_hang" not in worker.config
+    try:
+        worker.start()
+        assert worker.call("echo", {"value": "unchanged"})["value"] == "unchanged"
+    finally:
+        worker.close()
+
+
 async def test_native_gil_hang_does_not_block_parent_and_observation_cancel_reaps(tmp_path):
     worker = fixture_worker(tmp_path)
     worker.timeout_s = 10

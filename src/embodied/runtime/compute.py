@@ -41,7 +41,8 @@ class ComputeProcess:
     def __init__(self, config: dict, *, timeout_s: float = 2.0, startup_timeout_s: float = 30.0, _command=None):
         if any(not math.isfinite(t) or t <= 0 for t in (timeout_s, startup_timeout_s)):
             raise ValueError("compute budgets must be finite and positive")
-        self.config = parse_payload(json_payload(config))
+        self._config_json = json_payload(parse_payload(json_payload(config)))
+        self._environment = worker_environment()
         self.timeout_s, self.startup_timeout_s = timeout_s, startup_timeout_s
         self._command = _command
         self._lock = threading.Lock()
@@ -59,6 +60,10 @@ class ComputeProcess:
         self.shutdown_acknowledged = False
         self._sequence = 0
         _WORKERS.add(self)
+
+    @property
+    def config(self):
+        return parse_payload(self._config_json)
 
     @property
     def reaped(self) -> bool:
@@ -109,7 +114,7 @@ class ComputeProcess:
                                         "--parent-pid", str(os.getpid())]
             self._process = subprocess.Popen(
                 command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                bufsize=0, close_fds=True, env=worker_environment(),
+                bufsize=0, close_fds=True, env=self._environment,
                 creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
                 start_new_session=os.name != "nt",
             )
