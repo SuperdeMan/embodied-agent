@@ -25,6 +25,7 @@ from embodied.contracts.effect import EffectRejected
 from embodied.contracts.observation import ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.stopping import StopRejected
+from embodied.runtime.observation import ObservationUnavailable
 from embodied.runtime.rpcgen import import_common, import_control
 from embodied.skills.registry import ConfirmationRequired, SkillRegistry
 
@@ -80,7 +81,7 @@ def build_servicer(state: ControlState):
                 return pb2.WorldStateReply(available=False, reason="world_state_unavailable")
             started = time.monotonic()
             try:
-                epoch, obs = state.world_reader()
+                epoch, obs = await state.registry.observe(state.world_reader)
                 state.world_sequence += 1
                 envelope = ObservationEnvelope(
                     robot_id=state.registry.robot_id, boot_id=state.registry.ledger.boot_id,
@@ -117,14 +118,14 @@ def build_servicer(state: ControlState):
             return self._operation_reply(state.registry.cancel_operation(request.operation_id))
 
         async def CheckEffect(self, request, context):
-            result = state.registry.check_effect(request.operation_id, request.attempt_id,
-                                                 request.evidence_id, request.verification_digest)
+            result = await state.registry.check_effect_async(request.operation_id, request.attempt_id,
+                                                             request.evidence_id, request.verification_digest)
             evidence = result.pop("evidence")
             return pb2.EffectReply(**result, evidence_json=json.dumps(evidence) if evidence else "")
 
         async def ReconcileEffect(self, request, context):
             try:
-                return self._operation_reply(state.registry.reconcile_effect(request.operation_id, request.attempt_id))
+                return self._operation_reply(await state.registry.reconcile_effect_async(request.operation_id, request.attempt_id))
             except EffectRejected as exc:
                 reason = str(exc)
             except Exception:
@@ -224,7 +225,11 @@ def build_servicer(state: ControlState):
             interval = max(0.02, float(request.min_interval_ms or 100) / 1000.0)
             while not context.cancelled():
                 if state.sim is not None:
-                    obs = state.sim.read()
+                    try:
+                        obs = await state.registry.observe(state.sim.read)
+                    except ObservationUnavailable:
+                        await asyncio.sleep(interval)
+                        continue
                     msg = common.RobotState(
                         embodiment_id=state.sim.spec().embodiment_id,
                         gripper_opening=obs.gripper_opening,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import time
 from dataclasses import asdict
@@ -20,15 +21,20 @@ class EffectObserver:
 
     def context(self, verification: dict, params: dict) -> dict:
         scene_epoch = self.controller.sim.state_epoch
-        bindings = {}
-        if verification.get("expect", {}).get("args", {}).get("object") == "$input:held_object":
-            obs = self.embodiment.read()
-            if obs.reference is None or obs.reference.scene_epoch != scene_epoch:
-                raise EffectRejected("effect_binding_scene_changed")
-            bindings["held_object"] = held_object(WorldSnapshot.from_observation(obs))
+        pending = verification.get("expect", {}).get("args", {}).get("object") == "$input:held_object"
         return {"controller_boot_id": self.controller.boot_id, "scene_epoch": scene_epoch,
                 "profile_digest": self.controller.profile.digest, "verification": verification, "params": params,
-                "resources": list(self.controller.profile.resources), "bindings": bindings}
+                "resources": list(self.controller.profile.resources), "bindings": {}, "binding_pending": pending}
+
+    def bind_context(self, context: dict) -> dict:
+        context = copy.deepcopy(context)
+        if context.get("binding_pending"):
+            obs = self.embodiment.read()
+            if obs.reference is None or obs.reference.scene_epoch != context["scene_epoch"] or not self.matches(context):
+                raise EffectRejected("effect_binding_scene_changed")
+            context["bindings"]["held_object"] = held_object(WorldSnapshot.from_observation(obs))
+            context["binding_pending"] = False
+        return context
 
     def evidence_current(self, evidence: dict) -> bool:
         if evidence["source"] != "perception":
@@ -55,6 +61,8 @@ class EffectObserver:
             raise EffectRejected("effect_context_unavailable")
         started = time.monotonic()
         snapshot, verdict, source, reason = {}, UNKNOWN, "unavailable", unavailable
+        if context.get("binding_pending"):
+            reason = reason or "effect_binding_unavailable"
         if not self.matches(context):
             reason = "effect_context_changed"
         if not reason:

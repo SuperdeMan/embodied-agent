@@ -83,10 +83,14 @@ class InvocationPermit:
 
 
 CURRENT_INVOCATION: ContextVar[InvocationPermit | None] = ContextVar("invocation_permit", default=None)
+OBSERVATION_ONLY: ContextVar[bool] = ContextVar("observation_only", default=False)
 
 
 @contextmanager
 def invocation_access() -> Iterator[bool]:
+    if OBSERVATION_ONLY.get():
+        yield False
+        return
     permit = CURRENT_INVOCATION.get()
     if permit is None:
         # 无上下文只允许未绑定的参考夹具；绑定驱动还须检查自己的执行权威。

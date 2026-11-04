@@ -232,7 +232,7 @@ class DagExecutor:
                 return _verify.UNKNOWN
             evidence = result.data.get("_effect")
             if evidence is not None and (step.verification or {}).get("mode") == _verify.MODE_STATE:
-                checker = getattr(self._registry, "effect_verdict", None)
+                checker = getattr(self._registry, "effect_verdict_async", None) or getattr(self._registry, "effect_verdict", None)
                 if checker is None:
                     return _verify.UNKNOWN
                 verdict = checker(result.operation_id, result.attempt_id, evidence["evidence_id"], step.verification)

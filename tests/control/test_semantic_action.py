@@ -23,7 +23,7 @@ except FileNotFoundError:
 
 
 @pytest.mark.parametrize("fault", ["slow_inference", "chunk_age", "calibration_change", "scene_change", "slow_target_solve"])
-def test_policy_keeps_semantic_input_identity_through_inference_and_chunk(fault):
+def test_policy_keeps_semantic_input_identity_through_inference_and_chunk(fault, monkeypatch):
     sim = TabletopSim(seed=42)
     runtime = SkillRegistry(robot_id=sim.spec().embodiment_id)
     runtime.configure_execution_controller(sim.action_controller)
@@ -33,6 +33,9 @@ def test_policy_keeps_semantic_input_identity_through_inference_and_chunk(fault)
     wrapped._render_rgbd = lambda *a: (None, None)
     now = [wrapped._clock()]
     wrapped._clock = lambda: now[0]
+    # 生产方与消费方共享受控测试时钟，不把机器调度耗时混入故障预算。
+    # Share the controlled clock between producer and consumer; exclude host scheduling jitter.
+    monkeypatch.setattr("embodied.contracts.object_state.time", SimpleNamespace(monotonic=lambda: now[0]))
     old_t, old_ctrl = sim.data.time, sim.data.ctrl.copy()
 
     class Policy:

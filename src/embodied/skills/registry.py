@@ -26,6 +26,7 @@ from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.stopping import StopEvidence, StopProfile, StopRejected, StopRequest, validate_stop_evidence
 from embodied.runtime.arbiter import Lease, ResourceArbiter, ResourceBusy
 from embodied.runtime.invocation import CURRENT_INVOCATION, InvocationPermit
+from embodied.runtime.observation import OBSERVATION_TIMEOUT_S, ObservationLane, ObservationUnavailable
 from embodied.runtime.operations import OperationLedger, OperationRecord, request_digest
 from embodied.skills.manifest import SkillManifest
 
@@ -74,7 +75,8 @@ class _Dispatch:
 
 
 class SkillRegistry:
-    def __init__(self, *, ledger: OperationLedger | None = None, robot_id: str = "reference") -> None:
+    def __init__(self, *, ledger: OperationLedger | None = None, robot_id: str = "reference",
+                 observation_timeout_s: float = OBSERVATION_TIMEOUT_S) -> None:
         self._skills: dict[str, tuple[SkillManifest, SkillHandler]] = {}
         self._retiring: set[asyncio.Task] = set()
         self.ledger = ledger if ledger is not None else OperationLedger()
@@ -90,6 +92,22 @@ class SkillRegistry:
         self._closed = False
         self._thread_id = threading.get_ident()
         self._effect_observer = None
+        self._observations = ObservationLane(observation_timeout_s)
+        self._read_barriers: list[Callable[[], bool]] = []
+
+    @property
+    def observation_pending(self) -> bool:
+        return self._observations.busy or any(barrier() for barrier in self._read_barriers)
+
+    def add_read_barrier(self, barrier: Callable[[], bool]) -> None:
+        self.check_thread()
+        self._read_barriers.append(barrier)
+
+    async def observe(self, function, *args, **kwargs):
+        self.check_thread()
+        if self._closed:
+            raise ObservationUnavailable("runtime_closed")
+        return await self._observations.call(function, *args, **kwargs)
 
     def configure_effect_observer(self, embodiment) -> None:
         self.check_thread()
@@ -164,8 +182,13 @@ class SkillRegistry:
         with self._dispatch(manifest, merged, operation, "skill", name in self._tracked_skills) as dispatch:
             if isinstance(dispatch, SkillResult):
                 return dispatch
+            try:
+                await self._bind_effect_async(dispatch)
+            except Exception as exc:
+                reason = str(exc) if isinstance(exc, ObservationUnavailable) else "effect_binding_failed"
+                return await self._finish_async(dispatch, SkillResult(ok=False, detail=reason), unavailable=reason)
             result = await self._execute(manifest, handler, merged, dispatch.permit)
-            return self._finish(dispatch, result)
+            return await self._finish_async(dispatch, result)
 
     def invoke_operator(self, manifest: SkillManifest, handler, params: dict | None = None, *,
                         operation: OperationIdentity | None = None, confirmed: bool = False) -> SkillResult:
@@ -177,6 +200,14 @@ class SkillRegistry:
         with self._dispatch(manifest, merged, operation, "teleop", True) as dispatch:
             if isinstance(dispatch, SkillResult):
                 return dispatch
+            try:
+                context = dispatch.record.stop_context.get("effect_context", {})
+                if context.get("binding_pending"):
+                    context = self._observations.call_sync(self._effect_observer.bind_context, context)
+                    self._commit_binding(dispatch, context)
+            except Exception as exc:
+                reason = str(exc) if isinstance(exc, ObservationUnavailable) else "effect_binding_failed"
+                return self._finish(dispatch, SkillResult(ok=False, detail=reason), unavailable=reason)
             binding = CURRENT_INVOCATION.set(dispatch.permit)
             try:
                 result = handler(**merged)
@@ -199,24 +230,29 @@ class SkillRegistry:
     @contextmanager
     def _dispatch(self, manifest, params, operation, source, tracked):
         identity = operation or OperationIdentity.fresh()
+        declaration = manifest.model_dump(mode="json")
+        if source != "skill":
+            declaration["execution_source"] = source
+        digest = request_digest(manifest.name, params, declaration, self.robot_id)
+        previous = self.ledger.lookup(identity, digest)
+        if previous:
+            outcome = self._from_record(previous)
+            if manifest.verification.get("mode") == "state_predicate":
+                outcome.data["_operation_replay"] = True
+            yield outcome
+            return
+        if self.observation_pending:
+            yield SkillResult(ok=False, detail="observation_worker_busy", operation_id=identity.operation_id,
+                              invocation_state="REJECTED")
+            return
         controller = self._execution_controller
         lease = None
         with controller.admission() if controller is not None else nullcontext():
-            declaration = manifest.model_dump(mode="json")
-            if source != "skill":
-                declaration["execution_source"] = source
-            digest = request_digest(manifest.name, params, declaration, self.robot_id)
-            previous = self.ledger.lookup(identity, digest)
-            if previous:
-                outcome = self._from_record(previous)
-                if manifest.verification.get("mode") == "state_predicate":
-                    outcome.data["_operation_replay"] = True
-            else:
-                try:
-                    lease = self.arbiter.acquire(identity.operation_id, self.ledger.next_epoch(), manifest.resources)
-                except ResourceBusy as exc:
-                    outcome = SkillResult(ok=False, detail=str(exc), operation_id=identity.operation_id,
-                                          invocation_state="REJECTED")
+            try:
+                lease = self.arbiter.acquire(identity.operation_id, self.ledger.next_epoch(), manifest.resources)
+            except ResourceBusy as exc:
+                outcome = SkillResult(ok=False, detail=str(exc), operation_id=identity.operation_id,
+                                      invocation_state="REJECTED")
         if lease is not None:
             try:
                 stop = self._stop_controller
@@ -255,8 +291,9 @@ class SkillRegistry:
             yield outcome
         except BaseException:
             outcome.permit.revoke()
-            self.arbiter.quarantine(outcome.lease)
-            self.ledger.finish(identity.operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED")
+            if outcome.record.state not in {"RETURNED", "FAILED"}:
+                self.arbiter.quarantine(outcome.lease)
+                self.ledger.finish(identity.operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED")
             raise
         finally:
             outcome.permit.revoke()
@@ -267,7 +304,19 @@ class SkillRegistry:
             else:
                 self.arbiter.quarantine(outcome.lease)
 
-    def _finish(self, dispatch, result):
+    async def _bind_effect_async(self, dispatch):
+        context = dispatch.record.stop_context.get("effect_context", {})
+        if context.get("binding_pending"):
+            context = await self.observe(self._effect_observer.bind_context, context)
+            self._commit_binding(dispatch, context)
+
+    def _commit_binding(self, dispatch, context):
+        with dispatch.permit.access() as allowed:
+            if not allowed or not self._effect_observer.matches(context):
+                raise EffectRejected("effect_binding_context_changed")
+            dispatch.record = self.ledger.bind_effect(dispatch.record.operation_id, dispatch.record.attempt_id, context)
+
+    def _store_call(self, dispatch, result, unavailable=""):
         permit = dispatch.permit
         result.data.pop("_effect", None)
         result.data.pop("_operation_replay", None)
@@ -282,13 +331,41 @@ class SkillRegistry:
         state = "OUTCOME_UNKNOWN" if unknown else "RETURNED" if result.ok else "FAILED"
         dispatch.record = self.ledger.finish(dispatch.record.operation_id, state, asdict(result),
                                              "STOP_UNCONFIRMED" if unknown else "NOT_REQUESTED")
+        if unknown:
+            unavailable = "call_outcome_unknown"
+        if self._effect_observer is not None and not set(self._effect_observer.controller.profile.resources).issubset(
+            dispatch.record.resources
+        ):
+            unavailable = "effect_resources_not_owned"
+        return unavailable
+
+    def _unknown_effect(self, record, reason):
+        return self._effect_observer.capture(record, self.ledger.boot_id, unavailable=reason)
+
+    def _finish(self, dispatch, result, unavailable=""):
+        unavailable = self._store_call(dispatch, result, unavailable)
         if self._effect_observer is not None and "effect_context" in dispatch.record.stop_context:
-            unavailable = "call_outcome_unknown" if unknown else ""
-            if not set(self._effect_observer.controller.profile.resources).issubset(dispatch.record.resources):
-                unavailable = "effect_resources_not_owned"
-            evidence = self._effect_observer.capture(
-                dispatch.record, self.ledger.boot_id, unavailable=unavailable,
-            )
+            try:
+                evidence = (self._unknown_effect(dispatch.record, unavailable) if unavailable else
+                            self._observations.call_sync(self._effect_observer.capture, dispatch.record, self.ledger.boot_id))
+            except Exception as exc:
+                reason = str(exc) if isinstance(exc, ObservationUnavailable) else "effect_observation_failed"
+                evidence = self._unknown_effect(dispatch.record, reason)
+            dispatch.record = self.ledger.record_effect(evidence)
+        return self._from_record(dispatch.record)
+
+    async def _finish_async(self, dispatch, result, unavailable=""):
+        unavailable = self._store_call(dispatch, result, unavailable)
+        if self._effect_observer is not None and "effect_context" in dispatch.record.stop_context:
+            try:
+                evidence = (self._unknown_effect(dispatch.record, unavailable) if unavailable else
+                            await self.observe(self._effect_observer.capture, dispatch.record, self.ledger.boot_id))
+            except asyncio.CancelledError:
+                dispatch.record = self.ledger.record_effect(self._unknown_effect(dispatch.record, "effect_observation_cancelled"))
+                raise
+            except Exception as exc:
+                reason = str(exc) if isinstance(exc, ObservationUnavailable) else "effect_observation_failed"
+                evidence = self._unknown_effect(dispatch.record, reason)
             dispatch.record = self.ledger.record_effect(evidence)
         return self._from_record(dispatch.record)
 
@@ -314,12 +391,15 @@ class SkillRegistry:
             result.data["_execution"] = {"outcome": "OUTCOME_UNKNOWN", "stop_state": record.stop_state}
         return result
 
-    def check_effect(self, operation_id: str, attempt_id: str, evidence_id: str,
+    def _check_effect(self, operation_id: str, attempt_id: str, evidence_id: str,
                      verification_digest: str) -> dict:
         self.check_thread()
         record = self.ledger.get(operation_id)
         answer = {"eligible": False, "verdict": "unknown", "age_s": 0.0,
                   "reason": "effect_unavailable", "evidence": None}
+        if self._observations.busy:
+            answer["reason"] = "observation_worker_busy"
+            return answer
         if record is None or record.attempt_id != attempt_id or record.effect_evidence is None:
             return answer
         evidence = record.effect_evidence
@@ -331,18 +411,47 @@ class SkillRegistry:
             return answer
         if (self._effect_observer is None or not self._effect_observer.matches(record.stop_context["effect_context"])
                 or self.ledger.newer_conflict(record)
-                or not self.arbiter.idle(self._effect_observer.controller.profile.resources)
-                or not self._effect_observer.evidence_current(evidence)):
+                or not self.arbiter.idle(self._effect_observer.controller.profile.resources)):
             answer["reason"] = "effect_context_or_owner_changed"
             return answer
         answer.update(eligible=True, verdict=evidence["verdict"], age_s=age, reason=evidence["reason"])
         return answer
 
+    @staticmethod
+    def _unavailable_effect(answer, reason):
+        return dict(answer, eligible=False, verdict="unknown", reason=reason)
+
+    def check_effect(self, *args) -> dict:
+        answer = self._check_effect(*args)
+        if not answer["eligible"]:
+            return answer
+        try:
+            current = self._observations.call_sync(self._effect_observer.evidence_current, answer["evidence"])
+            return self._check_effect(*args) if current else self._unavailable_effect(answer, "effect_observation_stale")
+        except Exception:
+            return self._unavailable_effect(answer, "effect_check_unavailable")
+
+    async def check_effect_async(self, *args) -> dict:
+        answer = self._check_effect(*args)
+        if not answer["eligible"]:
+            return answer
+        try:
+            current = await self.observe(self._effect_observer.evidence_current, answer["evidence"])
+            return self._check_effect(*args) if current else self._unavailable_effect(answer, "effect_observation_stale")
+        except Exception:
+            return self._unavailable_effect(answer, "effect_check_unavailable")
+
     def effect_verdict(self, operation_id: str, attempt_id: str, evidence_id: str, verification: dict) -> str:
         return self.check_effect(operation_id, attempt_id, evidence_id, effect_digest(verification))["verdict"]
 
-    def reconcile_effect(self, operation_id: str, attempt_id: str) -> OperationRecord:
+    async def effect_verdict_async(self, operation_id: str, attempt_id: str, evidence_id: str, verification: dict) -> str:
+        answer = await self.check_effect_async(operation_id, attempt_id, evidence_id, effect_digest(verification))
+        return answer["verdict"]
+
+    def _reserve_effect(self, operation_id: str, attempt_id: str):
         self.check_thread()
+        if self.observation_pending:
+            raise EffectRejected("observation_worker_busy")
         record = self.ledger.get(operation_id)
         if record is None or record.attempt_id != attempt_id or record.state == "RUNNING":
             raise EffectRejected("effect_attempt_unavailable")
@@ -358,12 +467,37 @@ class SkillRegistry:
             if not observer.matches(record.stop_context["effect_context"]) or self.ledger.newer_conflict(record):
                 raise EffectRejected("effect_context_or_owner_changed")
             lease = self.arbiter.acquire("effect:" + uuid4().hex, self.ledger.next_epoch(), observer.controller.profile.resources)
+        return record, observer, lease
+
+    def _commit_effect(self, record, observer, evidence):
+        if not observer.matches(record.stop_context["effect_context"]) or self.ledger.newer_conflict(record):
+            raise EffectRejected("effect_context_or_owner_changed")
+        return self.ledger.record_effect(evidence)
+
+    def reconcile_effect(self, operation_id: str, attempt_id: str) -> OperationRecord:
+        record, observer, lease = self._reserve_effect(operation_id, attempt_id)
         try:
-            evidence = observer.capture(record, self.ledger.boot_id)
-            with observer.controller.admission():
-                if not observer.matches(record.stop_context["effect_context"]) or self.ledger.newer_conflict(record):
-                    raise EffectRejected("effect_context_or_owner_changed")
-                return self.ledger.record_effect(evidence)
+            try:
+                evidence = self._observations.call_sync(observer.capture, record, self.ledger.boot_id)
+            except Exception as exc:
+                reason = str(exc) if isinstance(exc, ObservationUnavailable) else "effect_observation_failed"
+                evidence = self._unknown_effect(record, reason)
+            return self._commit_effect(record, observer, evidence)
+        finally:
+            self.arbiter.release(lease)
+
+    async def reconcile_effect_async(self, operation_id: str, attempt_id: str) -> OperationRecord:
+        record, observer, lease = self._reserve_effect(operation_id, attempt_id)
+        try:
+            try:
+                evidence = await self.observe(observer.capture, record, self.ledger.boot_id)
+            except asyncio.CancelledError:
+                self.ledger.record_effect(self._unknown_effect(record, "effect_observation_cancelled"))
+                raise
+            except Exception as exc:
+                reason = str(exc) if isinstance(exc, ObservationUnavailable) else "effect_observation_failed"
+                evidence = self._unknown_effect(record, reason)
+            return self._commit_effect(record, observer, evidence)
         finally:
             self.arbiter.release(lease)
 
@@ -376,9 +510,11 @@ class SkillRegistry:
         if active:
             task, permit, lease = active
             permit.revoke()
-            self.arbiter.quarantine(lease)
-            record = self.ledger.finish(operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED",
-                                        event="cancel_requested")
+            record = self.ledger.get(operation_id)
+            if record.state == "RUNNING":
+                self.arbiter.quarantine(lease)
+                record = self.ledger.finish(operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED",
+                                            event="cancel_requested")
             if task is not None:
                 task.cancel()
             return record
@@ -390,7 +526,7 @@ class SkillRegistry:
 
     def close(self) -> None:
         self.check_thread()
-        if (self._active or any(not permit.drained for permit in self._stop_contexts.values())
+        if (self.observation_pending or self._active or any(not permit.drained for permit in self._stop_contexts.values())
                 or self._stop_inflight is not None and not self._stop_inflight.done()):
             raise SkillError("cannot close registry with active operations or workers")
         self.ledger.close()
@@ -400,6 +536,8 @@ class SkillRegistry:
         self.check_thread()
         if confirmed is not True:
             raise ConfirmationRequired("maintenance.reconcile_stop")
+        if self.observation_pending:
+            raise StopRejected("observation_worker_still_running")
         async with self._stop_lock:
             record = self.ledger.get(operation_id)
             if record is None or record.attempt_id != attempt_id:

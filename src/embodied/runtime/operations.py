@@ -158,6 +158,17 @@ class OperationLedger:
         admitted = self._event_payload(operation_id, row["attempt_id"], "admitted") or {}
         evidence = self._event_payload(operation_id, row["attempt_id"], "stop_observed")
         stop_context = admitted.get("stop_context", {})
+        binding = self._event_payload(operation_id, row["attempt_id"], "effect_bound")
+        if binding is not None and isinstance(stop_context, dict):
+            initial = stop_context.get("effect_context", {})
+            bound = binding.get("context", {})
+            try:
+                if (binding.get("digest") == effect_digest(bound) and not bound.get("binding_pending", True)
+                        and all(bound.get(key) == value for key, value in initial.items()
+                                if key not in {"bindings", "binding_pending"})):
+                    stop_context["effect_context"] = bound
+            except (ValueError, TypeError, AttributeError):
+                pass
         record = OperationRecord(
             operation_id=row["operation_id"], task_id=row["task_id"], request_digest=row["request_digest"],
             skill_id=row["skill_id"], state=row["state"], attempt_id=row["attempt_id"], boot_id=row["boot_id"],
@@ -219,6 +230,20 @@ class OperationLedger:
                 raise EffectRejected("effect_evidence_too_large")
             self._event(record.operation_id, record.attempt_id, "effect_observed", payload)
         return self.get(record.operation_id)
+
+    def bind_effect(self, operation_id: str, attempt_id: str, context: dict) -> OperationRecord:
+        with self._db:
+            self._db.execute("BEGIN IMMEDIATE")
+            record = self.get(operation_id)
+            if record is None or record.attempt_id != attempt_id or record.state != "RUNNING":
+                raise EffectRejected("effect_binding_attempt_changed")
+            initial = record.stop_context.get("effect_context", {})
+            if (not initial.get("binding_pending") or context.get("binding_pending", True)
+                    or any(context.get(key) != value for key, value in initial.items()
+                           if key not in {"bindings", "binding_pending"})):
+                raise EffectRejected("effect_binding_context_changed")
+            self._event(operation_id, attempt_id, "effect_bound", {"context": context, "digest": effect_digest(context)})
+        return self.get(operation_id)
 
     @staticmethod
     def _valid_stored_stop(record: OperationRecord, *, historical: bool = True) -> bool:

@@ -30,6 +30,7 @@ from embodied.contracts.observation import ObjectPose
 from embodied.control.camera import CameraModel
 from embodied.control.hal import Observation, Pose
 from embodied.providers.perception import BasePerceptionProvider, Detection
+from embodied.runtime.invocation import OBSERVATION_ONLY
 
 # 首版单视角不估计物体朝向。
 _IDENTITY_QUAT = (1.0, 0.0, 0.0, 0.0)  # v1: single view -> no orientation estimate
@@ -173,11 +174,12 @@ class PerceivedSim:
     - multiple cameras, tried in order until every configured object is seen;
     - an OBJECT REGISTRY with persistence — a momentarily-undetected object keeps
       its last known pose instead of vanishing (object permanence; the registry
-      clears on reset). Staleness marking is a v2 concern;
+      clears on reset), bounded by the original detection's simulation and wall-clock TTL;
     - a KINEMATIC-ATTACHMENT belief: when the gripper closes at an object's last
       known pose, the unseen object is believed to move WITH the hand (updated from
       encoder proprioception, no ground truth involved) until the gripper opens or
-      a fresh sighting contradicts the belief (slipped grasp -> detach, honest fail).
+      a fresh sighting contradicts the belief, or the original detection expires.
+      Propagation never renews the detection timestamp (slipped grasp -> detach, honest fail).
 
 
     包装器只替换物体表，不改变关节、夹爪与末端反馈；按仿真时间节流。遮挡时尝试相机后备与有期限的附着信念；推算不刷新检测时间，重置或时效/标定失效后清空旧位置。
@@ -242,11 +244,19 @@ class PerceivedSim:
         return self._sim.read()
 
     def reset(self, **kwargs: Any) -> Observation:
+        self._require_no_observer()
         with self._lock:
             obs = self._sim.reset(**kwargs)
             self._fallback_epoch = uuid4().hex
             self._clear()
             return self._decorate(obs)
+
+    def _require_no_observer(self) -> None:
+        if OBSERVATION_ONLY.get():
+            raise RuntimeError("observation_is_read_only")
+        controller = getattr(self._sim, "action_controller", None)
+        if controller is not None and controller.runtime is not None and controller.runtime.observation_pending:
+            raise RuntimeError("observation_worker_busy")
 
     def _clear(self) -> None:
         self._cache_t = -math.inf
@@ -292,6 +302,7 @@ class PerceivedSim:
 
         渲染器必须在拥有 GL 上下文的线程销毁，跨线程 GLFW 析构可能段错误；使用方结束时调用 close。
         """
+        self._require_no_observer()
         if self._render_thread is None:
             return
 

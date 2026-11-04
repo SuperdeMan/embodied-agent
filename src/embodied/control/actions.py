@@ -133,7 +133,8 @@ class ActionAuthority:
 
     def can_step(self, permit) -> bool:
         if permit is None:
-            return self.runtime is not None and not self.runtime._closed and self.runtime.arbiter.idle(self.profile.resources)
+            return (self.runtime is not None and not self.runtime._closed and not self.runtime.observation_pending
+                    and self.runtime.arbiter.idle(self.profile.resources))
         allowed = (
             self._owned(permit) and self.sim.guard.limits is self._limits
             and permit.scene_epoch == self.sim.state_epoch and permit.control_epoch == self.epoch
@@ -145,6 +146,8 @@ class ActionAuthority:
         return allowed
 
     def require_idle(self) -> None:
+        if self.runtime is not None and self.runtime.observation_pending:
+            raise ActionRejected("observation_worker_busy")
         if self.runtime is not None and (CURRENT_INVOCATION.get() is not None
                                         or not self.runtime.arbiter.idle(self.profile.resources)):
             raise ActionRejected("controller_not_idle")

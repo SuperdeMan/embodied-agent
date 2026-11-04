@@ -37,11 +37,15 @@ import logging
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import Context
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
 from aiohttp import WSMsgType, web
+
+from embodied.runtime.invocation import OBSERVATION_ONLY
+from embodied.runtime.observation import OBSERVATION_TIMEOUT_S, ObservationUnavailable
 
 logger = logging.getLogger("hri.server")
 
@@ -232,8 +236,12 @@ class AppContext:
         self._asr = asr
         self._tts_stream = tts_stream
         self.tts_sample_rate = tts_sample_rate
-        self._render_lock = asyncio.Lock()
         self._render_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="console-render")
+        self._frame_future: asyncio.Future | None = None
+        self._render_timeout_s = OBSERVATION_TIMEOUT_S
+        self._render_closed = False
+        if hasattr(registry, "add_read_barrier"):
+            registry.add_read_barrier(lambda: self._frame_future is not None and not self._frame_future.done())
         self.runtime_info = runtime_info or {"environment": "simulation", "planner": "configured", "audio": "configured"}
 
     async def transcribe(self, pcm: bytes) -> str:
@@ -255,18 +263,44 @@ class AppContext:
             yield chunk
 
     async def render_jpeg(self) -> bytes:
+        if self._render_closed:
+            raise ObservationUnavailable("renderer_closed")
+        if self._frame_future is not None and not self._frame_future.done():
+            raise ObservationUnavailable("render_worker_busy")
+        if getattr(self.registry, "observation_pending", False):
+            raise ObservationUnavailable("observation_worker_busy")
+        future = asyncio.get_running_loop().run_in_executor(self._render_thread, Context().run, self._render_jpeg)
+        self._frame_future = future
+        future.add_done_callback(lambda f: None if f.cancelled() else f.exception())
+        try:
+            return await asyncio.wait_for(asyncio.shield(future), timeout=self._render_timeout_s)
+        except asyncio.TimeoutError:
+            raise ObservationUnavailable("render_timeout") from None
+
+    def _render_jpeg(self) -> bytes:
         from PIL import Image
 
-        async with self._render_lock:
-            frame = await asyncio.get_running_loop().run_in_executor(self._render_thread, self.sim.render, "side")
-        buf = io.BytesIO()
-        Image.fromarray(frame).save(buf, format="JPEG", quality=80)
-        return buf.getvalue()
+        token = OBSERVATION_ONLY.set(True)
+        try:
+            frame = self.sim.render("side")
+            buf = io.BytesIO()
+            Image.fromarray(frame).save(buf, format="JPEG", quality=80)
+            return buf.getvalue()
+        finally:
+            OBSERVATION_ONLY.reset(token)
 
     async def close(self) -> None:
+        self._render_closed = True
+        if self._frame_future is not None and not self._frame_future.done():
+            raise ObservationUnavailable("render_worker_still_running")
         cleanup = getattr(self.sim, "close_renderers", lambda: None)
-        await asyncio.get_running_loop().run_in_executor(self._render_thread, cleanup)
-        self._render_thread.shutdown(wait=True)
+        future = asyncio.get_running_loop().run_in_executor(self._render_thread, cleanup)
+        self._frame_future = future
+        future.add_done_callback(lambda f: None if f.cancelled() else f.exception())
+        try:
+            await asyncio.wait_for(asyncio.shield(future), timeout=self._render_timeout_s)
+        finally:
+            self._render_thread.shutdown(wait=False)
 
 
 # aiohttp 服务接线。

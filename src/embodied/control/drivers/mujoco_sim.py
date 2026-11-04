@@ -31,7 +31,7 @@ from embodied.control.hal import (
     WriteResult,
 )
 from embodied.control.simassets import stage_tabletop
-from embodied.runtime.invocation import CURRENT_INVOCATION, invocation_access
+from embodied.runtime.invocation import CURRENT_INVOCATION, OBSERVATION_ONLY, invocation_access
 from embodied.safety.guard import Guard, GuardEvent, GuardLimits
 
 ARM_JOINTS = ("Rotation", "Pitch", "Elbow", "Wrist_Pitch", "Wrist_Roll")
@@ -52,6 +52,12 @@ def _state_locked(method):
     """Keep observation and scene epoch consistent. 保持观测与场景代次一致。"""
     @wraps(method)
     def wrapped(self, *args, **kwargs):
+        if method.__name__ == "reset":
+            if OBSERVATION_ONLY.get():
+                raise RuntimeError("observation_is_read_only")
+            controller = getattr(self, "_action_controller", None)
+            if controller is not None and controller.runtime is not None and controller.runtime.observation_pending:
+                raise ActionRejected("observation_worker_busy")
         with self._state_lock:
             return method(self, *args, **kwargs)
     return wrapped

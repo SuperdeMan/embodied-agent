@@ -213,11 +213,17 @@ def _make_sim_engine(sim: Any, registry: Any, provider: Any, confirm: Any) -> An
     from embodied.cognition.engine import PlannerEngine
     from embodied.cognition.world_state import WorldSnapshot
 
-    def world_fn() -> Any:
-        return WorldSnapshot.from_observation(sim.read())
+    async def world_fn() -> Any:
+        from embodied.runtime.observation import ObservationUnavailable
+        try:
+            return WorldSnapshot.from_observation(await registry.observe(sim.read))
+        except ObservationUnavailable:
+            return None
 
-    def context_fn() -> str:
-        snap = world_fn()
+    async def context_fn() -> str:
+        snap = await world_fn()
+        if snap is None:
+            return "World observation unavailable; do not assume physical effects."
         objs = ", ".join(f"{k}@({v.pos[0]:.2f},{v.pos[1]:.2f},{v.pos[2]:.2f})" for k, v in snap.objects.items())
         regions = ", ".join(snap.regions)
         return f"objects: {objs or 'none'}\nregions: {regions or 'none'}\ngripper_opening: {snap.gripper_opening:.2f}"

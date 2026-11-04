@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 SMOKE = r'''
-import asyncio, json, sqlite3
+import asyncio, json, sqlite3, threading, time
 from aiohttp import ClientSession, WSMsgType
 async def main():
     async with ClientSession() as session:
@@ -45,8 +45,32 @@ async def main():
         assert states == ['RETURNED','RETURNED']
         from embodied.contracts.effect import EffectEvidence
         assert len(evidence) == 2 and all(e['verdict']=='sat' and EffectEvidence.model_validate(e).intact() for e in evidence)
+        from embodied.runtime.observation import ObservationLane, ObservationUnavailable
+        lane=ObservationLane(0.1)
+        release=threading.Event()
+        heartbeat=asyncio.create_task(asyncio.sleep(0.01))
+        started=time.monotonic()
+        try:
+            try:
+                await lane.call(lambda: release.wait(2))
+                raise AssertionError('blocking observation unexpectedly returned')
+            except ObservationUnavailable:
+                assert lane.busy and heartbeat.done()
+            try:
+                await lane.call(lambda: True)
+                raise AssertionError('busy observation was queued')
+            except ObservationUnavailable:
+                assert lane.started==1
+            latency=time.monotonic()-started
+            assert latency < 1.0
+        finally:
+            release.set()
+            while lane.busy:
+                await asyncio.sleep(0.001)
+        assert await lane.call(lambda: 'fresh')=='fresh'
         print(json.dumps({'passed':True,'health':health,'jpeg_bytes':len(image),'steps':steps,
-                          'operation_states':states,'effect_verdicts':[e['verdict'] for e in evidence]}))
+                          'operation_states':states,'effect_verdicts':[e['verdict'] for e in evidence],
+                          'bounded_observation':{'passed':True,'timeout_probe_s':latency,'queued_replacements':0}}))
 asyncio.run(main())
 '''
 
