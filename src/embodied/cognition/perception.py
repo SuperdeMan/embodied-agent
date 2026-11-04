@@ -18,6 +18,7 @@ import math
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+from contextvars import copy_context
 from dataclasses import asdict, dataclass, field
 from typing import Any
 from uuid import uuid4
@@ -231,6 +232,9 @@ class PerceivedSim:
     # -- the perception seam ------------------------------------------------------
 
     def read(self) -> Observation:
+        prepare = getattr(self._sim, "prepare_renderer", None)
+        if prepare is not None:
+            prepare()
         with self._lock:
             return self._decorate(self._sim.read())
 
@@ -243,8 +247,15 @@ class PerceivedSim:
     def read_truth(self) -> Observation:
         return self._sim.read()
 
+    @property
+    def compute_provider(self):
+        return getattr(self._pipeline, "provider", None)
+
     def reset(self, **kwargs: Any) -> Observation:
         self._require_no_observer()
+        prepare = getattr(self._sim, "prepare_renderer", None)
+        if prepare is not None:
+            prepare()
         with self._lock:
             obs = self._sim.reset(**kwargs)
             self._fallback_epoch = uuid4().hex
@@ -303,7 +314,13 @@ class PerceivedSim:
         渲染器必须在拥有 GL 上下文的线程销毁，跨线程 GLFW 析构可能段错误；使用方结束时调用 close。
         """
         self._require_no_observer()
+        close_provider = getattr(getattr(self._pipeline, "provider", None), "close", None)
+        if close_provider is not None:
+            close_provider()
         if self._render_thread is None:
+            close_renderers = getattr(self._sim, "close_renderers", None)
+            if close_renderers is not None:
+                close_renderers()
             return
 
         def _cleanup() -> None:
@@ -317,18 +334,22 @@ class PerceivedSim:
                     renderers.pop(key).close()
                 except Exception:
                     pass
+            close_renderers = getattr(self._sim, "close_renderers", None)
+            if close_renderers is not None:
+                close_renderers()
 
+        future = self._render_thread.submit(_cleanup)
         try:
-            self._render_thread.submit(_cleanup).result(timeout=5)
-        except Exception:
-            pass
-        self._render_thread.shutdown(wait=True)
-        self._render_thread = None
+            future.result(timeout=3)
+        finally:
+            self._render_thread.shutdown(wait=False)
+            if future.done():
+                self._render_thread = None
 
     def _render_rgbd(self, camera: str, width: int, height: int):
         if self._render_thread is None:
             self._render_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="perception-render")
-        return self._render_thread.submit(self._sim.render_rgbd, camera, width, height).result()
+        return self._render_thread.submit(copy_context().run, self._sim.render_rgbd, camera, width, height).result()
 
     def _perceive(self, obs: Observation) -> dict[str, Pose]:
         now = self._clock()

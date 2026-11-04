@@ -28,6 +28,8 @@ D025 已验收[有界只读观察](bounded-observation.md)，应用 `e8df7ad` �
 
 ## 历史进展与保留事项
 
+D026 已接入[纯计算进程隔离](isolated-compute.md)，正在验证 Windows/Linux 生命周期与原任务回归；本批不迁移父进程物理控制。后续优先任务恢复计划、多 attempt 规则及剩余 P1 门禁。
+
 [M0–M5 历史路线与进展](roadmap-milestones.md)保存原任务、完成记录和未闭环项；[评测账本](../eval/BASELINES.md)继续只增。M1 控制台人工验证、RPC 世界状态，M2 学习策略方差、DINO 鲁棒化、失败归档均未自动销项。它们按平台计划迁入 P1/P2，原 M3 真机对应 P2，M4 学习策略对应 P2/P4，M5 扩展对应 P3/P4/P5。
 
 ## 迭代纪律

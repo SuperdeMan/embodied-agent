@@ -1,0 +1,20 @@
+syntax = "proto3";
+package embodied.compute.v1;
+
+// 本地管道使用 JSON 字段映射，外层为网络序 uint32 长度；不传执行对象。
+// Local pipes use the JSON field mapping with a network-order uint32 length; no execution objects cross it.
+message ComputeEnvelope {
+  string api_version = 1;
+  string boot_id = 2;
+  string request_id = 3;
+  string kind = 4;
+  string payload_json = 5;
+}
+
+// 数组数据是 base64 编码的连续小端数值；字节数必须与 dtype/shape 一致。
+// Array bytes are base64-encoded contiguous little-endian values; byte count must match dtype and shape.
+message ComputeArray {
+  string dtype = 1;
+  repeated uint32 shape = 2;
+  bytes data = 3;
+}

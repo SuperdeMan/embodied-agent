@@ -178,12 +178,15 @@ class GroundingDinoProvider(BasePerceptionProvider):
         return list(best.values())
 
 
-def build_perception_provider(kind: str | None = None) -> BasePerceptionProvider:
+def build_perception_provider(kind: str | None = None, *, isolated: bool = False) -> BasePerceptionProvider:
     """Factory: ``color`` (default) or ``dino``; env PERCEPTION_PROVIDER overrides.
 
     工厂默认颜色检测，可由环境选择 DINO。
     """
     kind = (kind or os.getenv("PERCEPTION_PROVIDER") or "color").lower()
+    if isolated and kind in {"color", "dino"}:
+        from embodied.providers.isolated import ProcessPerception
+        return ProcessPerception(kind, model_id=os.getenv("PERCEPTION_DINO_MODEL", DEFAULT_DINO_MODEL))
     if kind == "color":
         return ColorBlobProvider()
     if kind == "dino":

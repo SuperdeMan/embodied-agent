@@ -149,9 +149,12 @@ class MockChunkPolicy(BasePolicyProvider):
         return out.reshape(self._meta.chunk_size, self._meta.action_dim)
 
 
-def build_policy_provider(path: Path | str) -> BasePolicyProvider:
+def build_policy_provider(path: Path | str, *, isolated: bool = False) -> BasePolicyProvider:
     """Factory (mirrors build_provider/build_asr_provider): one artifact kind today.
 
     策略工厂当前只支持一种模型产物类型。
     """
+    if isolated:
+        from embodied.providers.isolated import ProcessPolicy
+        return ProcessPolicy(path)
     return OnnxPolicy(path)

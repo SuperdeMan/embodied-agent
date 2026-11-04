@@ -95,6 +95,42 @@ class SkillRegistry:
         self._observations = ObservationLane(observation_timeout_s)
         self._read_barriers: list[Callable[[], bool]] = []
         self._preview_admissions: dict[str, asyncio.Task] = {}
+        self._compute_providers: list[Any] = []
+
+    def add_compute_provider(self, provider) -> None:
+        self.check_thread()
+        if callable(getattr(provider, "close", None)) and all(item is not provider for item in self._compute_providers):
+            self._compute_providers.append(provider)
+
+    def restart_compute(self) -> None:
+        self.check_thread()
+        if self._execution_controller is None:
+            raise SkillError("compute controller unavailable")
+        self._execution_controller.require_idle()
+        for provider in self._compute_providers:
+            if getattr(getattr(provider, "worker", None), "state", None) == "FAILED":
+                provider.restart()
+        sim = self._execution_controller.sim
+        if getattr(getattr(sim, "_render_process", None), "state", None) == "FAILED":
+            sim.restart_renderer()
+
+    async def drain_compute(self, timeout_s: float = 3.0) -> None:
+        self.check_thread()
+        self.cancel_all()
+        for provider in self._compute_providers:
+            worker = getattr(provider, "worker", None)
+            if worker is not None and worker.busy:
+                worker.request_stop()
+        if self._execution_controller is not None:
+            cancel_render = getattr(self._execution_controller.sim, "cancel_render", None)
+            if cancel_render is not None:
+                cancel_render()
+        deadline = time.monotonic() + timeout_s
+        while (self.observation_pending or self._active or any(not p.drained for p in self._stop_contexts.values())
+               or self._stop_inflight is not None and not self._stop_inflight.done()):
+            if time.monotonic() >= deadline:
+                raise SkillError("compute_shutdown_incomplete")
+            await asyncio.sleep(0.005)
 
     @property
     def observation_pending(self) -> bool:
@@ -118,6 +154,9 @@ class SkillRegistry:
             raise SkillError("effect observer already bound")
         from embodied.runtime.effects import EffectObserver
         self._effect_observer = EffectObserver(embodiment)
+        provider = getattr(embodiment, "compute_provider", None)
+        if provider is not None:
+            self.add_compute_provider(provider)
 
     def check_thread(self) -> None:
         if threading.get_ident() != self._thread_id:
@@ -550,6 +589,8 @@ class SkillRegistry:
         if (self.observation_pending or self._active or any(not permit.drained for permit in self._stop_contexts.values())
                 or self._stop_inflight is not None and not self._stop_inflight.done()):
             raise SkillError("cannot close registry with active operations or workers")
+        for provider in self._compute_providers:
+            provider.close()
         self.ledger.close()
         self._closed = True
 

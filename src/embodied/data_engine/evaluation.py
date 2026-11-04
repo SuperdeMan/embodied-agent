@@ -82,12 +82,16 @@ def _truth_obs(sim):
     return sim.read_truth() if hasattr(sim, "read_truth") else sim.read()
 
 
-def _close_sim(sim) -> None:
+async def _close_sim(sim) -> None:
     """Per-seed sims that own resources (perception render threads) must release
     them deterministically; bare sims have no close() and skip as a no-op.
 
     有渲染线程等资源的仿真须确定性关闭，裸仿真无 close 时跳过。
     """
+    registry = getattr(sim, "_eval_registry", None)
+    if registry is not None:
+        await registry.drain_compute()
+        registry.close()
     fn = getattr(sim, "close", None)
     if callable(fn):
         fn()
@@ -148,51 +152,53 @@ async def run_task(
     idx = 0
     for seed in task.seeds:
         sim = make_sim(seed)
-        for k in range(task.per_seed):
-            idx += 1
-            sim.reset(randomize=True)
-            truth0 = _truth_obs(sim)
-            start_pos = tuple(round(v, 4) for v in truth0.objects[task.judge.get("object", "obj_cube")].pos)
-            engine = make_engine(sim)
-            writer = None
-            if recorder is not None:
-                writer = recorder.start(
-                    task=task.command, embodiment_id=sim.spec().embodiment_id,
-                    seed=seed, extra_meta={"eval_task": task.task_id, "episode_index": idx},
-                )
-                sim.set_hooks(
-                    on_step=writer.on_step,
-                    on_guard_event=lambda e, w=writer: w.on_event("safety", {"kind": e.kind, "reason": e.reason}),
-                )
-            episode_dir = ""
-            try:
-                turn = await engine.turn(task.command)
-                snap = WorldSnapshot.from_observation(_truth_obs(sim))
-                success = task.judge_success(snap)
-                if writer:
-                    for r in turn.results:
-                        writer.on_event("skill_end", {"step": r.step_id, "status": r.status.value,
-                                                      "detail": (r.detail or r.error)[:200]})
-                    episode_dir = str(writer.finish(bool(success), detail=turn.text[:200]))
-            except Exception as e:
-                if writer:
-                    episode_dir = str(writer.abort(repr(e)))
-                raise
-            finally:
+        try:
+            for k in range(task.per_seed):
+                idx += 1
+                sim.reset(randomize=True)
+                truth0 = _truth_obs(sim)
+                start_pos = tuple(round(v, 4) for v in truth0.objects[task.judge.get("object", "obj_cube")].pos)
+                engine = make_engine(sim)
+                writer = None
                 if recorder is not None:
-                    sim.set_hooks(None, None)
-            steps = [
-                {"id": r.step_id, "status": r.status.value, "detail": (r.detail or r.error)[:160]}
-                for r in turn.results
-            ]
-            episodes.append({
-                "index": idx, "seed": seed, "start_pos": start_pos, "success": bool(success),
-                "steps": steps, "report": turn.text[:300], "episode_dir": episode_dir,
-            })
-            summary = " ".join(f"{s['id']}={s['status']}" for s in steps) or "no-steps"
-            progress(f"[{task.task_id}] episode {idx:>3}: seed={seed} pos={start_pos[:2]} "
-                     f"{summary} -> {'SUCCESS' if success else 'FAIL'}")
-        _close_sim(sim)
+                    writer = recorder.start(
+                        task=task.command, embodiment_id=sim.spec().embodiment_id,
+                        seed=seed, extra_meta={"eval_task": task.task_id, "episode_index": idx},
+                    )
+                    sim.set_hooks(
+                        on_step=writer.on_step,
+                        on_guard_event=lambda e, w=writer: w.on_event("safety", {"kind": e.kind, "reason": e.reason}),
+                    )
+                episode_dir = ""
+                try:
+                    turn = await engine.turn(task.command)
+                    snap = WorldSnapshot.from_observation(_truth_obs(sim))
+                    success = task.judge_success(snap)
+                    if writer:
+                        for r in turn.results:
+                            writer.on_event("skill_end", {"step": r.step_id, "status": r.status.value,
+                                                          "detail": (r.detail or r.error)[:200]})
+                        episode_dir = str(writer.finish(bool(success), detail=turn.text[:200]))
+                except Exception as e:
+                    if writer:
+                        episode_dir = str(writer.abort(repr(e)))
+                    raise
+                finally:
+                    if recorder is not None:
+                        sim.set_hooks(None, None)
+                steps = [
+                    {"id": r.step_id, "status": r.status.value, "detail": (r.detail or r.error)[:160]}
+                    for r in turn.results
+                ]
+                episodes.append({
+                    "index": idx, "seed": seed, "start_pos": start_pos, "success": bool(success),
+                    "steps": steps, "report": turn.text[:300], "episode_dir": episode_dir,
+                })
+                summary = " ".join(f"{s['id']}={s['status']}" for s in steps) or "no-steps"
+                progress(f"[{task.task_id}] episode {idx:>3}: seed={seed} pos={start_pos[:2]} "
+                         f"{summary} -> {'SUCCESS' if success else 'FAIL'}")
+        finally:
+            await _close_sim(sim)
 
     report = EvalReport(task_id=task.task_id, episodes=episodes, passed=False, out_path=None)
     report.passed = report.rate >= task.pass_threshold

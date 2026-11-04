@@ -24,7 +24,7 @@ except FileNotFoundError:
 
 @pytest.mark.parametrize("fault", ["slow_inference", "chunk_age", "calibration_change", "scene_change", "slow_target_solve"])
 def test_policy_keeps_semantic_input_identity_through_inference_and_chunk(fault, monkeypatch):
-    sim = TabletopSim(seed=42)
+    sim = TabletopSim(seed=42, isolated_render=False)
     runtime = SkillRegistry(robot_id=sim.spec().embodiment_id)
     runtime.configure_execution_controller(sim.action_controller)
     pipeline = SimpleNamespace(objects={"cube": ObjectSpec("cube")},

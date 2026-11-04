@@ -9,7 +9,7 @@ import time
 from concurrent.futures import Future, TimeoutError
 from contextvars import Context
 
-from embodied.runtime.invocation import OBSERVATION_ONLY
+from embodied.runtime.invocation import OBSERVATION_CANCELLED, OBSERVATION_ONLY
 
 OBSERVATION_TIMEOUT_S = 1.0
 
@@ -41,9 +41,12 @@ class ObservationLane:
             self._future = future
             self._waiting = True
             self.started += 1
+            cancelled = threading.Event()
+            future.observation_cancelled = cancelled
 
         def work():
             token = OBSERVATION_ONLY.set(True)
+            cancellation = OBSERVATION_CANCELLED.set(cancelled)
             try:
                 result = function(*args, **kwargs)
             except BaseException as exc:
@@ -53,6 +56,7 @@ class ObservationLane:
                 error = None
             finally:
                 OBSERVATION_ONLY.reset(token)
+                OBSERVATION_CANCELLED.reset(cancellation)
             # 工作及上下文清理完成后才标记结束；工作线程永不提交账本。
             # Complete only after user work and context cleanup; workers never commit the ledger.
             if error is None:
@@ -71,7 +75,8 @@ class ObservationLane:
 
     async def call(self, function, *args, **kwargs):
         deadline = time.monotonic() + self.timeout_s
-        future = asyncio.wrap_future(self._submit(function, args, kwargs))
+        raw_future = self._submit(function, args, kwargs)
+        future = asyncio.wrap_future(raw_future)
         future.add_done_callback(lambda f: None if f.cancelled() else f.exception())
         try:
             try:
@@ -81,6 +86,9 @@ class ObservationLane:
             if time.monotonic() >= deadline:
                 raise ObservationUnavailable("observation_timeout")
             return result
+        except BaseException:
+            raw_future.observation_cancelled.set()
+            raise
         finally:
             with self._lock:
                 self._waiting = False
@@ -96,6 +104,9 @@ class ObservationLane:
             if time.monotonic() >= deadline:
                 raise ObservationUnavailable("observation_timeout")
             return result
+        except BaseException:
+            future.observation_cancelled.set()
+            raise
         finally:
             with self._lock:
                 self._waiting = False

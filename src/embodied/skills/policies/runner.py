@@ -169,6 +169,7 @@ def register_policy_sim_skills(
     if controller is not None:
         registry.configure_stop_controller(controller)
     if pick is not None:
+        registry.add_compute_provider(pick)
         # 注册时验证维度，不延迟到首次调用。
         PolicyRunner(emb, pick)  # validate dims at registration, not first call
 
@@ -177,6 +178,7 @@ def register_policy_sim_skills(
 
         registry.register(PICK, pick_handler, tracked_workers=True)
     if place is not None:
+        registry.add_compute_provider(place)
         PolicyRunner(emb, place)
 
         async def place_handler(region: str = "bin_region") -> SkillResult:

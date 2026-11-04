@@ -264,6 +264,7 @@ async def _serve_control(args: argparse.Namespace) -> int:
         wd.cancel()
         registry.cancel_all()
         await server.stop(None)
+        await registry.drain_compute()
         registry.close()
     return 0
 
@@ -355,7 +356,12 @@ def _wrap_perception(sim: Any, kind: str) -> Any:
     )
     from embodied.providers.perception import build_perception_provider
 
-    provider = build_perception_provider(kind)
+    provider = build_perception_provider(kind, isolated=True)
+    try:
+        sim.prepare_renderer()
+    except BaseException:
+        provider.close()
+        raise
     objects = DINO_TABLETOP_OBJECTS if kind == "dino" else TABLETOP_OBJECTS
     # 重型检测器降低检测频率，缓存按仿真时间索引。
     # Heavier detectors perceive less often; the cache is keyed on sim time.
@@ -374,14 +380,14 @@ def _register_skills(registry: Any, sim: Any, *, pick_policy: str = "", place_po
     pick = place = None
     skip: list[str] = []
     if pick_policy or place_policy:
-        from embodied.providers.policy import OnnxPolicy
+        from embodied.providers.policy import build_policy_provider
         from embodied.skills.policies import register_policy_sim_skills
 
         if pick_policy:
-            pick = OnnxPolicy(pick_policy)
+            pick = build_policy_provider(pick_policy, isolated=True)
             skip.append("skill.manip.pick")
         if place_policy:
-            place = OnnxPolicy(place_policy)
+            place = build_policy_provider(place_policy, isolated=True)
             skip.append("skill.manip.place")
     register_sim_skills(registry, sim, skip=tuple(skip))
     if pick or place:
@@ -396,6 +402,8 @@ async def _sim(args: argparse.Namespace) -> int:
 
     if args.remote:
         return await _sim_remote(args)
+    if args.task and not args.snapshot:
+        return await _sim_eval_task(args)
 
     sim = _wrap_perception(TabletopSim(seed=int(args.seed)), str(args.perception))
     ledger = OperationLedger() if args.task or args.eval > 0 else OperationLedger(args.ledger)
@@ -421,6 +429,7 @@ async def _sim(args: argparse.Namespace) -> int:
             Image.fromarray(sim.render("side")).save(args.snapshot)
             print(f"snapshot -> {args.snapshot}")
     finally:
+        await registry.drain_compute()
         registry.close()
         close = getattr(sim, "close", None)
         if callable(close):

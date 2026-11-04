@@ -239,6 +239,7 @@ class AppContext:
         self._render_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="console-render")
         self._frame_future: asyncio.Future | None = None
         self._render_timeout_s = OBSERVATION_TIMEOUT_S
+        self._render_close_timeout_s = 3.0
         self._render_closed = False
         if hasattr(registry, "add_read_barrier"):
             registry.add_read_barrier(lambda: self._frame_future is not None and not self._frame_future.done())
@@ -282,6 +283,9 @@ class AppContext:
 
         token = OBSERVATION_ONLY.set(True)
         try:
+            render_jpeg = getattr(self.sim, "render_jpeg", None)
+            if render_jpeg is not None:
+                return render_jpeg("side")
             frame = self.sim.render("side")
             buf = io.BytesIO()
             Image.fromarray(frame).save(buf, format="JPEG", quality=80)
@@ -292,13 +296,25 @@ class AppContext:
     async def close(self) -> None:
         self._render_closed = True
         if self._frame_future is not None and not self._frame_future.done():
-            raise ObservationUnavailable("render_worker_still_running")
+            cancel = getattr(self.sim, "cancel_render", None)
+            if cancel is None:
+                raise ObservationUnavailable("render_worker_still_running")
+            cancel()
+            try:
+                await asyncio.wait_for(asyncio.shield(self._frame_future), timeout=self._render_close_timeout_s)
+            except asyncio.TimeoutError:
+                raise ObservationUnavailable("render_worker_still_running") from None
+            except Exception:
+                pass
+        drain = getattr(self.registry, "drain_compute", None)
+        if drain is not None:
+            await drain()
         cleanup = getattr(self.sim, "close_renderers", lambda: None)
         future = asyncio.get_running_loop().run_in_executor(self._render_thread, cleanup)
         self._frame_future = future
         future.add_done_callback(lambda f: None if f.cancelled() else f.exception())
         try:
-            await asyncio.wait_for(asyncio.shield(future), timeout=self._render_timeout_s)
+            await asyncio.wait_for(asyncio.shield(future), timeout=self._render_close_timeout_s)
         finally:
             self._render_thread.shutdown(wait=False)
 

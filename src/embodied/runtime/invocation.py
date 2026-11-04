@@ -84,6 +84,7 @@ class InvocationPermit:
 
 CURRENT_INVOCATION: ContextVar[InvocationPermit | None] = ContextVar("invocation_permit", default=None)
 OBSERVATION_ONLY: ContextVar[bool] = ContextVar("observation_only", default=False)
+OBSERVATION_CANCELLED: ContextVar[threading.Event | None] = ContextVar("observation_cancelled", default=None)
 
 
 @contextmanager

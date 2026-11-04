@@ -78,11 +78,15 @@ class TabletopSim:
         on_guard_event: Callable[[GuardEvent], None] | None = None,
         spawn_radial: tuple[float, float] = (0.18, 0.27),
         spawn_angle_deg: tuple[float, float] = (230.0, 310.0),
+        isolated_render: bool = True,
     ) -> None:
         self._state_lock = threading.RLock()
         self._stop_fence: str | None = None
         self._stop_controller = None
         self._action_controller = None
+        self._isolated_render = isolated_render
+        self._render_process = None
+        self._render_process_lock = threading.Lock()
         scene = stage_tabletop()
         self._scene_path = scene
         self.model = mujoco.MjModel.from_xml_path(str(scene))
@@ -381,22 +385,105 @@ class TabletopSim:
             cache[key] = r
         return r
 
-    @_state_locked
     def render(self, camera: str = "side", width: int = 640, height: int = 480) -> np.ndarray:
-        r = self._renderer_for(width, height, depth=False)
-        r.update_scene(self.data, camera=camera)
-        return r.render()
+        if self._isolated_render:
+            return self._render_copy(camera, width, height, False)[0]
+        with self._state_lock:
+            r = self._renderer_for(width, height, depth=False)
+            r.update_scene(self.data, camera=camera)
+            return r.render()
 
-    @_state_locked
     def render_rgbd(self, camera: str = "side", width: int = 640, height: int = 480):
         """RGB frame + metric depth map (meters along the view axis) — perception input.
 
         感知输入为 RGB 与沿视轴的米制深度图。
         """
-        rgb = self.render(camera, width, height)
-        d = self._renderer_for(width, height, depth=True)
-        d.update_scene(self.data, camera=camera)
-        return rgb, d.render()
+        if self._isolated_render:
+            return self._render_copy(camera, width, height, True)
+        with self._state_lock:
+            rgb = self.render(camera, width, height)
+            d = self._renderer_for(width, height, depth=True)
+            d.update_scene(self.data, camera=camera)
+            return rgb, d.render()
+
+    def render_jpeg(self, camera: str = "side", width: int = 640, height: int = 480) -> bytes:
+        if self._isolated_render:
+            return self._render_copy(camera, width, height, False, jpeg=True)
+        import io
+
+        from PIL import Image
+        buffer = io.BytesIO()
+        Image.fromarray(self.render(camera, width, height)).save(buffer, format="JPEG", quality=80)
+        return buffer.getvalue()
+
+    def prepare_renderer(self):
+        if not self._isolated_render:
+            return
+        from embodied.runtime.compute import ComputeProcess, ComputeUnavailable
+
+        with self._render_process_lock:
+            if self._render_process is None:
+                self._render_process = ComputeProcess({"backend": "render", "scene": str(self._scene_path),
+                                                       "asset_digest": self.stop_controller.profile.asset_digest})
+            worker = self._render_process
+        metadata = worker.start()
+        if metadata.get("nq") != self.model.nq or metadata.get("nv") != self.model.nv:
+            worker.close()
+            raise ComputeUnavailable("render_model_mismatch")
+
+    def _render_copy(self, camera, width, height, depth, *, jpeg=False):
+        import base64
+
+        from embodied.contracts.compute import decode_array, encode_array
+        from embodied.control.render_worker import CAMERA_FIELDS, DATA_FIELDS, POSE_FIELDS
+        from embodied.runtime.compute import ComputeUnavailable
+
+        if type(width) is not int or type(height) is not int or not 0 < width <= 1024 or not 0 < height <= 1024:
+            raise ValueError("invalid render dimensions")
+        self.prepare_renderer()
+        with self._state_lock:
+            if mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_CAMERA, camera) < 0:
+                raise ValueError("unknown camera")
+            epoch = self.state_epoch
+            state = {name: encode_array(getattr(self.data, name).copy()) for name in DATA_FIELDS}
+            state.update({name: encode_array(getattr(self.data, name).copy()) for name in POSE_FIELDS})
+            state.update({name: encode_array(getattr(self.model, name).copy()) for name in CAMERA_FIELDS})
+            state["time"] = float(self.data.time)
+
+        def validate(reply):
+            expected = ({"epoch", "time", "jpeg"} if jpeg else
+                        {"epoch", "time", "rgb", "depth"} if depth else {"epoch", "time", "rgb"})
+            if (set(reply) != expected or reply["epoch"] != epoch or type(reply["time"]) not in (float, int)
+                    or reply["time"] != state["time"]):
+                raise ValueError("render_snapshot_mismatch")
+            if jpeg:
+                raw = base64.b64decode(reply["jpeg"], validate=True)
+                if not 4 <= len(raw) <= 4 * 1024 * 1024 or not raw.startswith(b"\xff\xd8") or not raw.endswith(b"\xff\xd9"):
+                    raise ValueError("invalid JPEG response")
+                return raw
+            rgb = decode_array(reply["rgb"], dtype="uint8", shape=(height, width, 3))
+            distance = decode_array(reply["depth"], dtype="float32", shape=(height, width)) if depth else None
+            return rgb, distance
+
+        result = self._render_process.call("jpeg" if jpeg else "render", {
+            "state": state, "camera": camera, "width": width, "height": height, "depth": depth, "epoch": epoch,
+        }, validate=validate)
+        with self._state_lock:
+            if self.state_epoch != epoch:
+                raise ComputeUnavailable("render_scene_changed")
+        return result
+
+    def restart_renderer(self):
+        self.action_controller.require_idle()
+        if self.action_controller.runtime is not None:
+            self.action_controller.runtime.check_thread()
+        if self._render_process is not None:
+            self._render_process.restart()
+
+    def cancel_render(self):
+        worker = self._render_process
+        if worker is not None and worker.busy:
+            worker.request_stop()
 
     @_state_locked
     def camera_model(self, camera: str = "side", width: int = 640, height: int = 480):
@@ -404,12 +491,26 @@ class TabletopSim:
 
         return CameraModel.from_mujoco(self.model, self.data, camera, width, height)
 
-    @_state_locked
     def close_renderers(self) -> None:
-        """Destroy GL resources on their owning thread. 在拥有者线程释放 GL 资源。"""
+        """Reap isolated rendering; reference GL resources remain thread-owned.
+
+        回收隔离渲染；参考模式 GL 资源仍由其线程释放。
+        """
+        if self._render_process is not None:
+            self._render_process.close()
+            self._render_process = None
         cache = self.__dict__.get("_renderers", {})
         for key in [key for key in cache if key[0] == threading.get_ident()]:
             cache.pop(key).close()
+
+    def close(self):
+        self.close_renderers()
+
+    def __del__(self):
+        try:
+            self.close_renderers()
+        except Exception:
+            pass
 
     # 内部实现。
     # -- internals -------------------------------------------------------------

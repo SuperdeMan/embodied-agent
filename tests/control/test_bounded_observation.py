@@ -199,8 +199,6 @@ async def test_binding_and_effect_ledger_commits_stay_on_owner_thread(env, monke
 
 
 async def test_stuck_frame_cannot_block_new_admission_on_native_lock(env, monkeypatch):
-    import numpy as np
-
     from embodied.hri.server import AppContext
     from embodied.runtime.observation import ObservationUnavailable
 
@@ -211,9 +209,9 @@ async def test_stuck_frame_cannot_block_new_admission_on_native_lock(env, monkey
         with sim._state_lock:
             entered.set()
             assert release.wait(2)
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return b"\xff\xd8\xff\xd9"
 
-    monkeypatch.setattr(sim, "render", render)
+    monkeypatch.setattr(sim, "render_jpeg", render)
     ctx = AppContext(sim, registry, None, None, None)
     ctx._render_timeout_s = 0.05
     frame = asyncio.create_task(ctx.render_jpeg())
@@ -235,8 +233,6 @@ async def test_stuck_frame_cannot_block_new_admission_on_native_lock(env, monkey
 
 @pytest.mark.parametrize("cancel", [False, True])
 async def test_preview_admission_handoff_is_bounded_and_cancellable(env, monkeypatch, cancel):
-    import numpy as np
-
     from embodied.hri.server import AppContext
 
     sim, registry = env
@@ -247,9 +243,9 @@ async def test_preview_admission_handoff_is_bounded_and_cancellable(env, monkeyp
         with sim._state_lock:
             entered.set()
             assert release.wait(2)
-            return np.zeros((8, 8, 3), dtype=np.uint8)
+            return b"\xff\xd8\xff\xd9"
 
-    monkeypatch.setattr(sim, "render", render)
+    monkeypatch.setattr(sim, "render_jpeg", render)
     ctx = AppContext(sim, registry, None, None, None)
     frame = asyncio.create_task(ctx.render_jpeg())
     identity = OperationIdentity(task_id="task", operation_id="preview-wait")

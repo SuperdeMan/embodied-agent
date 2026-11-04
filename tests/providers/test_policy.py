@@ -108,3 +108,35 @@ def test_onnx_without_schema_rejected(tmp_path):
     _export(path, None)
     with pytest.raises(ValueError, match="not an embodied policy artifact"):
         OnnxPolicy(path)
+
+
+def test_isolated_policy_matches_reference_and_closes(artifact):
+    import os
+
+    p = build_policy_provider(artifact, isolated=True)
+    try:
+        reference = OnnxPolicy(artifact)
+        assert p.worker.last_pid != os.getpid() and p.meta == reference.meta
+        state, env = np.arange(6, dtype=np.float32), np.full(7, 0.25, dtype=np.float32)
+        p.reset()
+        np.testing.assert_allclose(p.act(state, env), reference.act(state, env), rtol=0, atol=1e-6)
+    finally:
+        p.close()
+    assert p.worker.reaped
+
+
+def test_isolated_restart_rejects_replaced_artifact(artifact, tmp_path):
+    from embodied.runtime.compute import ComputeUnavailable
+
+    copied = tmp_path / "model.onnx"
+    copied.write_bytes(artifact.read_bytes())
+    p = build_policy_provider(copied, isolated=True)
+    try:
+        with pytest.raises(ComputeUnavailable):
+            p.worker.call("not_a_policy_operation", {})
+        copied.write_bytes(copied.read_bytes() + b"changed")
+        with pytest.raises(ComputeUnavailable):
+            p.restart()
+        assert p.worker.state == "FAILED" and p.worker.reaped
+    finally:
+        p.close()

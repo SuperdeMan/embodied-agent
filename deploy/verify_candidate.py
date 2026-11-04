@@ -161,8 +161,23 @@ def main() -> None:
             time.sleep(0.5)
         else:
             raise RuntimeError("candidate health timeout")
-        probe = run(["docker", "exec", "-i", name, "/app/.venv/bin/python", "-"], input=SMOKE, timeout=180)
+        try:
+            probe = run(["docker", "exec", "-i", name, "/app/.venv/bin/python", "-"], input=SMOKE, timeout=180)
+        except subprocess.CalledProcessError as exc:
+            (artifacts / "smoke-failure.json").write_text(json.dumps({
+                "returncode": exc.returncode, "stdout": exc.stdout[-20000:], "stderr": exc.stderr[-20000:],
+            }))
+            raise
         result = json.loads(probe.stdout)
+        try:
+            computation = run(["docker", "exec", name, "/app/.venv/bin/python", "/app/scripts/compute_smoke.py",
+                               "--out", "/app/outputs/compute-smoke.json"], timeout=120)
+        except subprocess.CalledProcessError as exc:
+            (artifacts / "compute-failure.json").write_text(json.dumps({
+                "returncode": exc.returncode, "stdout": exc.stdout[-20000:], "stderr": exc.stderr[-20000:],
+            }))
+            raise
+        result["isolated_compute"] = json.loads(computation.stdout)
         result["commit"] = args.sha
         result["image_id"] = run(["docker", "image", "inspect", f"embodied-agent:{args.sha}", "--format", "{{.Id}}"]
                                  ).stdout.strip()
