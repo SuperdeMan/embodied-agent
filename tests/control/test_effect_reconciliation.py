@@ -184,3 +184,24 @@ async def test_unknown_predicate_is_persisted_as_unknown(env):
     manifest, result = await invoke_probe(registry, verification={"mode": "state_predicate", "expect": {"predicate": "future"}})
     assert result.data["_effect"]["verdict"] == "unknown"
     assert result.data["_effect"]["verification_digest"] == effect_digest(manifest.verification)
+
+
+async def test_color_place_binding_and_effect_recheck_do_not_hold_render_lock():
+    from embodied.cognition.perception import TABLETOP_OBJECTS, PerceivedSim, PerceptionPipeline
+    from embodied.providers.perception import ColorBlobProvider
+
+    sim = TabletopSim(seed=42)
+    wrapped = PerceivedSim(sim, PerceptionPipeline(ColorBlobProvider(), dict(TABLETOP_OBJECTS)))
+    registry = SkillRegistry(robot_id=sim.spec().embodiment_id)
+    register_sim_skills(registry, wrapped)
+    try:
+        assert (await registry.invoke("skill.manip.pick")).ok
+        placed = await registry.invoke("skill.manip.place")
+        assert placed.ok and placed.data["_effect"]["verdict"] == "sat"
+        t = sim.data.time
+        checked = registry.reconcile_effect(placed.operation_id, placed.attempt_id)
+        assert checked.effect_evidence["verdict"] == "sat" and sim.data.time == t
+        assert checked.stop_context["effect_context"]["bindings"]["held_object"] == "obj_cube"
+    finally:
+        wrapped.close()
+        registry.close()

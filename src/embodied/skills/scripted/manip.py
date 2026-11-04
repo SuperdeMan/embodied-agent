@@ -73,11 +73,11 @@ PLACE = SkillManifest(
     effects=["object inside target region"],
     scopes=["arm.move", "gripper.open"],
     termination=TerminationSpec(timeout_s=60.0, success="object center inside region box"),
-    # 放置内部空间检查通过才返回物体与区域；外层结构验证确认真实结果存在，避免重复同一空间谓词。
-    # Schema mode: the skill returns {object, region} only after its own in-skill region
-    # check passed — asserting real data present exercises the second evaluator without
-    # duplicating the spatial predicate (which pick already demonstrates).
-    verification={"mode": "schema", "expect": {"data_keys": ["object", "region"]}, "on_fail": "report"},
+    # 准入时绑定实际持有对象，不接受 handler 自报对象作为效果目标。
+    # Bind the held object at admission; do not trust a handler-reported effect target.
+    verification={"mode": "state_predicate", "expect": {"predicate": "object_in_region", "args": {
+        "object": "$input:held_object", "region": "$param:region", "margin": 0.005,
+    }}, "on_fail": "report"},
 )
 
 

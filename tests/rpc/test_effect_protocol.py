@@ -48,7 +48,10 @@ async def test_rpc_current_effect_history_recheck_and_replay_are_distinct():
         assert not checked.reconciliation_error and sim.data.time == before
         denied = await remote.reconcile_effect("pick", "wrong")
         assert denied.reconciliation_error == "effect_attempt_unavailable"
-        assert (await remote.invoke("skill.manip.place", {"region": "bin_region"})).ok
+        placed = await remote.invoke("skill.manip.place", {"region": "bin_region"})
+        assert placed.ok and placed.data["_effect"]["verdict"] == "sat"
+        place_record = registry.get_operation(placed.operation_id)
+        assert place_record.stop_context["effect_context"]["bindings"] == {"held_object": "obj_cube"}
         old = await remote.get_operation("pick")
         assert json.loads(old.effect_evidence_json)["verdict"] == "sat"
         assert await remote.effect_verdict("pick", result.attempt_id, evidence["evidence_id"], verification) == "unknown"

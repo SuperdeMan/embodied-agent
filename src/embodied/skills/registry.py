@@ -200,6 +200,7 @@ class SkillRegistry:
     def _dispatch(self, manifest, params, operation, source, tracked):
         identity = operation or OperationIdentity.fresh()
         controller = self._execution_controller
+        lease = None
         with controller.admission() if controller is not None else nullcontext():
             declaration = manifest.model_dump(mode="json")
             if source != "skill":
@@ -216,19 +217,20 @@ class SkillRegistry:
                 except ResourceBusy as exc:
                     outcome = SkillResult(ok=False, detail=str(exc), operation_id=identity.operation_id,
                                           invocation_state="REJECTED")
-                else:
-                    try:
-                        stop = self._stop_controller
-                        context = {"tracked_workers": tracked, "stop_profile": None, "execution_source": source}
-                        if self._effect_observer is not None and manifest.verification.get("mode") == "state_predicate":
-                            context["effect_context"] = self._effect_observer.context(manifest.verification, params)
-                        if stop is not None and set(lease.resources) == set(stop.profile.resources):
-                            context["stop_profile"] = stop.profile.model_dump(mode="json")
-                        record = self.ledger.begin(identity, self.robot_id, manifest.name, digest,
-                                                   lease.resources, lease.epoch, stop_context=context)
-                    except BaseException:
-                        self.arbiter.release(lease)
-                        raise
+        if lease is not None:
+            try:
+                stop = self._stop_controller
+                context = {"tracked_workers": tracked, "stop_profile": None, "execution_source": source}
+                # 持资源租约采样，但不持原生锁等待渲染线程。 / Hold the lease, not the native lock, while awaiting rendering.
+                if self._effect_observer is not None and manifest.verification.get("mode") == "state_predicate":
+                    context["effect_context"] = self._effect_observer.context(manifest.verification, params)
+                if stop is not None and set(lease.resources) == set(stop.profile.resources):
+                    context["stop_profile"] = stop.profile.model_dump(mode="json")
+                with controller.admission() if controller is not None else nullcontext():
+                    if "effect_context" in context and not self._effect_observer.matches(context["effect_context"]):
+                        raise EffectRejected("effect_context_changed")
+                    record = self.ledger.begin(identity, self.robot_id, manifest.name, digest,
+                                               lease.resources, lease.epoch, stop_context=context)
                     permit = InvocationPermit(manifest.termination.timeout_s, lambda: self.arbiter.valid(lease))
                     permit.issuer = self
                     permit.operation_id, permit.attempt_id = record.operation_id, record.attempt_id
@@ -243,6 +245,9 @@ class SkillRegistry:
                         task = None
                     self._active[identity.operation_id] = (task, permit, lease)
                     outcome = _Dispatch(record, permit, lease)
+            except BaseException:
+                self.arbiter.release(lease)
+                raise
         if isinstance(outcome, SkillResult):
             yield outcome
             return
@@ -352,7 +357,15 @@ class SkillRegistry:
                 raise EffectRejected("effect_resources_busy")
             if not observer.matches(record.stop_context["effect_context"]) or self.ledger.newer_conflict(record):
                 raise EffectRejected("effect_context_or_owner_changed")
-            return self.ledger.record_effect(observer.capture(record, self.ledger.boot_id))
+            lease = self.arbiter.acquire("effect:" + uuid4().hex, self.ledger.next_epoch(), observer.controller.profile.resources)
+        try:
+            evidence = observer.capture(record, self.ledger.boot_id)
+            with observer.controller.admission():
+                if not observer.matches(record.stop_context["effect_context"]) or self.ledger.newer_conflict(record):
+                    raise EffectRejected("effect_context_or_owner_changed")
+                return self.ledger.record_effect(evidence)
+        finally:
+            self.arbiter.release(lease)
 
     def get_operation(self, operation_id: str) -> OperationRecord | None:
         return self.ledger.get(operation_id)

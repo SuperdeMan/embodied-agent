@@ -30,6 +30,7 @@ class EffectEvidence(BaseModel):
     robot_id: str = Field(min_length=1)
     request_digest: str = Field(min_length=1)
     verification_digest: str = Field(min_length=1)
+    binding_digest: str = Field(min_length=1)
     observer_boot_id: str = Field(min_length=1)
     controller_boot_id: str = Field(min_length=1)
     scene_epoch: str = Field(min_length=1)

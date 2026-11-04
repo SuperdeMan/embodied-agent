@@ -196,6 +196,7 @@ class OperationLedger:
                     and evidence.attempt_id == record.attempt_id and evidence.robot_id == record.robot_id
                     and evidence.request_digest == record.request_digest
                     and evidence.verification_digest == effect_digest(context["verification"])
+                    and evidence.binding_digest == effect_digest(context["bindings"])
                     and all(getattr(evidence, key) == context[key]
                             for key in ("controller_boot_id", "scene_epoch", "profile_digest")))
         except (ValueError, TypeError, KeyError, AttributeError):
