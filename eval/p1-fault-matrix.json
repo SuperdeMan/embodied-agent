@@ -1,0 +1,21 @@
+{
+  "schema": "embodied.p1-fault-matrix/v1",
+  "groups": [
+    {"id": "storage_cancel", "tests": ["tests/runtime/test_cancel_storage_faults.py", "tests/rpc/test_halt_storage_faults.py"], "scope": "SQLite page-cap FULL, read/write failure, cancellation, Guard latch and watchdog"},
+    {"id": "operation_crash_and_replay", "tests": ["tests/runtime/test_operations.py", "tests/rpc/test_operation_protocol.py"], "scope": "Abrupt owner exit, duplicate identity, restart and loopback RPC"},
+    {"id": "task_recovery", "tests": ["tests/runtime/test_task_journal.py", "tests/control/test_task_recovery.py", "tests/rpc/test_task_protocol.py"], "scope": "Task corruption, interrupted intent, scene change, read-only assessment"},
+    {"id": "incompatible_ledger", "tests": ["tests/runtime/test_task_schema.py"], "scope": "Unknown schema, live-owner refusal, atomic migration rollback"},
+    {"id": "compute_process", "tests": ["tests/runtime/test_compute_process.py"], "scope": "Worker timeout, crash, bad protocol, process reaping and no request replay"},
+    {"id": "supervision_link", "tests": ["tests/rpc/test_process_split.py"], "scope": "Loopback control/Guardian link loss, stale heartbeat, confirmation and latch"},
+    {"id": "observation_availability", "tests": ["tests/runtime/test_observation_lane.py", "tests/cognition/test_object_freshness.py"], "scope": "Blocked read-only workers, stale or missing local perception; no real camera disconnect"}
+  ],
+  "open_gates": [
+    "Real storage-medium I/O failure and power loss",
+    "Physical control process native hang and independent hardware stop",
+    "Real camera disconnection and cross-host sensor clock validation",
+    "Authenticated cross-host recovery authority and multi-attempt protocol",
+    "Real network partition and field-device supervision",
+    "Physical stop latency, stale-action rate and real episode data loss metrics",
+    "Release compatibility and downgrade/recovery rehearsal after new v2 writes"
+  ]
+}

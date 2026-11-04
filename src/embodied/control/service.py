@@ -43,6 +43,7 @@ class ControlState:
         self.require_supervisor = require_supervisor
         self.halted = False
         self.halt_reason = ""
+        self.halt_persistence_errors: dict[str, str] = {}
         self.last_supervisor_ping = 0.0
         self.supervisor_connected = False
         self.world_reader = world_reader
@@ -53,10 +54,13 @@ class ControlState:
             logger.warning("HALT latched: %s", reason)
         self.halted = True
         self.halt_reason = reason
-        self.registry.cancel_all()
-        if self.sim is not None and hasattr(self.sim, "guard"):
-            # 驱动层同时拒绝进行中的写入。
-            self.sim.guard.estop(reason)  # deny in-flight writes at the driver path too
+        # 驱动闩锁先于数据库；即使 Guard 抛错，也尝试撤销所有调用许可。
+        # Latch the driver before database work; revoke all permits even if Guard raises.
+        try:
+            if self.sim is not None and hasattr(self.sim, "guard"):
+                self.sim.guard.estop(reason)
+        finally:
+            self.halt_persistence_errors.update(self.registry.cancel_all())
 
     def reset(self, reason: str) -> None:
         logger.info("reset (%s)", reason)

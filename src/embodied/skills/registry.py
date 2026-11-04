@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import inspect
 import json
+import logging
 import threading
 import time
 from contextlib import contextmanager, nullcontext
@@ -29,6 +30,8 @@ from embodied.runtime.invocation import CURRENT_INVOCATION, InvocationPermit
 from embodied.runtime.observation import OBSERVATION_TIMEOUT_S, ObservationLane, ObservationUnavailable
 from embodied.runtime.operations import OperationLedger, OperationRecord, request_digest
 from embodied.skills.manifest import SkillManifest
+
+logger = logging.getLogger("skills.registry")
 
 
 class SkillError(RuntimeError):
@@ -620,19 +623,41 @@ class SkillRegistry:
         if active:
             task, permit, lease = active
             permit.revoke()
-            record = self.ledger.get(operation_id)
-            if record.state == "RUNNING":
-                self.arbiter.quarantine(lease)
-                record = self.ledger.finish(operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED",
-                                            event="cancel_requested")
+            # 撤权与协程取消不依赖账本读写成功。 / Revocation and cancellation do not depend on ledger I/O.
             if task is not None:
                 task.cancel()
-            return record
+            try:
+                record = self.ledger.get(operation_id)
+                if record is None:
+                    raise SkillError("active_operation_missing")
+                if record.state == "RUNNING":
+                    self.arbiter.quarantine(lease)
+                    record = self.ledger.finish(operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED",
+                                                event="cancel_requested")
+                return record
+            except Exception:
+                self.arbiter.quarantine(lease)
+                raise
         return self.ledger.get(operation_id)
 
-    def cancel_all(self) -> None:
+    def cancel_all(self) -> dict[str, str]:
+        self.check_thread()
+        # 先撤销全部许可，避免第一项慢写或失败延迟其余调用的撤权。
+        # Revoke every permit first so the first slow or failed write cannot delay other revocations.
+        for task in self._preview_admissions.values():
+            task.cancel()
+        for task, permit, _ in self._active.values():
+            permit.revoke()
+            if task is not None:
+                task.cancel()
+        errors = {}
         for operation_id in list(self._preview_admissions) + list(self._active):
-            self.cancel_operation(operation_id)
+            try:
+                self.cancel_operation(operation_id)
+            except Exception as exc:
+                errors[operation_id] = type(exc).__name__
+                logger.error("cancellation persistence failed: operation=%s error=%s", operation_id, type(exc).__name__)
+        return errors
 
     def close(self) -> None:
         self.check_thread()
