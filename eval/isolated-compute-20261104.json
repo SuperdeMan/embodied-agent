@@ -1,0 +1,164 @@
+{
+  "date_local": "2026-11-04",
+  "timezone": "Asia/Singapore",
+  "qualified_commit": "505b60eed5b796991c9b84e0c4bf00473d604a1e",
+  "source_tree": "f19d32be8fd0a6503c3941ae0af04c36ffd9b39e",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_version": 1,
+  "schema_ddl_unchanged": true,
+  "control_rpc_wire_unchanged": true,
+  "new_local_protocol": "proto/embodiedrpc/compute/v1/compute.proto",
+  "proto_generation": "scripts/gen-proto.ps1: 4 files generated",
+  "full_suite": {
+    "command": "uv run pytest -q -o addopts= --import-mode=importlib --junitxml=outputs/isolated-compute-505b60e.xml",
+    "file": "outputs/isolated-compute-505b60e.xml",
+    "sha256": "52f97c36df2c3fce64769da0a2d3b072050617d42749f6fb4246303ce0f44f69",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "715",
+      "time": "84.050",
+      "timestamp": "2026-11-04T13:56:55.354095+08:00"
+    },
+    "warnings": 4,
+    "new_tests": 57
+  },
+  "rpc_suite": {
+    "command": "uv run --group rpc pytest tests/rpc -q -o addopts= --import-mode=importlib --junitxml=outputs/isolated-rpc-505b60e.xml",
+    "file": "outputs/isolated-rpc-505b60e.xml",
+    "sha256": "f32f66eaa9c6085f1c44b64590ea6c43fc8a2428145302762cfb4660acd1eba3",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "24",
+      "time": "3.713",
+      "timestamp": "2026-11-04T13:58:22.421054+08:00"
+    },
+    "included_in_full_suite": true
+  },
+  "ruff": "passed",
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-055837.json",
+      "sha256": "c82f534892e08a078b19393001299faca94564dd78604700019b22336714c683",
+      "result": {
+        "commit": "505b60e",
+        "finished_at": "2026-11-04T05:58:37.526735+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "isolated_pick_v1_truth",
+      "command": "uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --pick-policy outputs/policies/pick-v1.onnx",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-055900.json",
+      "sha256": "7cb0d96f8c33addac74ebabfdafbb472f3bdc912e9feec1a325519f409f03439",
+      "result": {
+        "commit": "505b60e",
+        "finished_at": "2026-11-04T05:59:00.389041+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "scripted_isolated_color",
+      "command": "uv run --group sim --group perceive embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --perception color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-060229.json",
+      "sha256": "6cbdae47818f5086c8527b8c7e369118beaed27b5e319d4a4a1c57ef3e2fee7d",
+      "result": {
+        "commit": "505b60e",
+        "finished_at": "2026-11-04T06:02:29.771886+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "defaults": {
+    "startup_s": 30.0,
+    "compute_s": 2.0,
+    "reap_s": 2.0,
+    "observation_wait_s": 1.0,
+    "max_inflight_per_instance": 1,
+    "queued_replacements": 0,
+    "max_frame_bytes": 16777216,
+    "max_array_bytes": 8388608
+  },
+  "artifacts": {
+    "uv.lock": "226d7d13f79771c31143b417c87723efde8ca15c4e3b7e378cf1e49daec38acf",
+    "eval/tasks/tabletop_pick_place_v1.yaml": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+    "outputs/policies/pick-v1.onnx": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+    "proto/embodiedrpc/compute/v1/compute.proto": "bf55365f3fc435cdb84126738332af7d50bc4328409b2292c7fc222b6d1f09e6"
+  },
+  "fault_coverage": [
+    "process hang and native GIL-holding call",
+    "unexpected exit and abort",
+    "boot/request mismatch, oversized/partial/malformed frames",
+    "nonfinite/shape/dtype and duplicate JSON rejection",
+    "owned descendants stopped; direct worker and I/O reaped",
+    "parent exit stops direct worker",
+    "unfinished I/O forbids replacement generation",
+    "no request replay; explicit restart changes boot",
+    "already revoked caller does not retire healthy worker",
+    "artifact replacement and configuration mutation rejected",
+    "closed client cannot be reactivated",
+    "policy failure preserves UNKNOWN and requires confirmed stop before recovery",
+    "console shutdown aborts owned render compute",
+    "render snapshot leaves parent state unchanged and rejects changed scene"
+  ],
+  "equivalence": {
+    "windows_rgb_depth_reference": "exact array equality",
+    "color_masks_scores_labels": "exact equality",
+    "tiny_onnx_output": "rtol=0, atol=1e-6"
+  },
+  "qualified_limits": [
+    "Windows and Linux reference deployments only",
+    "Linux orphan-descendant final reaping depends on host init",
+    "No filesystem/network sandbox for hostile code",
+    "Native physical controller, Guard and SQLite remain in parent",
+    "DINO adapter wired but real DINO weights/quality/latency not qualified",
+    "IPC copies add cost; no hard-real-time performance claim",
+    "No automatic physical retry or quarantine clearing",
+    "pick-v1 still below scripted 30/30 baseline",
+    "Cloud probes reported separately"
+  ]
+}

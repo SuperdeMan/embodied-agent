@@ -35,3 +35,6 @@
 | 2026-11-04 | e8df7ad | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D025 有界观察、只读上下文和预览交接后的干净提交；脚本 + 真值 + 离线规划，UTC 文件 20261104-025850；完整测试 658 passed，证据见 `eval/bounded-observation-20261104.json` |
 | 2026-11-04 | e8df7ad | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | pick-v1 ONNX + 脚本 place + 真值；模型摘要及第 14 局 horizon reached 失败详情与 D024 相同，UTC 文件 20261104-025909。*不劣于脚本目标仍未关闭 |
 | 2026-11-04 | e8df7ad | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + color + 独立真值裁判；默认观察等待 1 秒、原时效预算不变，UTC 文件 20261104-030006。云端并行预览、抓放和阻塞注入另见 `eval/cloud-observation-upgrade-20261104.json`，不转借本地全量结果 |
+| 2026-11-04 | 505b60e | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D026 纯计算进程隔离后的干净提交；脚本 + 真值 + 离线规划，UTC 文件 20261104-055837；完整测试 715 passed，证据见 `eval/isolated-compute-20261104.json` |
+| 2026-11-04 | 505b60e | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | 隔离 pick-v1 ONNX + 脚本 place + 真值；模型摘要及第 14 局 horizon reached 失败详情与 D025 相同，UTC 文件 20261104-055900。*不劣于脚本目标仍未关闭 |
+| 2026-11-04 | 505b60e | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + 隔离 color/RGB-D + 独立真值裁判；实际检测和渲染跨进程，UTC 文件 20261104-060229。Linux 故障回收、云端并行预览与抓放另见 `eval/cloud-compute-upgrade-20261104.json` |
