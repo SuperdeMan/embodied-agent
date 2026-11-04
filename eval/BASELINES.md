@@ -32,3 +32,6 @@
 | 2026-11-04 | 5e2311f | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D024 持久效果、放置对象准入绑定后的干净提交；脚本 + 真值 + 离线规划，UTC 文件 20261104-013913；完整测试 634 passed，证据见 `eval/effect-reconciliation-20261104.json` |
 | 2026-11-04 | 5e2311f | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | pick-v1 ONNX + 脚本 place + 真值；模型摘要及第 14 局 horizon reached 失败详情与 D023 相同，UTC 文件 20261104-013932。*不劣于脚本目标仍未关闭 |
 | 2026-11-04 | 5e2311f | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + color + 独立真值裁判；持久效果重查与渲染锁回归后，UTC 文件 20261104-014027。云端该 SHA 的候选/常驻/真实 HTTPS 冒烟另见 `eval/cloud-upgrade-20261104.json`，不转借本地 30/30 |
+| 2026-11-04 | e8df7ad | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D025 有界观察、只读上下文和预览交接后的干净提交；脚本 + 真值 + 离线规划，UTC 文件 20261104-025850；完整测试 658 passed，证据见 `eval/bounded-observation-20261104.json` |
+| 2026-11-04 | e8df7ad | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | pick-v1 ONNX + 脚本 place + 真值；模型摘要及第 14 局 horizon reached 失败详情与 D024 相同，UTC 文件 20261104-025909。*不劣于脚本目标仍未关闭 |
+| 2026-11-04 | e8df7ad | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + color + 独立真值裁判；默认观察等待 1 秒、原时效预算不变，UTC 文件 20261104-030006。云端并行预览、抓放和阻塞注入另见 `eval/cloud-observation-upgrade-20261104.json`，不转借本地全量结果 |

@@ -1,0 +1,171 @@
+{
+  "date_local": "2026-11-04",
+  "timezone": "Asia/Singapore",
+  "qualified_commit": "e8df7ad84e3a1f03604a608b836756f230f0dd5b",
+  "source_tree": "ca1ba4700492b9a9c6ed8a7e860b5f62e4e6e154",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_version": 1,
+  "schema_ddl_unchanged": true,
+  "rpc_wire_unchanged": true,
+  "full_suite": {
+    "command": "uv run pytest -q -o addopts= --import-mode=importlib --junitxml=outputs/bounded-observation-e8df7ad.xml",
+    "file": "outputs/bounded-observation-e8df7ad.xml",
+    "sha256": "3dba00d7647e6585f3325fce5013d6ba6c48a70fa15f937ce3d7e08ef2f73c37",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "658",
+      "time": "39.332",
+      "timestamp": "2026-11-04T10:57:52.628597+08:00"
+    },
+    "warnings": 4,
+    "new_tests": 24
+  },
+  "rpc_suite": {
+    "command": "uv run --group rpc pytest tests/rpc -q -o addopts= --import-mode=importlib --junitxml=outputs/bounded-rpc-e8df7ad.xml",
+    "file": "outputs/bounded-rpc-e8df7ad.xml",
+    "sha256": "8cc10c286f3a83f84bcfa07feeee3de3be2d78188d4d6278a941addc01bd13e3",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "24",
+      "time": "3.695",
+      "timestamp": "2026-11-04T10:58:34.851675+08:00"
+    },
+    "included_in_full_suite": true
+  },
+  "ruff": "passed",
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-025850.json",
+      "sha256": "341fd363d95224dcae21ede3c223d52fe15c732913fcb2f113c8023f4eb339ec",
+      "result": {
+        "commit": "e8df7ad",
+        "finished_at": "2026-11-04T02:58:50.149145+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "pick_v1_truth",
+      "command": "uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --pick-policy outputs/policies/pick-v1.onnx",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-025909.json",
+      "sha256": "1831f48514702674e0fb525b5b831cb6fbc1058c228268078e720a90904acc29",
+      "result": {
+        "commit": "e8df7ad",
+        "finished_at": "2026-11-04T02:59:09.149002+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "scripted_color",
+      "command": "uv run --group sim --group perceive embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --perception color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-030006.json",
+      "sha256": "ac561e97ebdc230097af362e826381a1db7ad098a3805dec4b86f7a0cff437f1",
+      "result": {
+        "commit": "e8df7ad",
+        "finished_at": "2026-11-04T03:00:06.541438+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "budgets": {
+    "observation_wait_s": 1.0,
+    "render_wait_s": 1.0,
+    "effect_max_age_s": 2.0,
+    "max_observation_workers": 1,
+    "queued_observation_replacements": 0,
+    "max_preview_admission_waiters": 1,
+    "frame_readiness_probe_s": 6.0
+  },
+  "artifacts": {
+    "uv.lock": "226d7d13f79771c31143b417c87723efde8ca15c4e3b7e378cf1e49daec38acf",
+    "eval/tasks/tabletop_pick_place_v1.yaml": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+    "outputs/policies/pick-v1.onnx": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+    "proto/embodiedrpc/control/v1/control.proto": "180914170530709c571ae8e574d8c0cfc0c6e571b966ff652949d05563f53eb2"
+  },
+  "fault_coverage": [
+    "bounded timeout and actual worker retention",
+    "cancellation drops late value and exception",
+    "no inherited invocation authority; driver write/step/reset denied",
+    "binding timeout never invokes handler or commits late binding",
+    "effect timeout preserves call outcome and cannot be replaced by late SAT",
+    "cancel after call return preserves known call and records unknown effect",
+    "observer/renderer busy blocks native admission, reset, stop and close",
+    "historical operation replay remains available during blocked observation",
+    "RPC query, Halt and supervisor remain responsive",
+    "RPC effect recheck timeout/cancel drops late evidence",
+    "bounded frame wait, no render queue and fresh retry",
+    "SQLite bindings and effects committed only on owner thread",
+    "preview admission waits for current frame without blocking the event loop",
+    "preview admission cancellation prevents later handler dispatch"
+  ],
+  "development_failure": {
+    "scope": "uncommitted development tree",
+    "file": "outputs/bounded-observation-development.xml",
+    "sha256": "e33efe0a8a84bceb5aa6445042d621fe9f1c6f1a86dde8f9fc06044e6e7afcb9",
+    "issue": "semantic chunk-age fixture mixed a controlled producer clock with real consumer time",
+    "resolution": "consumer uses the same injected clock; expiry budgets and assertions unchanged"
+  },
+  "qualified_limits": [
+    "In-process waiting and concurrency bounds only",
+    "No safe forced thread termination, GIL/native crash isolation or bounded process exit",
+    "Permanent native/provider hangs require controlled process restart",
+    "Read-only compatibility APIs remain synchronous and bounded; application/RPC paths are asynchronous",
+    "No database migration, new device driver or new cross-host clock protocol",
+    "pick-v1 remains below scripted baseline",
+    "Cloud qualification recorded separately"
+  ],
+  "javascript_syntax": "node --check console/app.js: passed",
+  "frontend_git_blob_sha256": "a7d59717e7ab2d9283c0cf44517f7a191ec8e86eaee047e9f3d9160a8145f0bf",
+  "prequalification_candidate": {
+    "commit": "47f68ccf928a1b362d76a69d1d1e282163f741ef",
+    "status": "never_activated",
+    "issue": "cold first frame returned bounded 503; the old smoke required immediate 200",
+    "diagnostic": "outputs/cloud/render-startup-47f68cc.json",
+    "sha256": "e12f70dd3eeaa687363c08b1526c4068c18d611d46fe2cb649f14ed37b19a82d",
+    "resolution": "finite readiness retries; sequential browser polling and one bounded cancellable preview handoff; 1-second worker budgets unchanged"
+  }
+}

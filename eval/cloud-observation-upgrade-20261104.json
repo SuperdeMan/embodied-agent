@@ -1,0 +1,219 @@
+{
+  "date_local": "2026-11-04",
+  "commit": "e8df7ad84e3a1f03604a608b836756f230f0dd5b",
+  "previous_commit": "5e2311f355034d32d1fb9fa4241f79fe1c9c159d",
+  "status": "activated",
+  "activation_id": "20261104T030336Z",
+  "image_id": "sha256:1f2cf92cb78a9fede23f16771ea36e18dca6f4802ca8a7c0d9db51cdbf34ea39",
+  "container_id": "a27f270a04049611022578aa06fd4b091695fbb43df5cd694a9ab0808e2223ad",
+  "config_commit": "cfb5997025fa77c1a89ab1e9fe2878c09db58cdd",
+  "compose_path": "/home/ubuntu/embodied-agent/runtime/compose-9b1c4be840f31b21.yaml",
+  "compose_sha256": "9b1c4be840f31b21bf4fa54c4e77a4c5530db1ced4e93d48c32b53becbed6b5b",
+  "url_template": "https://<tailnet-host>:8449/",
+  "target": "http://172.30.0.2:8390",
+  "volume": "embodied-agent-cloud_runtime",
+  "candidate": {
+    "archive_sha256": "c2c8cc14bcf57e6a07825e7556e036f20d8d30995e0ba53a71c523a16c21a111",
+    "passed": true,
+    "effect_verdicts": [
+      "sat",
+      "sat"
+    ],
+    "frame_attempts": [
+      {
+        "status": 503,
+        "bytes": 34
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 200,
+        "bytes": 31088
+      }
+    ],
+    "concurrent_preview_statuses": [
+      200,
+      200,
+      200
+    ],
+    "bounded_observation": {
+      "passed": true,
+      "timeout_probe_s": 0.10095454845577478,
+      "queued_replacements": 0
+    },
+    "other_containers_unchanged": true
+  },
+  "activation": {
+    "prior_operation_count": 4,
+    "backup_path": "/app/outputs/deployment-backups/pre-e8df7ad84e3a1f03604a608b836756f230f0dd5b-20261104T030336Z.sqlite3",
+    "backup_sha256": "2cd450f7a4194b84163f42f5e4cdcf54e424994651b2371d97fcbc011a1df005",
+    "effect_verdicts": [
+      "sat",
+      "sat"
+    ],
+    "frame_attempts": [
+      503,
+      503,
+      503,
+      503,
+      200
+    ],
+    "restart_marker_survived": true,
+    "restart_rows_unchanged": true,
+    "other_container_count": 39,
+    "other_containers_unchanged": true,
+    "other_serve_mappings_unchanged": true,
+    "funnel": false
+  },
+  "external": {
+    "passed": true,
+    "health": {
+      "status": "ok",
+      "release": "e8df7ad84e3a1f03604a608b836756f230f0dd5b",
+      "runtime": {
+        "environment": "simulation",
+        "planner": "offline",
+        "audio": "mock"
+      }
+    },
+    "tls_verified": true,
+    "html_bytes": 3263,
+    "js_sha256": "8aa6db67f6302686e0ac2464ce5048a32d1a1fe4872a5621307562965cac508b",
+    "js_matches_bundle": true,
+    "js_git_text_equivalent": true,
+    "frame_attempts": [
+      {
+        "status": 503,
+        "seconds": 1.0142345000058413
+      },
+      {
+        "status": 503,
+        "seconds": 0.01282640011049807
+      },
+      {
+        "status": 503,
+        "seconds": 0.02387899998575449
+      },
+      {
+        "status": 200,
+        "seconds": 0.32204679981805384
+      }
+    ],
+    "jpeg_bytes": 31088,
+    "jpeg_sha256": "0882399560750d370185b7f3a01f67af83ac1adf674cb18bc20578c3d6703dc8",
+    "preview_statuses": [
+      200
+    ],
+    "health_latencies_s": [
+      0.013683500001206994
+    ],
+    "steps": [
+      {
+        "type": "step",
+        "step_id": "s1",
+        "skill": "skill.manip.pick",
+        "status": "ok",
+        "detail": "obj_cube grasped and lifted",
+        "operation_id": "91927072ac5558ffaea07c75d0389c43",
+        "attempt_id": "480b77a6cf42478dbef27c8f19b34a4d",
+        "invocation_state": "RETURNED",
+        "stop_state": "NOT_REQUESTED"
+      },
+      {
+        "type": "step",
+        "step_id": "s2",
+        "skill": "skill.manip.place",
+        "status": "ok",
+        "detail": "obj_cube placed in bin_region",
+        "operation_id": "8cb7dd3e5bdc537aa49123931ead6d21",
+        "attempt_id": "4e2f154f2b9d4cc19b2ad80086fb35a5",
+        "invocation_state": "RETURNED",
+        "stop_state": "NOT_REQUESTED"
+      }
+    ],
+    "reply": {
+      "type": "reply",
+      "text": "已完成。\n- s1: 完成：obj_cube grasped and lifted\n- s2: 完成：obj_cube placed in bin_region"
+    },
+    "origin_checked": true
+  },
+  "post_external": {
+    "commit": "e8df7ad84e3a1f03604a608b836756f230f0dd5b",
+    "container_id": "a27f270a04049611022578aa06fd4b091695fbb43df5cd694a9ab0808e2223ad",
+    "image_id": "sha256:1f2cf92cb78a9fede23f16771ea36e18dca6f4802ca8a7c0d9db51cdbf34ea39",
+    "health": "healthy",
+    "ledger": {
+      "historical_rows_unchanged": true,
+      "historical_row_counts": {
+        "schema_version": 1,
+        "tasks": 2,
+        "operations": 4,
+        "attempts": 4,
+        "operation_events": 12
+      },
+      "states": {
+        "RETURNED": 8
+      },
+      "effect_events": 8,
+      "binding_events": 2
+    },
+    "volume": "embodied-agent-cloud_runtime",
+    "network_internal": true,
+    "limits": {
+      "Memory": 1610612736,
+      "NanoCpus": 1000000000,
+      "PidsLimit": 128,
+      "ReadonlyRootfs": true,
+      "CapDrop": [
+        "ALL"
+      ],
+      "SecurityOpt": [
+        "no-new-privileges:true"
+      ],
+      "PortBindings": {}
+    },
+    "user": "10001:10001",
+    "other_container_count": 39,
+    "activation_id": "20261104T030336Z"
+  },
+  "raw_artifacts": {
+    "activated-e8df7ad.json": {
+      "file": "outputs\\cloud\\activated-e8df7ad.json",
+      "sha256": "b3bae38df5857bca2d6ef9a65b4babea428ccb5636911474d5334dc45ec4d9b9"
+    },
+    "candidate-e8df7ad.json": {
+      "file": "outputs\\cloud\\candidate-e8df7ad.json",
+      "sha256": "3724d7ab0d480ccd1a71b1b5208c9f6adce6fb0db845af120efb5608e9bffe17"
+    },
+    "candidate-host-e8df7ad.json": {
+      "file": "outputs\\cloud\\candidate-host-e8df7ad.json",
+      "sha256": "6a87a8a0121825a8bc5565323675ee2f3398d0ac8a675840b446f3c61469fb76"
+    },
+    "external-e8df7ad.json": {
+      "file": "outputs\\cloud\\external-e8df7ad.json",
+      "sha256": "1add9b771eba4238b8ceecf86b68cc5b22fbafcc34ef696bd13b92c47f93dfb1"
+    },
+    "post-external-e8df7ad.json": {
+      "file": "outputs\\cloud\\post-external-e8df7ad.json",
+      "sha256": "c038604fdd29d12ebfdb86cb77fe4604f7f87ed001ac90401ed538680816d73f"
+    },
+    "activate_bounded_candidate.py": {
+      "file": "outputs\\cloud\\activate_bounded_candidate.py",
+      "sha256": "4e0907d6c7c8440d7774f0fa31456f2fd6b8bf718850fadcc4ca753eac92e0c5"
+    }
+  },
+  "limits": [
+    "Private simulation, offline planner, mock audio",
+    "Cold first frame may return 503 before readiness; per-work budget remains 1 second",
+    "Preview/task concurrent HTTP/WSS probes are not full browser or microphone qualification",
+    "Linux fault probe uses a 0.1-second injected budget; no hard realtime claim",
+    "Original volume and schema v1 retained; prior rows compared against backup",
+    "Cloud smoke is not cloud 30/30 task evaluation"
+  ]
+}
