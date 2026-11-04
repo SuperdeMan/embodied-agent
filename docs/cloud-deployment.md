@@ -1,8 +1,18 @@
 # 云端仿真控制台
 
-> 2026-11-04，当前 **activated**：应用镜像固定 `f27d0ac`，运行配置仍为 `cfb5997`，私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D026/D025/D024/2026-10-30 记录保留为历史。
+> 2026-11-04，当前 **activated**：应用镜像固定 `c1fc926`，运行配置仍为 `cfb5997`，私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D027/D026/D025/D024/2026-10-30 记录保留为历史。
 
-## D027 最近升级（2026-11-04）
+## D028 最近升级（2026-11-04）
+
+应用由 `f27d0ac` 升级至 `c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d`，激活回执 `20261104T113328Z`，镜像 ID `sha256:6cd3883e5b5adfde91d1f488632c60c084bfecfa70b2ef33c1e6725259d615c7`。修复持久化失败导致批量撤权或监督 Guard 闩锁遗漏的问题；既有 v2 schema、运行配置和数据卷保持。
+
+升级前备份包含 8 tasks / 16 operations / 16 attempts / 54 operation_events / 2 task_plans / 12 task_events；升级、抓放和重启后旧行逐条保留。真实 HTTPS/WSS 验证后为 10 tasks / 20 RETURNED operations / 4 task_plans / 24 task_events，全部任务查询无写入或重放。
+
+Linux 隔离候选与 SQLite FULL 取消检查通过，常驻健康、资源限制、39 个其他容器及 Serve 映射保持。仍为私网仿真/离线规划/模拟音频；未声称物理急停、完整浏览器/麦克风或真机验收。详见 [cloud-cancellation-upgrade-20261104.json](../eval/cloud-cancellation-upgrade-20261104.json)。
+
+首次部署前置检查 `20261104T113212Z` 在停写后的只读卷上无法打开 SQLite WAL 共享内存文件，未迁移 schema 或写入业务数据。先恢复原 v2 服务，再改为检查停写后的完整临时副本，第二次激活成功；未覆盖备份或丢弃记录，失败日志保留。
+
+## D027 升级（2026-11-04 历史）
 
 应用由 `505b60e` 升级至 `f27d0aca617bc09b3e24f2369fe5fdee7b78eeb4`，激活回执 `20261104T075640Z`，镜像 ID `sha256:6b474409db455e4d9fab20062cd02e7ffea36078ef384ad20763a3c0ea588cb8`。用户明确授权新增 `task_plans/task_events`；停止旧写者后独占账本、生成 v1 备份、单事务升级 v2，并核对旧业务内容摘要一致。
 

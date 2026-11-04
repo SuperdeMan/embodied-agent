@@ -89,4 +89,4 @@ D021 停止与受信恢复的实际边界见 [stop-reconciliation.md](stop-recon
 
 D022 统一动作准入见 [action-admission.md](action-admission.md)。包络在控制进程消费，不增设跨主机 raw-action RPC；慢推理沿用原输入观察引用，遥操作不加入模型工具目录。后续 D023 已接入本地对象 TTL 与失效传播；不能用本体反馈的新时间戳代替语义感知的新鲜度。
 
-D023 已接入本地对象级 TTL，实际范围见 [object-freshness.md](object-freshness.md)。D024 已验收[持久效果证据](effect-reconciliation.md)，调用、效果与停止分离，UNKNOWN 不自动翻转、不盲目重试。D025/D026 已验收[有界观察](bounded-observation.md)与[纯计算进程隔离](isolated-compute.md)，应用 `505b60e` 曾部署。D027 已完成[任务日志与只读恢复评估](task-recovery.md)，用户明确授权后新增 `task_plans/task_events` 并将云端账本升级为 v2，旧业务表与行不变，应用 `f27d0ac` 已部署。下一批优先 P1 故障矩阵和恢复权限协议，再推进多 attempt 规则；父进程物理控制隔离、跨机身份和真机停止仍需独立验证。
+D023 已接入本地对象级 TTL，实际范围见 [object-freshness.md](object-freshness.md)。D024 已验收[持久效果证据](effect-reconciliation.md)，调用、效果与停止分离，UNKNOWN 不自动翻转、不盲目重试。D025/D026 已验收[有界观察](bounded-observation.md)与[纯计算进程隔离](isolated-compute.md)，应用 `505b60e` 曾部署。D027 已完成[任务日志与只读恢复评估](task-recovery.md)，用户明确授权后新增 `task_plans/task_events` 并将云端账本升级为 v2，旧业务表与行不变，应用 `f27d0ac` 已部署。D028 已补存储故障与取消/监督组合检查、修复全量撤权顺序，参考故障矩阵 120 项通过，应用 `c1fc926` 已部署且 v2 schema 不变。下一批优先恢复权限协议，再推进多 attempt 规则；父进程物理控制隔离、跨机身份和真机停止仍需独立验证。

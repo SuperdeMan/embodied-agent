@@ -1,0 +1,375 @@
+{
+  "commit": "c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d",
+  "previous_commit": "f27d0aca617bc09b3e24f2369fe5fdee7b78eeb4",
+  "status": "activated",
+  "activation_id": "20261104T113328Z",
+  "image_id": "sha256:6cd3883e5b5adfde91d1f488632c60c084bfecfa70b2ef33c1e6725259d615c7",
+  "container_id": "45526e2788f298d74c34749b8de1243bf049fcd5747e3d773bb5bb43faf3479d",
+  "config_commit": "cfb5997025fa77c1a89ab1e9fe2878c09db58cdd",
+  "compose_path": "/home/ubuntu/embodied-agent/runtime/compose-9b1c4be840f31b21.yaml",
+  "compose_sha256": "9b1c4be840f31b21bf4fa54c4e77a4c5530db1ced4e93d48c32b53becbed6b5b",
+  "target": "http://172.30.0.2:8390",
+  "volume": "embodied-agent-cloud_runtime",
+  "date_local": "2026-11-04",
+  "url_template": "https://<tailnet-host>:8449/",
+  "schema_version": 2,
+  "schema_changed": false,
+  "backup": {
+    "backup": "/app/outputs/deployment-backups/pre-c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d-20261104T113328Z.sqlite3",
+    "sha256": "87dd9a164af93ce900611f8f089c452ccd0d17fe68a277fb508f09d614540793"
+  },
+  "post_external": {
+    "schema_version": 2,
+    "old_rows_preserved": {
+      "tasks": 8,
+      "operations": 16,
+      "attempts": 16,
+      "operation_events": 54,
+      "task_plans": 2,
+      "task_events": 12
+    },
+    "counts": {
+      "tasks": 10,
+      "operations": 20,
+      "attempts": 20,
+      "operation_events": 68,
+      "task_plans": 4,
+      "task_events": 24
+    },
+    "states": [
+      [
+        "RETURNED",
+        20
+      ]
+    ],
+    "tasks": [
+      {
+        "task_id": "2df415bffbb14e6fb06a94b0f7e9ae25",
+        "workflow": "LEGACY"
+      },
+      {
+        "task_id": "30ba68c59b9f45c082d7e903481de665",
+        "workflow": "FINISHED"
+      },
+      {
+        "task_id": "7ad259ab954d4e2c872b52d0b4bb32ba",
+        "workflow": "FINISHED"
+      },
+      {
+        "task_id": "9938df8ffac24d4681d15df5281d061a",
+        "workflow": "LEGACY"
+      },
+      {
+        "task_id": "a536b400692b4feb9ab0d12f0ed9e2f5",
+        "workflow": "FINISHED"
+      },
+      {
+        "task_id": "a6f3f23b91b54a18b4d44a55c0c137ba",
+        "workflow": "LEGACY"
+      },
+      {
+        "task_id": "abb81b7a8b9f42e8b1ada4219fc36e95",
+        "workflow": "LEGACY"
+      },
+      {
+        "task_id": "aca2c289c3d94d2eb8c7c508eb161854",
+        "workflow": "FINISHED"
+      },
+      {
+        "task_id": "cc730cb665de4965b847a92172842f48",
+        "workflow": "LEGACY"
+      },
+      {
+        "task_id": "ff961b0689c94c89bf1ee752ae1d9bac",
+        "workflow": "LEGACY"
+      }
+    ],
+    "all_task_queries_read_only": true,
+    "commit": "c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d",
+    "container_healthy": true,
+    "image_id": "sha256:6cd3883e5b5adfde91d1f488632c60c084bfecfa70b2ef33c1e6725259d615c7",
+    "runtime_limits_preserved": true
+  },
+  "linux_storage_fault": {
+    "passed": true,
+    "sqlite_errorcode": 13,
+    "operations": 2,
+    "all_revoked_before_first_write": true,
+    "cancel_all_wall_s": 0.0032347962260246277,
+    "physical_stop_measured": false,
+    "before_restart": [
+      "RUNNING",
+      "RUNNING"
+    ],
+    "after_restart": [
+      "OUTCOME_UNKNOWN",
+      "OUTCOME_UNKNOWN"
+    ],
+    "stop_states": [
+      "STOP_UNCONFIRMED",
+      "STOP_UNCONFIRMED"
+    ],
+    "automatic_resume": false,
+    "commit": "c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d"
+  },
+  "candidate": {
+    "passed": true,
+    "effect_verdicts": [
+      "sat",
+      "sat"
+    ],
+    "task_journal": {
+      "schema_version": 2,
+      "task_id": "da62c501ab32408e8b86648004390eea",
+      "events": 6,
+      "read_only": true
+    },
+    "frame_attempts": [
+      {
+        "status": 503,
+        "bytes": 34
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 503,
+        "bytes": 38
+      },
+      {
+        "status": 200,
+        "bytes": 31088
+      }
+    ],
+    "isolated_compute": {
+      "passed": true,
+      "faults": [
+        {
+          "fault": "hang",
+          "old_pid": 69,
+          "seconds": 0.10357924364507198,
+          "reaped": true,
+          "request_replayed": false
+        },
+        {
+          "fault": "gil_hang",
+          "old_pid": 73,
+          "seconds": 0.10366041492670774,
+          "reaped": true,
+          "request_replayed": false
+        },
+        {
+          "fault": "crash",
+          "old_pid": 77,
+          "seconds": 0.003460844047367573,
+          "reaped": true,
+          "request_replayed": false
+        },
+        {
+          "fault": "abort",
+          "old_pid": 81,
+          "seconds": 0.10362489335238934,
+          "reaped": true,
+          "request_replayed": false
+        },
+        {
+          "fault": "wrong_boot",
+          "old_pid": 85,
+          "seconds": 0.00796134676784277,
+          "reaped": true,
+          "request_replayed": false
+        },
+        {
+          "fault": "oversize",
+          "old_pid": 89,
+          "seconds": 0.003700723871588707,
+          "reaped": true,
+          "request_replayed": false
+        }
+      ],
+      "color_pid": 99,
+      "color_reference_equal": true,
+      "color_reaped": true,
+      "graceful_ack": true,
+      "exitcode": 0
+    },
+    "runtime_limits": {
+      "cpus": 1,
+      "memory_mib": 1536,
+      "ports": [],
+      "network": "none"
+    },
+    "archive_sha256": "397a8eeebd81fa9e66bfcc8a9cbdcfa2facff85f16307db5b5b80a0c0e8dea71"
+  },
+  "activation": {
+    "old_rows_preserved": {
+      "tasks": 8,
+      "operations": 16,
+      "attempts": 16,
+      "operation_events": 54,
+      "task_plans": 2,
+      "task_events": 12
+    },
+    "query_did_not_write": true,
+    "restart_preserved_rows": true,
+    "restart_automatic_resume_allowed": false,
+    "other_container_count": 39,
+    "other_containers_unchanged": true,
+    "existing_serve_mappings_unchanged": true,
+    "funnel": false
+  },
+  "external": {
+    "passed": true,
+    "tls_verified": true,
+    "health": {
+      "status": "ok",
+      "release": "c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d",
+      "runtime": {
+        "environment": "simulation",
+        "planner": "offline",
+        "audio": "mock"
+      }
+    },
+    "js_sha256": "8aa6db67f6302686e0ac2464ce5048a32d1a1fe4872a5621307562965cac508b",
+    "frame_attempts": [
+      503,
+      503,
+      503,
+      503,
+      503,
+      503,
+      503,
+      503,
+      503,
+      200
+    ],
+    "steps": [
+      {
+        "type": "step",
+        "step_id": "s1",
+        "task_id": "aca2c289c3d94d2eb8c7c508eb161854",
+        "skill": "skill.manip.pick",
+        "status": "ok",
+        "detail": "obj_cube grasped and lifted",
+        "operation_id": "659c1134875a582884f635dba9943728",
+        "attempt_id": "165b0112f7fe4abeb42706e3fd9ab4cd",
+        "invocation_state": "RETURNED",
+        "stop_state": "NOT_REQUESTED"
+      },
+      {
+        "type": "step",
+        "step_id": "s2",
+        "task_id": "aca2c289c3d94d2eb8c7c508eb161854",
+        "skill": "skill.manip.place",
+        "status": "ok",
+        "detail": "obj_cube placed in bin_region",
+        "operation_id": "724d0eea11535bd99bcff1b4c76b614d",
+        "attempt_id": "da2f60ecc45c41af8175379a6d7a6a0a",
+        "invocation_state": "RETURNED",
+        "stop_state": "NOT_REQUESTED"
+      }
+    ],
+    "listed_tasks": 10
+  },
+  "local_artifacts": [
+    {
+      "file": "outputs/cloud/activation-c1fc926.json",
+      "sha256": "a8af73cdfc70ad573e508a5c89894f9979019777170ff456f6b627e54b8dffe8"
+    },
+    {
+      "file": "outputs/cloud/candidate-c1fc926.json",
+      "sha256": "5b1a53d5612f974781a4b41002e2fd74808c5af68a52303d17314a5c11a262e8"
+    },
+    {
+      "file": "outputs/cloud/external-c1fc926.json",
+      "sha256": "883f8baada81962319b9c1c301267f88166c660237182611e5e23f5196e22f3c"
+    },
+    {
+      "file": "outputs/cloud/post-external-c1fc926.json",
+      "sha256": "d2de0fd348a8c24b59ec6500fc4201e3954f50e865cb68d635075320e1a21895"
+    },
+    {
+      "file": "outputs/cloud/cancel-faults-c1fc926.json",
+      "sha256": "07f7294d146ecd93de075580a554f73f430175b41ca2630bdf00f24ae273c3a4"
+    },
+    {
+      "file": "outputs/cloud/activate_cancel_candidate.py",
+      "sha256": "324e2a7d32fc52bef120be3ef6a770526c1dc8160e5f5d37a882f36272ec84c5"
+    },
+    {
+      "file": "outputs/cloud/cancel_linux_probe.py",
+      "sha256": "abc01b2f26b33b47910da6b864f46168c8891612635bf3046c95d666a810d935"
+    },
+    {
+      "file": "outputs/cloud/cancel_external_probe.py",
+      "sha256": "729cf11b23ed855e0a1695d674d51699517e84d5ea85eea89ff206e7d83ec363"
+    },
+    {
+      "file": "outputs/cloud/cancel_post_probe.py",
+      "sha256": "ebd93f9c653f62f7d907aa91d179172b12ab772b627858a595cd8861d81b3b73"
+    },
+    {
+      "file": "outputs/cloud/failed-activation-c1fc926.json",
+      "sha256": "2cd90850f248c686983057adff65fa7ec5d03f2d1d3afc35d424241ffa1eecb3"
+    },
+    {
+      "file": "outputs/cloud/preflight-recovery-c1fc926.json",
+      "sha256": "3866f815897622c48780276ee347cc10b1d2ebcbcbdc19e0d3734f1f080492e8"
+    }
+  ],
+  "boundaries": [
+    "Offline simulation and mock audio",
+    "No physical stop latency qualification",
+    "No executable resume",
+    "No full browser/microphone or hardware qualification",
+    "No downgrade rehearsal"
+  ],
+  "preflight_incident": {
+    "activation_id": "20261104T113212Z",
+    "stage": "stopped-writer schema preview",
+    "reason": "read-only volume lacked writable SQLite WAL shared-memory sidecar; backup could not open source",
+    "schema_changed": false,
+    "business_data_written": false,
+    "previous_v2_service_restored": true,
+    "backup_restored": false,
+    "fix": "inspect a coherent stopped-writer copy in writable tmpfs while original volume stays read-only",
+    "second_activation_passed": true
+  }
+}

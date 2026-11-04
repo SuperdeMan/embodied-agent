@@ -1,0 +1,275 @@
+{
+  "date_local": "2026-11-04",
+  "qualified_commit": "c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d",
+  "source_tree": "64098f615313e74fd2cdb66297d3429ebc12607f",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_version": 2,
+  "schema_changed": false,
+  "rpc_wire_changed": false,
+  "ruff": "passed",
+  "full_suite": {
+    "file": "outputs/cancel-c1fc926.xml",
+    "sha256": "422302535027c2444e1eb0511e5843a007120a3a3ed80dec1f7dfaca1c5c41a9",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "757",
+      "time": "106.831",
+      "timestamp": "2026-11-04T19:24:59.418368+08:00"
+    },
+    "warnings": 4,
+    "new_tests": 8
+  },
+  "rpc_suite": {
+    "file": "outputs/cancel-rpc-c1fc926.xml",
+    "sha256": "a693091245a647b2d4e9c9ba4cc0a457fb772b4f0f5a3fdbd81ec449eae4b20d",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "28",
+      "time": "4.091",
+      "timestamp": "2026-11-04T19:26:49.157626+08:00"
+    },
+    "included_in_full_suite": true
+  },
+  "fault_matrix": {
+    "file": "outputs/p1-faults/20261104T112653Z-c1fc926/report.json",
+    "sha256": "84749b4a45d39b8d55f69ee3f2eeb602e58a1ebf03743f836ed9d06ced58f396",
+    "result": {
+      "schema": "embodied.p1-fault-matrix/v1",
+      "commit": "c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d",
+      "working_tree_clean": true,
+      "matrix_sha256": "e850670023e7ea275b91925fec679a6f18324eb35f04244b6d4e2c34cd517854",
+      "reference_checks_passed": true,
+      "p1_complete": false,
+      "groups": [
+        {
+          "id": "storage_cancel",
+          "tests": [
+            "tests/runtime/test_cancel_storage_faults.py",
+            "tests/rpc/test_halt_storage_faults.py"
+          ],
+          "scope": "SQLite page-cap FULL, read/write failure, cancellation, Guard latch and watchdog",
+          "total": 8,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.109,
+            "max": 0.109
+          }
+        },
+        {
+          "id": "operation_crash_and_replay",
+          "tests": [
+            "tests/runtime/test_operations.py",
+            "tests/rpc/test_operation_protocol.py"
+          ],
+          "scope": "Abrupt owner exit, duplicate identity, restart and loopback RPC",
+          "total": 15,
+          "passed": 15,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.668,
+            "max": 0.668
+          }
+        },
+        {
+          "id": "task_recovery",
+          "tests": [
+            "tests/runtime/test_task_journal.py",
+            "tests/control/test_task_recovery.py",
+            "tests/rpc/test_task_protocol.py"
+          ],
+          "scope": "Task corruption, interrupted intent, scene change, read-only assessment",
+          "total": 29,
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.624,
+            "max": 0.927
+          }
+        },
+        {
+          "id": "incompatible_ledger",
+          "tests": [
+            "tests/runtime/test_task_schema.py"
+          ],
+          "scope": "Unknown schema, live-owner refusal, atomic migration rollback",
+          "total": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.039,
+            "max": 0.039
+          }
+        },
+        {
+          "id": "compute_process",
+          "tests": [
+            "tests/runtime/test_compute_process.py"
+          ],
+          "scope": "Worker timeout, crash, bad protocol, process reaping and no request replay",
+          "total": 20,
+          "passed": 20,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 1.486,
+            "max": 2.092
+          }
+        },
+        {
+          "id": "supervision_link",
+          "tests": [
+            "tests/rpc/test_process_split.py"
+          ],
+          "scope": "Loopback control/Guardian link loss, stale heartbeat, confirmation and latch",
+          "total": 9,
+          "passed": 9,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.611,
+            "max": 0.611
+          }
+        },
+        {
+          "id": "observation_availability",
+          "tests": [
+            "tests/runtime/test_observation_lane.py",
+            "tests/cognition/test_object_freshness.py"
+          ],
+          "scope": "Blocked read-only workers, stale or missing local perception; no real camera disconnect",
+          "total": 35,
+          "passed": 35,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.074,
+            "max": 0.115
+          }
+        }
+      ],
+      "open_gates": [
+        "Real storage-medium I/O failure and power loss",
+        "Physical control process native hang and independent hardware stop",
+        "Real camera disconnection and cross-host sensor clock validation",
+        "Authenticated cross-host recovery authority and multi-attempt protocol",
+        "Real network partition and field-device supervision",
+        "Physical stop latency, stale-action rate and real episode data loss metrics",
+        "Release compatibility and downgrade/recovery rehearsal after new v2 writes"
+      ],
+      "wall_duration_s": 28.46647570002824,
+      "returncode": 0,
+      "junit_sha256": "a8995e104f1e5ff0157292d05984be43584d4fab039cdd3b824cee7023514326"
+    }
+  },
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-112750.json",
+      "sha256": "7dfd1a259923afb176c8499b14839ab9cae53c6ed26b3e5e619357f1babe8339",
+      "result": {
+        "commit": "c1fc926",
+        "finished_at": "2026-11-04T11:27:50.102941+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "isolated_pick_v1_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-112815.json",
+      "sha256": "c27d2d943b098bf70b950cf9b30b94f46ca82395bc31b5324043a9cda4119623",
+      "result": {
+        "commit": "c1fc926",
+        "finished_at": "2026-11-04T11:28:15.978065+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "isolated_color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-113154.json",
+      "sha256": "80bdf389bde8fdbd20f248275fbb1c8931d1af7b7d9d8ce96e6bf72ff31068a1",
+      "result": {
+        "commit": "c1fc926",
+        "finished_at": "2026-11-04T11:31:54.447365+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+  "pick_v1_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+  "linux_storage_fault": {
+    "passed": true,
+    "sqlite_errorcode": 13,
+    "operations": 2,
+    "all_revoked_before_first_write": true,
+    "cancel_all_wall_s": 0.0032347962260246277,
+    "physical_stop_measured": false,
+    "before_restart": [
+      "RUNNING",
+      "RUNNING"
+    ],
+    "after_restart": [
+      "OUTCOME_UNKNOWN",
+      "OUTCOME_UNKNOWN"
+    ],
+    "stop_states": [
+      "STOP_UNCONFIRMED",
+      "STOP_UNCONFIRMED"
+    ],
+    "automatic_resume": false,
+    "commit": "c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d"
+  }
+}
