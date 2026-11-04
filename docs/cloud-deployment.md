@@ -1,8 +1,16 @@
 # 云端仿真控制台
 
-> 2026-11-04，当前 **activated**：应用镜像固定 `c1fc926`，运行配置仍为 `cfb5997`，私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D027/D026/D025/D024/2026-10-30 记录保留为历史。
+> 2026-11-04，当前 **activated**：应用镜像固定 `a29ad0e`，运行配置仍为 `cfb5997`，私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D028/D027/D026/D025/D024/2026-10-30 记录保留为历史。
 
-## D028 最近升级（2026-11-04）
+## D029 最近升级（2026-11-04）
+
+应用由 `c1fc926` 升级至 `a29ad0e796c201d7ea1eb1ead5f7d3d946553f4f`，激活回执 `20261104T123844Z`，镜像 ID `sha256:615787e0467da6996ef1da776d51969fa56c0c7beb60c08d9f2a212e749809ab`。恢复评估新增一致快照、操作身份绑定与明确拒绝执行授权；Guard 生命周期变化和传输/等待老化均纳入失效检查。
+
+维持原 v2 schema、运行配置及持久卷。升级前 10 tasks / 20 operations / 20 attempts / 68 operation_events / 4 task_plans / 24 task_events 在升级、抓放和 restart 后逐行保留；外部 HTTPS/WSS 后为 12 tasks / 24 RETURNED operations / 6 task_plans / 36 task_events。全部任务审查通过一致性检查且未产生写入或重放。
+
+Linux 候选、三种真实仿真审查路径和真实入口验证通过；其他 39 个容器与 Serve 映射保持。仍为私网仿真、离线规划、模拟音频；受信操作者认证、执行恢复、完整浏览器/麦克风及真机未验收。证据见 [cloud-review-upgrade-20261104.json](../eval/cloud-review-upgrade-20261104.json)。
+
+## D028 升级（2026-11-04 历史）
 
 应用由 `f27d0ac` 升级至 `c1fc92643ca739dc7f9a33f34ddabc62bfd05a5d`，激活回执 `20261104T113328Z`，镜像 ID `sha256:6cd3883e5b5adfde91d1f488632c60c084bfecfa70b2ef33c1e6725259d615c7`。修复持久化失败导致批量撤权或监督 Guard 闩锁遗漏的问题；既有 v2 schema、运行配置和数据卷保持。
 

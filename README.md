@@ -33,7 +33,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID
 uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID --cancel
 ```
 
-**远端状态与云端入口**：D019 已接入有时效的仿真快照，用于远端规划和效果验证；丢失、过期或旧代次不按成功处理。云端应用 `c1fc926` 已激活为私网 HTTPS 8449 仿真控制台，使用离线规划和模拟音频；真实地址从服务器 `current-release.json` 读取。范围、配置版本和实际验收见[云端部署记录](docs/cloud-deployment.md)。
+**远端状态与云端入口**：D019 已接入有时效的仿真快照，用于远端规划和效果验证；丢失、过期或旧代次不按成功处理。云端应用 `a29ad0e` 已激活为私网 HTTPS 8449 仿真控制台，使用离线规划和模拟音频；真实地址从服务器 `current-release.json` 读取。范围、配置版本和实际验收见[云端部署记录](docs/cloud-deployment.md)。
 
 **停止对账（D021）**：已实现受信仿真 profile 的确认式停止观测：等待实际工作线程退出，观测关节速度与夹持接触，证据落账后才释放资源。原操作仍保持 UNKNOWN，不自动重放，也不解除 Guard 闩锁。使用方式与验证范围见[停止与受信恢复](docs/stop-reconciliation.md)。
 
@@ -51,7 +51,9 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID 
 
 **存储故障与取消（D028）**：批量取消先撤销全部许可，单项账本异常不再跳过后续调用或 Guard 闩锁；参考检查与未关闭门禁见 [P1 故障矩阵](docs/p1-fault-matrix.md)。
 
-云端已于 2026-11-04 升级至 `c1fc926`，保持既有 v2 账本、原数据卷与全部历史行；仍是私网仿真/离线规划/模拟音频。实际运行与访问链证据见[云端部署](docs/cloud-deployment.md)。
+**恢复审查（D029）**：报告绑定任务/操作/尝试和控制上下文；异步检查期间发生变更或证据过期时失效，明确返回未授权执行。主体认证与执行授权尚未实现，见[恢复审查边界](docs/recovery-review.md)。
+
+云端已于 2026-11-04 升级至 `a29ad0e`，保持既有 v2 账本、原数据卷与全部历史行；仍是私网仿真/离线规划/模拟音频。实际运行与访问链证据见[云端部署](docs/cloud-deployment.md)。
 
 ## 现在就能跑的（M1 · 仿真闭环）
 
