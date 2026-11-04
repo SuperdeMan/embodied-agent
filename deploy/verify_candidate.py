@@ -34,17 +34,34 @@ async def main():
                 assert response.status==503 and time.monotonic()<frame_deadline
             await asyncio.sleep(0.25)
         steps = []
+        preview_statuses=[]
+        preview_stop=asyncio.Event()
+        async def preview():
+            while not preview_stop.is_set():
+                async with session.get('http://127.0.0.1:8390/api/scene.jpg') as frame:
+                    data=await frame.read()
+                    assert frame.status in (200,503)
+                    if frame.status==200: assert data[:2]==bytes([255,216])
+                    preview_statuses.append(frame.status)
+                await asyncio.sleep(0.2)
         async with session.ws_connect('http://127.0.0.1:8390/ws/session', origin='http://127.0.0.1:8390') as ws:
             hello = await ws.receive_json()
             assert hello['type'] == 'hello'
-            await ws.send_json({'type':'text','text':'把红色方块放进盒子'})
-            while True:
-                message = await asyncio.wait_for(ws.receive(), 90)
-                assert message.type == WSMsgType.TEXT
-                event = json.loads(message.data)
-                if event['type'] == 'step': steps.append(event)
-                if event['type'] == 'error': raise AssertionError(event['message'])
-                if event['type'] == 'reply': break
+            polling=asyncio.create_task(preview())
+            try:
+                await asyncio.sleep(0.02)
+                await ws.send_json({'type':'text','text':'把红色方块放进盒子'})
+                while True:
+                    message = await asyncio.wait_for(ws.receive(), 90)
+                    assert message.type == WSMsgType.TEXT
+                    event = json.loads(message.data)
+                    if event['type'] == 'step': steps.append(event)
+                    if event['type'] == 'error': raise AssertionError(event['message'])
+                    if event['type'] == 'reply': break
+            finally:
+                preview_stop.set()
+                await asyncio.wait_for(polling,3)
+        assert 200 in preview_statuses
         assert len(steps) == 2 and all(step['status']=='ok' and step['operation_id'] for step in steps)
         with sqlite3.connect('/app/outputs/runtime/operations.sqlite3') as db:
             states = [row[0] for row in db.execute('SELECT state FROM operations')]
@@ -79,6 +96,7 @@ async def main():
         print(json.dumps({'passed':True,'health':health,'jpeg_bytes':len(image),'steps':steps,
                           'operation_states':states,'effect_verdicts':[e['verdict'] for e in evidence],
                           'frame_attempts':frame_attempts,
+                          'concurrent_preview_statuses':preview_statuses,
                           'bounded_observation':{'passed':True,'timeout_probe_s':latency,'queued_replacements':0}}))
 asyncio.run(main())
 '''
