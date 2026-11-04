@@ -38,3 +38,6 @@
 | 2026-11-04 | 505b60e | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D026 纯计算进程隔离后的干净提交；脚本 + 真值 + 离线规划，UTC 文件 20261104-055837；完整测试 715 passed，证据见 `eval/isolated-compute-20261104.json` |
 | 2026-11-04 | 505b60e | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | 隔离 pick-v1 ONNX + 脚本 place + 真值；模型摘要及第 14 局 horizon reached 失败详情与 D025 相同，UTC 文件 20261104-055900。*不劣于脚本目标仍未关闭 |
 | 2026-11-04 | 505b60e | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + 隔离 color/RGB-D + 独立真值裁判；实际检测和渲染跨进程，UTC 文件 20261104-060229。Linux 故障回收、云端并行预览与抓放另见 `eval/cloud-compute-upgrade-20261104.json` |
+| 2026-11-04 | f27d0ac | tabletop_pick_place@v1 | 30/30 | PASS | D027 任务日志与只读恢复评估；scripted_truth，干净提交；原任务参数与时效预算保持。结果 075132，完整测试 749 passed，证据见 `eval/task-recovery-20261104.json` |
+| 2026-11-04 | f27d0ac | tabletop_pick_place@v1 | 29/30 | PASS* | D027 任务日志与只读恢复评估；isolated_pick_v1_truth，干净提交；第 14 局 horizon reached 保留，不劣于脚本目标未关闭。结果 075158，完整测试 749 passed，证据见 `eval/task-recovery-20261104.json` |
+| 2026-11-04 | f27d0ac | tabletop_pick_place@v1 | 30/30 | PASS | D027 任务日志与只读恢复评估；isolated_color，干净提交；原任务参数与时效预算保持。结果 075618，完整测试 749 passed，证据见 `eval/task-recovery-20261104.json` |

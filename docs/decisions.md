@@ -268,3 +268,5 @@
 **替代方案**：立即抽共享内核（抽象未经两个运行场景检验）；将无人机直接并入本仓控制与安全模块（领域语义耦合）。两者均不采用。
 
 **重估触发器**：两项目建立并通过同一组公共契约测试，同时保留各自本体评测基线；或再出现新的本体消费者。对应决策与迁移边界见 [drone-agent D001](https://github.com/SuperdeMan/drone-agent/blob/main/docs/decisions.md#d001--独立仓库复用姊妹项目采用复制改造抽公共内核有明确触发器) 与 [复用清单](https://github.com/SuperdeMan/drone-agent/blob/main/docs/reuse-from-embodied-agent.md)。本条只补充重估结论，不修改本仓执行代码或历史评测结果。
+
+D027 验收补记（2026-11-04）：用户明确授权 v2 迁移与部署，`f27d0ac` 已在云端激活。停写后的 v1 备份与升级后旧业务内容摘要一致，新增任务、重启和外部访问后旧行仍完整。749 项测试与三组原任务回归见 `eval/task-recovery-20261104.json`，云端证据见 `eval/cloud-task-upgrade-20261104.json`。该交付不关闭自动续跑、多 attempt 或真机恢复门禁。

@@ -6,11 +6,11 @@
 
 **平台升级 P0/P1 进行中（2026-10-29）**。按用户指定完整方案原仓演进，先补可信执行，再做真机、本体和算力扩展。当前优先级与批次状态见 `docs/platform-upgrade.md` 和 `docs/roadmap.md`；历史 M0–M2 进展见 `docs/roadmap-milestones.md`。脚本/感知/ACT、评测任务及历史负结果保留；旧学习策略 29/30 尚未完成“不劣于脚本”目标。硬件、模型、RPC 结果必须绑定实际运行配置与提交，不跨版本借用证据。
 
-本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。本轮 commit/push、D018 新 SQLite 五表及 nightly 注释补齐已获用户明确授权；后续不同范围的敏感变更仍按红线确认。
+本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。本轮 commit/push、D018 新 SQLite 五表、D027 两表追加及 v2 云端迁移部署、nightly 注释补齐已获用户明确授权；后续不同范围的敏感变更仍按红线确认。
 
-云端仿真参考入口已按用户授权升级：应用 `505b60e`（2026-11-04）、私网 HTTPS 8449，当前为离线规划/模拟音频。渲染/JPEG 使用独立 worker；原数据卷和历史行保留，抓放、并行预览、进程故障回收及重启持久性已验证。准确配置与证据见 `docs/cloud-deployment.md`；后续 Git 主线前进不等于云端自动更新。
+云端仿真参考入口已按用户授权升级：应用 `f27d0ac`（2026-11-04）、私网 HTTPS 8449，当前为离线规划/模拟音频。渲染/JPEG 使用独立 worker；原数据卷和历史行保留，抓放、并行预览、进程故障回收及重启持久性已验证。准确配置与证据见 `docs/cloud-deployment.md`；后续 Git 主线前进不等于云端自动更新。
 
-开发主线 D021–D025 已接入仿真停止对账、统一动作准入、对象时效、持久效果与有界观察。D026 接入纯计算进程隔离（`docs/isolated-compute.md`）：检测、ONNX 与状态副本渲染不接收执行句柄，失败不重发。后续优先任务恢复与 P1 剩余门禁；父进程物理控制的原生隔离、多 attempt 自动恢复、跨机视觉时钟和真机停止尚未验收。用户已授权必要云端部署，实际运行版本以 `docs/cloud-deployment.md` 与部署回执为准。
+开发主线 D021–D025 已接入仿真停止对账、统一动作准入、对象时效、持久效果与有界观察。D026 接入纯计算进程隔离（`docs/isolated-compute.md`）：检测、ONNX 与状态副本渲染不接收执行句柄，失败不重发。D027 已验收计划/意图/回执日志、只读恢复评估与授权的 schema v2 云端迁移（`docs/task-recovery.md`）；后续优先 P1 故障矩阵与恢复权限协议；父进程物理控制的原生隔离、多 attempt 自动恢复、跨机视觉时钟和真机停止尚未验收。用户已授权必要云端部署，实际运行版本以 `docs/cloud-deployment.md` 与部署回执为准。
 
 ## 目录结构
 

@@ -1,0 +1,138 @@
+{
+  "date_local": "2026-11-04",
+  "timezone": "Asia/Singapore",
+  "qualified_commit": "f27d0aca617bc09b3e24f2369fe5fdee7b78eeb4",
+  "source_tree": "18597cfdd0778bd390fc82bd8dcbfcc4b07d4b82",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_version": 2,
+  "explicit_v1_upgrade_required": true,
+  "automatic_resume_allowed": false,
+  "ruff": "passed",
+  "proto_generation": "scripts/gen-proto.ps1: 4 files generated",
+  "full_suite": {
+    "file": "outputs/task-f27d0ac.xml",
+    "sha256": "2e9afd44d89225cbe97e2d68cc0d706a29031fabc3640c957ff00e2b21f593d3",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "749",
+      "time": "106.607",
+      "timestamp": "2026-11-04T15:49:14.164468+08:00",
+      "hostname": "SuperdeMan"
+    },
+    "command": "uv run pytest -q -o addopts= --import-mode=importlib --junitxml=outputs/task-f27d0ac.xml",
+    "warnings": 4,
+    "new_tests": 34
+  },
+  "rpc_suite": {
+    "file": "outputs/task-rpc-f27d0ac.xml",
+    "sha256": "b57eac60cc66fb43566206a39e5fda9befb24a0d76e4d8192f06bfe23c745b79",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "25",
+      "time": "4.236",
+      "timestamp": "2026-11-04T15:51:03.845792+08:00",
+      "hostname": "SuperdeMan"
+    },
+    "command": "uv run --group rpc pytest tests/rpc -q -o addopts= --import-mode=importlib --junitxml=outputs/task-rpc-f27d0ac.xml",
+    "included_in_full_suite": true
+  },
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-075132.json",
+      "sha256": "eb497c96d6238c08958ba497f4dab8f829d773dbedff415ada3f8b99bdbeeabe",
+      "result": {
+        "commit": "f27d0ac",
+        "finished_at": "2026-11-04T07:51:32.729096+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "isolated_pick_v1_truth",
+      "command": "uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --pick-policy outputs/policies/pick-v1.onnx",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-075158.json",
+      "sha256": "53dccd1c66515d714357c42ed97adc2df6417d1ff7a3684b4a41b8905da12f7e",
+      "result": {
+        "commit": "f27d0ac",
+        "finished_at": "2026-11-04T07:51:58.109097+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "isolated_color",
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --perception color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-075618.json",
+      "sha256": "61b71a68b8dcd8bdf7d27a7db8a0288fafc1930cca2ea609d3d0823037827cfc",
+      "result": {
+        "commit": "f27d0ac",
+        "finished_at": "2026-11-04T07:56:18.203078+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+  "pick_v1_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+  "coverage": [
+    "atomic v1 migration and old-row preservation",
+    "exclusive ownership and running-operation refusal",
+    "plan/intent/result persistence failure",
+    "malformed/corrupt journal rejection",
+    "receiver-owned confirmation and manifests",
+    "revision identity and capacity",
+    "real process exit and cancellation",
+    "scene reset and unknown-result continuation refusal",
+    "forged receipts cannot release dependencies",
+    "RPC and HTTP read-only history"
+  ],
+  "boundaries": [
+    "No executable resume or automatic retry",
+    "FINISHED means planner turn ended, not goal achieved",
+    "Historical SAT is not current authority",
+    "No real hardware or cross-host authenticated recovery qualification",
+    "Existing ONNX seed 1 episode 14 horizon failure remains"
+  ]
+}

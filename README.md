@@ -33,7 +33,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID
 uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID --cancel
 ```
 
-**远端状态与云端入口**：D019 已接入有时效的仿真快照，用于远端规划和效果验证；丢失、过期或旧代次不按成功处理。云端应用 `212f912` 已激活为私网 HTTPS 8449 仿真控制台，使用离线规划和模拟音频；真实地址从服务器 `current-release.json` 读取。范围、配置版本和实际验收见[云端部署记录](docs/cloud-deployment.md)。
+**远端状态与云端入口**：D019 已接入有时效的仿真快照，用于远端规划和效果验证；丢失、过期或旧代次不按成功处理。云端应用 `f27d0ac` 已激活为私网 HTTPS 8449 仿真控制台，使用离线规划和模拟音频；真实地址从服务器 `current-release.json` 读取。范围、配置版本和实际验收见[云端部署记录](docs/cloud-deployment.md)。
 
 **停止对账（D021）**：已实现受信仿真 profile 的确认式停止观测：等待实际工作线程退出，观测关节速度与夹持接触，证据落账后才释放资源。原操作仍保持 UNKNOWN，不自动重放，也不解除 Guard 闩锁。使用方式与验证范围见[停止与受信恢复](docs/stop-reconciliation.md)。
 
@@ -47,7 +47,9 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID 
 
 **纯计算隔离（D026）**：检测、ONNX 推理和状态副本渲染/JPEG 编码移入受控子进程，执行许可与账本留在父进程；失败后回收，显式恢复不重放动作。范围见[进程隔离](docs/isolated-compute.md)。
 
-云端已于 2026-11-04 升级至 `505b60e`，启用隔离渲染，保留原数据卷与历史记录；仍是私网仿真/离线规划/模拟音频。实际运行与访问链证据见[云端部署](docs/cloud-deployment.md)。
+**任务日志与只读恢复（D027）**：计划版本、步骤意图和执行器回执持久化；HTTP/RPC 可查询历史及已有证据当前资格。重启不续跑，历史 SAT 不授予当前执行权限。旧账本须显式升级至 v2，流程见[任务恢复](docs/task-recovery.md)。
+
+云端已于 2026-11-04 升级至 `f27d0ac`，账本显式迁移至 v2，保留原数据卷与全部历史行；仍是私网仿真/离线规划/模拟音频。实际运行与访问链证据见[云端部署](docs/cloud-deployment.md)。
 
 ## 现在就能跑的（M1 · 仿真闭环）
 
