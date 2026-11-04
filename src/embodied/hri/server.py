@@ -180,12 +180,13 @@ class ConsoleSession:
                 )
                 await self.send({
                     "type": "step", "step_id": r.step_id,
+                    "task_id": getattr(turn, "task_id", ""),
                     "skill": plan_step.skill if plan_step else "",
                     "status": r.status.value, "detail": r.detail or r.error,
                     "operation_id": r.operation_id, "attempt_id": r.attempt_id,
                     "invocation_state": r.invocation_state, "stop_state": r.stop_state,
                 })
-            await self.send({"type": "reply", "text": turn.text})
+            await self.send({"type": "reply", "text": turn.text, "task_id": getattr(turn, "task_id", "")})
             await self._speak(turn.text)
 
     async def _speak(self, text: str) -> None:
@@ -378,8 +379,24 @@ async def health_handler(request: web.Request) -> web.Response:
         ctx.registry.get_operation("health-check")
     except Exception:
         return web.json_response({"status": "unavailable"}, status=503)
+    if ctx.registry.ledger.schema_version < 2:
+        return web.json_response({"status": "maintenance", "reason": "task_journal_upgrade_required",
+                                  "release": os.getenv("EMBODIED_RELEASE", "development")}, status=503)
     return web.json_response({"status": "ok", "release": os.getenv("EMBODIED_RELEASE", "development"),
                               "runtime": ctx.runtime_info})
+
+
+async def tasks_handler(request: web.Request) -> web.Response:
+    ctx = request.app[CTX_KEY]
+    try:
+        task_id = request.match_info.get("task_id")
+        if not task_id:
+            return web.json_response(ctx.registry.list_tasks(int(request.query.get("limit", "20"))))
+        report = (await ctx.registry.reconcile_task(task_id) if request.query.get("assess") == "1"
+                  else ctx.registry.get_task(task_id))
+        return web.json_response(report, status=200 if report["found"] else 404)
+    except (ValueError, RuntimeError):
+        return web.json_response({"error": "task_query_unavailable", "automatic_resume_allowed": False}, status=400)
 
 
 def build_app(ctx: AppContext) -> web.Application:
@@ -389,6 +406,8 @@ def build_app(ctx: AppContext) -> web.Application:
     app.router.add_get("/api/scene.jpg", scene_handler)
     app.router.add_get("/", index_handler)
     app.router.add_get("/healthz", health_handler)
+    app.router.add_get("/api/tasks", tasks_handler)
+    app.router.add_get("/api/tasks/{task_id}", tasks_handler)
     app.router.add_static("/console", CONSOLE_DIR)
     async def cleanup(app):
         await ctx.close()

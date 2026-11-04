@@ -110,6 +110,7 @@ class PlanContext:
     raw_text: str = ""
     task_id: str = field(default_factory=lambda: uuid4().hex)
     plan_revision: int = 1
+    journal_started: bool = False
 
 
 class CyclicPlan(Exception):

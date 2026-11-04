@@ -21,6 +21,7 @@ import grpc
 from embodied.contracts.effect import EFFECT_MAX_AGE_S, EffectEvidence, effect_digest
 from embodied.contracts.observation import ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
+from embodied.contracts.task import TaskJournalError
 from embodied.runtime.rpcgen import import_control
 from embodied.runtime.world_state import SnapshotAdmission
 from embodied.skills.manifest import SkillManifest
@@ -114,6 +115,50 @@ class RemoteSkillRegistry:
 
     async def get_operation(self, operation_id: str):
         return await self._stub.GetOperation(self._pb2.OperationRequest(operation_id=operation_id), timeout=5)
+
+    @staticmethod
+    def _task_result(reply):
+        if reply.error:
+            raise TaskJournalError(reply.error)
+        return json.loads(reply.report_json) if reply.report_json else {"found": False}
+
+    async def record_task_plan(self, payload):
+        reply = await self._stub.RecordTaskPlan(self._pb2.TaskPlanRequest(plan_json=json.dumps(payload, allow_nan=False)), timeout=5)
+        return self._task_result(reply)
+
+    async def record_task_intent(self, task_id, revision, step_id, params):
+        return await self._record_task_step(task_id, revision, step_id, "intent", params)
+
+    async def record_task_result(self, task_id, revision, step_id, result):
+        return await self._record_task_step(task_id, revision, step_id, "result", result)
+
+    async def _record_task_step(self, task_id, revision, step_id, kind, payload):
+        reply = await self._stub.RecordTaskStep(self._pb2.TaskStepRequest(task_id=task_id, revision=revision,
+            step_id=step_id, kind=kind, payload_json=json.dumps(payload, allow_nan=False)), timeout=5)
+        return self._task_result(reply)
+
+    async def finish_task(self, task_id, *, interrupted=False):
+        reply = await self._stub.FinishTask(self._pb2.TaskFinishRequest(task_id=task_id, interrupted=interrupted), timeout=5)
+        return self._task_result(reply)
+
+    async def get_task(self, task_id):
+        return self._task_result(await self._stub.GetTask(self._pb2.TaskRequest(task_id=task_id), timeout=5))
+
+    async def list_tasks(self, limit=20):
+        reply = await self._stub.ListTasks(self._pb2.TaskListRequest(limit=limit), timeout=5)
+        if reply.error:
+            raise TaskJournalError(reply.error)
+        return json.loads(reply.tasks_json)
+
+    async def reconcile_task(self, task_id):
+        started = time.monotonic()
+        report = self._task_result(await self._stub.ReconcileTask(self._pb2.TaskRequest(task_id=task_id), timeout=5))
+        elapsed = time.monotonic() - started
+        for step in report.get("steps", []):
+            current = step["current_effect"]
+            if current.get("eligible") and not 0 <= current.get("age_s", EFFECT_MAX_AGE_S) + elapsed < EFFECT_MAX_AGE_S:
+                step["current_effect"] = {"eligible": False, "verdict": "unknown", "reason": "task_report_transport_stale"}
+        return report
 
     async def reconcile_effect(self, operation_id: str, attempt_id: str):
         return await self._stub.ReconcileEffect(self._pb2.EffectRequest(

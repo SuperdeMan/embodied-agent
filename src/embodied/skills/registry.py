@@ -146,6 +146,54 @@ class SkillRegistry:
             raise ObservationUnavailable("runtime_closed")
         return await self._observations.call(function, *args, **kwargs)
 
+    def record_task_plan(self, payload):
+        self.check_thread()
+        from embodied.runtime.task_journal import record_plan
+        return record_plan(self, payload)
+
+    def record_task_intent(self, task_id, revision, step_id, params):
+        self.check_thread()
+        from embodied.runtime.task_journal import record_intent
+        record_intent(self, task_id, revision, step_id, params)
+
+    def record_task_result(self, task_id, revision, step_id, result):
+        self.check_thread()
+        from embodied.runtime.task_journal import record_result
+        record_result(self, task_id, revision, step_id, result)
+
+    def finish_task(self, task_id, *, interrupted=False):
+        self.check_thread()
+        from embodied.runtime.task_journal import finish_task
+        finish_task(self, task_id, interrupted=interrupted)
+
+    def get_task(self, task_id):
+        self.check_thread()
+        from embodied.runtime.task_journal import report_task
+        return report_task(self, task_id)
+
+    def list_tasks(self, limit=20):
+        self.check_thread()
+        if type(limit) is not int or not 1 <= limit <= 50:
+            raise ValueError("task list limit must be in [1,50]")
+        ids = [row[0] for row in self.ledger._db.execute("SELECT task_id FROM tasks ORDER BY updated_at DESC,task_id LIMIT ?", (limit,))]
+        result = []
+        for task_id in ids:
+            report = self.get_task(task_id)
+            result.append({key: report[key] for key in ("task_id", "robot_id", "workflow", "automatic_resume_allowed")})
+        return result
+
+    async def reconcile_task(self, task_id):
+        report = self.get_task(task_id)
+        report["assessment"] = "current_eligibility_only"
+        for step in report.get("steps", []):
+            evidence = step["historical_effect"]
+            if not evidence or not step["manifest_matches"]:
+                continue
+            check = await self.check_effect_async(step["operation_id"], step["attempt_id"], evidence["evidence_id"],
+                                                   effect_digest(self.get(step["skill"]).verification))
+            step["current_effect"] = {key: check[key] for key in ("eligible", "verdict", "age_s", "reason")}
+        return report
+
     def configure_effect_observer(self, embodiment) -> None:
         self.check_thread()
         if embodiment.action_controller is not self._execution_controller:
@@ -297,6 +345,8 @@ class SkillRegistry:
                 outcome.data["_operation_replay"] = True
             yield outcome
             return
+        from embodied.runtime.task_journal import validate_dispatch
+        validate_dispatch(self, identity, digest)
         if self.observation_pending:
             yield SkillResult(ok=False, detail="observation_worker_busy", operation_id=identity.operation_id,
                               invocation_state="REJECTED")

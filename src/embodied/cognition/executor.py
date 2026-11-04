@@ -52,6 +52,7 @@ class DagExecutor:
         registry: SkillRegistry,
         confirm: ConfirmCallback | None = None,
         world_fn: Callable[[], Any] | None = None,
+        journal: bool = False,
     ) -> None:
         """
         registry: the only gate to the physical world (invoke enforces its own confirm check
@@ -66,6 +67,11 @@ class DagExecutor:
         self._registry = registry
         self._confirm = confirm
         self._world_fn = world_fn
+        self._journal = journal
+
+    async def _journal_call(self, method, *args, **kwargs):
+        value = getattr(self._registry, method)(*args, **kwargs)
+        return await value if inspect.isawaitable(value) else value
 
     async def run(
         self, plan: Plan, ctx: PlanContext, done: dict[str, StepResult] | None = None
@@ -77,6 +83,18 @@ class DagExecutor:
             logger.error("cyclic plan: %s", e)
             yield StepResult(step_id="plan", status=StepStatus.FAILED, error=str(e))
             return
+
+        if self._journal and plan.steps:
+            try:
+                payload = {"task_id": ctx.task_id, "revision": ctx.plan_revision, "goal": plan.goal or ctx.raw_text,
+                           "steps": [{key: getattr(s, key) for key in
+                                      ("id", "skill", "params", "depends_on", "param_refs", "operation_id")} for s in plan.steps]}
+                await self._journal_call("record_task_plan", payload)
+                ctx.journal_started = True
+            except Exception as exc:
+                yield StepResult(step_id="plan", status=StepStatus.FAILED, error=f"task_journal_failed:{type(exc).__name__}",
+                                 detail=str(exc))
+                return
 
         for layer in layers:
             runnable = [s for s in layer if s.id not in done and self._should_run(s, done)]
@@ -94,6 +112,7 @@ class DagExecutor:
                     res = StepResult(
                         step_id=step.id, status=StepStatus.FAILED, error=f"unexpected result: {res}"
                     )
+                res = await self._record_result(ctx, res)
                 done[res.step_id] = res
                 yield res
             # 显式呈现跳过步骤，确保汇报涵盖每一步的去向。
@@ -102,7 +121,21 @@ class DagExecutor:
             before = set(done)
             self._mark_skipped(plan.steps, done)
             for sid in set(done) - before:
+                done[sid] = await self._record_result(ctx, done[sid])
                 yield done[sid]
+
+    async def _record_result(self, ctx, result):
+        if not self._journal:
+            return result
+        payload = {key: getattr(result, key) for key in ("detail", "error", "operation_id", "attempt_id", "invocation_state", "stop_state")}
+        payload.update(status=result.status.value, effect_evidence_id=(result.data.get("_effect") or {}).get("evidence_id"),
+                       verify_verdict=(result.data.get("_verify") or {}).get("verdict"))
+        try:
+            await self._journal_call("record_task_result", ctx.task_id, ctx.plan_revision, result.step_id, payload)
+        except Exception:
+            result.status = StepStatus.FAILED
+            result.error = "task_result_persistence_failed"
+        return result
 
     async def _exec_step(self, step: Step, done: dict, ctx: PlanContext) -> StepResult:
         self._resolve_param_refs(step, done)
@@ -136,6 +169,11 @@ class DagExecutor:
             task_id=ctx.task_id, operation_id=step.operation_id or uuid5(NAMESPACE_URL, f"{ctx.task_id}:{step.id}").hex,
             plan_revision=ctx.plan_revision,
         )
+        if self._journal:
+            try:
+                await self._journal_call("record_task_intent", ctx.task_id, ctx.plan_revision, step.id, dict(step.params))
+            except Exception as exc:
+                return StepResult(step_id=step.id, status=StepStatus.FAILED, error="task_intent_persistence_failed", detail=str(exc))
         result = await self._invoke_once(step, confirmed, operation=identity)
         result = await self._verify_outcome(step, result)
         if result.status == StepStatus.OK:

@@ -19,7 +19,7 @@ from embodied.contracts.effect import EffectEvidence, EffectRejected, effect_dig
 from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.stopping import StopEvidence, StopProfile, StopRejected, StopRequest, validate_stop_evidence
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MAX_RESULT_BYTES = 1_048_576
 _SCHEMA = """
 BEGIN IMMEDIATE;
@@ -54,6 +54,26 @@ class OperationConflict(RuntimeError):
 
 class LedgerUnavailable(RuntimeError):
     pass
+
+
+def take_ledger_lock(path: Path):
+    stream = path.open("a+b")
+    try:
+        if os.name == "nt":
+            import msvcrt
+            stream.seek(0, 2)
+            if not stream.tell():
+                stream.write(b"\0")
+                stream.flush()
+            stream.seek(0)
+            msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as exc:
+        stream.close()
+        raise LedgerUnavailable("operation ledger already owned by another runtime") from exc
+    return stream
 
 
 def request_digest(skill: str, params: dict, manifest: dict, robot_id: str) -> str:
@@ -98,13 +118,19 @@ class OperationLedger:
             self._db.execute("PRAGMA foreign_keys=ON")
             tables = {row[0] for row in self._db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not tables:
-                self._db.executescript(_SCHEMA)
+                from embodied.runtime.task_schema import TASK_DDL
+                self._db.executescript(_SCHEMA.rsplit("COMMIT;", 1)[0] + ";".join(TASK_DDL)
+                                       + ";UPDATE schema_version SET version=2;COMMIT;")
+                self.schema_version = SCHEMA_VERSION
             else:
                 if "schema_version" not in tables:
                     raise LedgerUnavailable("unrecognized operation ledger schema")
                 versions = [row[0] for row in self._db.execute("SELECT version FROM schema_version")]
-                if versions != [SCHEMA_VERSION]:
+                if versions not in ([1], [SCHEMA_VERSION]):
                     raise LedgerUnavailable("unsupported operation ledger schema version")
+                self.schema_version = versions[0]
+                if self.schema_version == 2 and not {"task_plans", "task_events"}.issubset(tables):
+                    raise LedgerUnavailable("incomplete task journal schema")
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("PRAGMA synchronous=FULL")
             self._recover()
@@ -113,25 +139,7 @@ class OperationLedger:
             raise
 
     def _take_lock(self, path: Path) -> None:
-        stream = path.open("a+b")
-        try:
-            if os.name == "nt":
-                import msvcrt
-
-                stream.seek(0, 2)
-                if not stream.tell():
-                    stream.write(b"\0")
-                    stream.flush()
-                stream.seek(0)
-                msvcrt.locking(stream.fileno(), msvcrt.LK_NBLCK, 1)
-            else:
-                import fcntl
-
-                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError as exc:
-            stream.close()
-            raise LedgerUnavailable("operation ledger already owned by another runtime") from exc
-        self._lock_file = stream
+        self._lock_file = take_ledger_lock(path)
 
     def close(self) -> None:
         if self._db is not None:
@@ -146,6 +154,8 @@ class OperationLedger:
         running = list(self._db.execute("SELECT operation_id FROM operations WHERE state='RUNNING'"))
         for row in running:
             self.finish(row[0], "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED", event="recovered_unknown")
+        from embodied.runtime.task_journal import recover
+        recover(self)
 
     def get(self, operation_id: str) -> OperationRecord | None:
         row = self._db.execute("""

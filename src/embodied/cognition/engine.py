@@ -76,6 +76,7 @@ class EngineTurn:
     plan: Plan | None = None
     results: list[StepResult] = field(default_factory=list)
     replans: int = 0
+    task_id: str = ""
 
 
 class PlannerEngine:
@@ -91,7 +92,8 @@ class PlannerEngine:
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.builder = PlanBuilder(provider, registry, model=model)
-        self.executor = DagExecutor(registry, confirm=confirm, world_fn=world_fn)
+        self.executor = DagExecutor(registry, confirm=confirm, world_fn=world_fn, journal=True)
+        self._registry = registry
         self._provider = provider
         self._context_fn = context_fn
         self._model = model
@@ -114,35 +116,53 @@ class PlannerEngine:
         replans = 0
         current: Plan | None = plan
 
-        while current is not None:
-            ctx.plan_revision = replans + 1
-            async for sr in self.executor.run(current, ctx, done={r.step_id: r for r in results}):
-                results.append(sr)
-                observations.append(summarize(sr))
-                observations = observations[-6:]
-            current = None
-            if any(r.status == StepStatus.NEED_CONFIRM for r in results):
-                # 用户拒绝确认即结束本轮，不用重规划推翻拒绝。
-                break  # denied confirmation ends the turn honestly; no replan second-guessing
-            if plan.complexity != "adaptive":
-                break
-            if replans >= max_iters or time.monotonic() >= deadline:
-                break
-            nxt = await self.builder.replan(plan.goal or user_text, observations, await self._render_context())
-            replans += 1
-            if nxt.steps:
-                # 保留完成结果，供跨轮参数引用和指纹去重，避免重复执行。
-                # Seed with completed results so param_refs across rounds still resolve
-                # and dedup fingerprints survive the replan (anti re-execution).
-                done = {r.step_id: r for r in results}
-                current = nxt
-                current.steps = [s for s in nxt.steps if s.id not in done]
-                if not current.steps:
-                    current = None
+        try:
+            while current is not None:
+                ctx.plan_revision = replans + 1
+                async for sr in self.executor.run(current, ctx, done={r.step_id: r for r in results}):
+                    results.append(sr)
+                    observations.append(summarize(sr))
+                    observations = observations[-6:]
+                current = None
+                if any(r.status == StepStatus.NEED_CONFIRM for r in results):
+                    # 用户拒绝确认即结束本轮，不用重规划推翻拒绝。
+                    break  # denied confirmation ends the turn honestly; no replan second-guessing
+                if plan.complexity != "adaptive":
+                    break
+                if replans >= max_iters or time.monotonic() >= deadline:
+                    break
+                nxt = await self.builder.replan(plan.goal or user_text, observations, await self._render_context())
+                replans += 1
+                if nxt.steps:
+                    # 保留完成结果，供跨轮参数引用和指纹去重，避免重复执行。
+                    # Seed with completed results so param_refs across rounds still resolve
+                    # and dedup fingerprints survive the replan (anti re-execution).
+                    done = {r.step_id: r for r in results}
+                    current = nxt
+                    current.steps = [s for s in nxt.steps if s.id not in done]
+                    if not current.steps:
+                        current = None
 
+        except BaseException:
+            if ctx.journal_started:
+                try:
+                    value = self._registry.finish_task(ctx.task_id, interrupted=True)
+                    if inspect.isawaitable(value):
+                        await value
+                except Exception:
+                    logger.exception("task interruption could not be journaled")
+            raise
+
+        if ctx.journal_started:
+            value = self._registry.finish_task(ctx.task_id, interrupted=any(
+                r.error in {"task_result_persistence_failed", "task_intent_persistence_failed"}
+                or r.error.startswith("task_journal_failed") for r in results))
+            if inspect.isawaitable(value):
+                await value
         text = self._compose(user_text, results)
         self._remember(user_text, text)
-        return EngineTurn(text=text, plan=plan, results=results, replans=replans)
+        return EngineTurn(text=text, plan=plan, results=results, replans=replans,
+                          task_id=ctx.task_id if ctx.journal_started else "")
 
     # 确定性结果汇报。
     # -- compose (deterministic, grounded by construction) ---------------------

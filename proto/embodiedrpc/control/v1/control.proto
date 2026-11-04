@@ -25,6 +25,14 @@ service ControlService {
   rpc CheckEffect(EffectRequest) returns (EffectReply);
   // 空闲本体上的显式只读效果重查。 / Explicit read-only effect observation on an idle body.
   rpc ReconcileEffect(EffectRequest) returns (OperationReply);
+  // 任务日志先于动作保存；恢复接口只读，不提供自动续跑。
+  // Task journal precedes actions; recovery endpoints are read-only and never auto-resume.
+  rpc RecordTaskPlan(TaskPlanRequest) returns (TaskReply);
+  rpc RecordTaskStep(TaskStepRequest) returns (TaskReply);
+  rpc FinishTask(TaskFinishRequest) returns (TaskReply);
+  rpc GetTask(TaskRequest) returns (TaskReply);
+  rpc ReconcileTask(TaskRequest) returns (TaskReply);
+  rpc ListTasks(TaskListRequest) returns (TaskListReply);
   // 低频世界快照，校验版本与新鲜度。 / Low-rate world snapshot with version and freshness validation.
   rpc GetWorldState(WorldStateRequest) returns (WorldStateReply);
   rpc StreamState(StateRequest) returns (stream embodied.common.v1.RobotState);
@@ -41,6 +49,20 @@ service ControlService {
 }
 
 message ListSkillsRequest {}
+
+message TaskPlanRequest { string plan_json = 1; }
+message TaskStepRequest {
+  string task_id = 1;
+  uint32 revision = 2;
+  string step_id = 3;
+  string kind = 4;
+  string payload_json = 5;
+}
+message TaskFinishRequest { string task_id = 1; bool interrupted = 2; }
+message TaskRequest { string task_id = 1; }
+message TaskReply { bool found = 1; string report_json = 2; string error = 3; }
+message TaskListRequest { uint32 limit = 1; }
+message TaskListReply { string tasks_json = 1; string error = 2; }
 
 message WorldStateRequest {}
 

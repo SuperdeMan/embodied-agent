@@ -105,6 +105,17 @@ def main(argv: list[str] | None = None) -> int:
     operation.add_argument("--attempt", default="")
     operation.add_argument("--confirm", action="store_true")
 
+    upgrade = sub.add_parser("ledger-upgrade", help="preview or explicitly apply the task journal schema upgrade")
+    upgrade.add_argument("--ledger", required=True)
+    upgrade.add_argument("--apply", action="store_true")
+    upgrade.add_argument("--backup-dir", default=None)
+
+    task_query = sub.add_parser("task", help="query task history or assess recovery without executing actions")
+    task_query.add_argument("--remote", required=True)
+    task_query.add_argument("--id", default="")
+    task_query.add_argument("--reconcile", action="store_true")
+    task_query.add_argument("--limit", type=int, default=20)
+
     sg = sub.add_parser("serve-guardian", help="safety-guardian process (gRPC SafetyService)")
     sg.add_argument("--port", type=int, default=8392)
     sg.add_argument("--control", default="127.0.0.1:8391", metavar="ADDR")
@@ -132,6 +143,15 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_serve_guardian(args))
     if args.cmd == "operation":
         return asyncio.run(_operation(args))
+    if args.cmd == "ledger-upgrade":
+        import json
+
+        from embodied.runtime.task_schema import upgrade_ledger
+        print(json.dumps(upgrade_ledger(args.ledger, apply=args.apply, backup_dir=args.backup_dir),
+                         ensure_ascii=False, indent=2))
+        return 0
+    if args.cmd == "task":
+        return asyncio.run(_task_query(args))
     parser.error(f"unknown command {args.cmd!r}")
     return 2
 
@@ -288,6 +308,25 @@ async def _operation(args: argparse.Namespace) -> int:
             result = await action(args.id)
         print(json.dumps(MessageToDict(result, preserving_proto_field_name=True), ensure_ascii=False, indent=2))
         return 0 if result.found and not result.reconciliation_error else 1
+
+
+async def _task_query(args: argparse.Namespace) -> int:
+    import json
+
+    import grpc
+
+    from embodied.skills.remote import RemoteSkillRegistry
+
+    async with grpc.aio.insecure_channel(args.remote) as channel:
+        registry = RemoteSkillRegistry(channel)
+        if not args.id:
+            result = await registry.list_tasks(args.limit)
+        elif args.reconcile:
+            result = await registry.reconcile_task(args.id)
+        else:
+            result = await registry.get_task(args.id)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return 0 if isinstance(result, list) or result.get("found") else 1
 
 
 async def _serve_guardian(args: argparse.Namespace) -> int:

@@ -63,13 +63,25 @@ async def main():
                 await asyncio.wait_for(polling,3)
         assert 200 in preview_statuses
         assert len(steps) == 2 and all(step['status']=='ok' and step['operation_id'] for step in steps)
+        task_id=event['task_id']
+        assert task_id and all(step['task_id']==task_id for step in steps)
         with sqlite3.connect('/app/outputs/runtime/operations.sqlite3') as db:
+            assert db.execute('SELECT version FROM schema_version').fetchone()[0]==2
+            assert db.execute('SELECT count(*) FROM task_plans').fetchone()[0]==1
+            journal_before=db.execute('SELECT count(*) FROM task_events').fetchone()[0]
             states = [row[0] for row in db.execute('SELECT state FROM operations')]
             evidence = [json.loads(row[0]) for row in db.execute(
                 "SELECT payload_json FROM operation_events WHERE event_type='effect_observed' ORDER BY rowid")]
         assert states == ['RETURNED','RETURNED']
         from embodied.contracts.effect import EffectEvidence
         assert len(evidence) == 2 and all(e['verdict']=='sat' and EffectEvidence.model_validate(e).intact() for e in evidence)
+        async with session.get('http://127.0.0.1:8390/api/tasks/'+task_id+'?assess=1') as response:
+            task=await response.json()
+            assert response.status==200 and task['workflow']=='FINISHED'
+            assert task['read_only'] and not task['automatic_resume_allowed'] and len(task['steps'])==2
+        with sqlite3.connect('/app/outputs/runtime/operations.sqlite3') as db:
+            assert db.execute('SELECT count(*) FROM task_events').fetchone()[0]==journal_before
+            assert db.execute('SELECT count(*) FROM operations').fetchone()[0]==2
         from embodied.runtime.observation import ObservationLane, ObservationUnavailable
         lane=ObservationLane(0.1)
         release=threading.Event()
@@ -95,6 +107,7 @@ async def main():
         assert await lane.call(lambda: 'fresh')=='fresh'
         print(json.dumps({'passed':True,'health':health,'jpeg_bytes':len(image),'steps':steps,
                           'operation_states':states,'effect_verdicts':[e['verdict'] for e in evidence],
+                          'task_journal':{'schema_version':2,'task_id':task_id,'events':journal_before,'read_only':True},
                           'frame_attempts':frame_attempts,
                           'concurrent_preview_statuses':preview_statuses,
                           'bounded_observation':{'passed':True,'timeout_probe_s':latency,'queued_replacements':0}}))

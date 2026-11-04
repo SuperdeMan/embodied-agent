@@ -114,6 +114,57 @@ def build_servicer(state: ControlState):
         async def GetOperation(self, request, context):
             return self._operation_reply(state.registry.get_operation(request.operation_id))
 
+        def _task_reply(self, report=None, error=""):
+            return pb2.TaskReply(found=bool(report and report.get("found")),
+                                 report_json=json.dumps(report, ensure_ascii=False, allow_nan=False) if report else "",
+                                 error=error)
+
+        async def RecordTaskPlan(self, request, context):
+            try:
+                payload = json.loads(request.plan_json)
+                state.registry.record_task_plan(payload)
+                return self._task_reply({"found": True, "task_id": payload["task_id"]})
+            except Exception as exc:
+                return self._task_reply(error=str(exc))
+
+        async def RecordTaskStep(self, request, context):
+            try:
+                payload = json.loads(request.payload_json)
+                if request.kind == "intent":
+                    state.registry.record_task_intent(request.task_id, request.revision, request.step_id, payload)
+                elif request.kind == "result":
+                    state.registry.record_task_result(request.task_id, request.revision, request.step_id, payload)
+                else:
+                    raise ValueError("unknown_task_event_kind")
+                return self._task_reply({"found": True, "task_id": request.task_id})
+            except Exception as exc:
+                return self._task_reply(error=str(exc))
+
+        async def FinishTask(self, request, context):
+            try:
+                state.registry.finish_task(request.task_id, interrupted=request.interrupted)
+                return self._task_reply(state.registry.get_task(request.task_id))
+            except Exception as exc:
+                return self._task_reply(error=str(exc))
+
+        async def GetTask(self, request, context):
+            try:
+                return self._task_reply(state.registry.get_task(request.task_id))
+            except Exception as exc:
+                return self._task_reply(error=str(exc))
+
+        async def ReconcileTask(self, request, context):
+            try:
+                return self._task_reply(await state.registry.reconcile_task(request.task_id))
+            except Exception as exc:
+                return self._task_reply(error=str(exc))
+
+        async def ListTasks(self, request, context):
+            try:
+                return pb2.TaskListReply(tasks_json=json.dumps(state.registry.list_tasks(request.limit or 20), ensure_ascii=False))
+            except Exception as exc:
+                return pb2.TaskListReply(error=str(exc))
+
         async def CancelOperation(self, request, context):
             return self._operation_reply(state.registry.cancel_operation(request.operation_id))
 
