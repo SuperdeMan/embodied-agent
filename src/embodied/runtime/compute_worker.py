@@ -44,8 +44,12 @@ def main():
                 payload = parse_payload(request.payload_json)
                 with contextlib.redirect_stdout(sys.stderr):
                     if backend is None and request.kind == "init":
-                        from embodied.providers.isolated import create_backend
-                        backend = create_backend(payload)
+                        if payload.get("backend") == "render":
+                            from embodied.control.render_worker import RenderBackend
+                            backend = RenderBackend(payload)
+                        else:
+                            from embodied.providers.isolated import create_backend
+                            backend = create_backend(payload)
                         boot = request.boot_id
                         result, kind = {"pid": os.getpid(), **backend.metadata()}, "ready"
                     elif backend is not None and request.kind == "call":

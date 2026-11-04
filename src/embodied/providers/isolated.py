@@ -162,7 +162,4 @@ def create_backend(config):
         if hashlib.sha256(Path(config["path"]).read_bytes()).hexdigest() != config["sha256"]:
             raise ValueError("policy artifact changed")
         return _Backend(OnnxPolicy(config["path"]))
-    if kind == "render":
-        from embodied.control.render_worker import RenderBackend
-        return RenderBackend(config)
     raise ValueError("unsupported compute backend")
