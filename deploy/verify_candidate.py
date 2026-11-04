@@ -22,9 +22,17 @@ async def main():
         async with session.get('http://127.0.0.1:8390/healthz') as response:
             health = await response.json()
             assert response.status == 200 and health['runtime']['planner'] == 'offline'
-        async with session.get('http://127.0.0.1:8390/api/scene.jpg') as response:
-            image = await response.read()
-            assert response.status == 200 and image[:2] == bytes([255, 216])
+        frame_attempts=[]
+        frame_deadline=time.monotonic()+6
+        while True:
+            async with session.get('http://127.0.0.1:8390/api/scene.jpg') as response:
+                image = await response.read()
+                frame_attempts.append({'status':response.status,'bytes':len(image)})
+                if response.status==200:
+                    assert image[:2] == bytes([255,216])
+                    break
+                assert response.status==503 and time.monotonic()<frame_deadline
+            await asyncio.sleep(0.25)
         steps = []
         async with session.ws_connect('http://127.0.0.1:8390/ws/session', origin='http://127.0.0.1:8390') as ws:
             hello = await ws.receive_json()
@@ -70,6 +78,7 @@ async def main():
         assert await lane.call(lambda: 'fresh')=='fresh'
         print(json.dumps({'passed':True,'health':health,'jpeg_bytes':len(image),'steps':steps,
                           'operation_states':states,'effect_verdicts':[e['verdict'] for e in evidence],
+                          'frame_attempts':frame_attempts,
                           'bounded_observation':{'passed':True,'timeout_probe_s':latency,'queued_replacements':0}}))
 asyncio.run(main())
 '''

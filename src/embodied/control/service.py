@@ -202,7 +202,8 @@ def build_servicer(state: ControlState):
                     raise
                 record = state.registry.get_operation(identity.operation_id)
                 if record is None:
-                    raise
+                    yield ev(pb2.SkillEvent.FAILED, "cancelled before admission", "cancelled")
+                    return
                 result = state.registry._from_record(record)
                 yield ev(pb2.SkillEvent.HALTED if state.halted else pb2.SkillEvent.FAILED,
                          "cancel requested; physical stop unconfirmed", "outcome_unknown", result.data, result)

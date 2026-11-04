@@ -231,3 +231,45 @@ async def test_stuck_frame_cannot_block_new_admission_on_native_lock(env, monkey
         release.set()
         await asyncio.wait_for(asyncio.shield(ctx._frame_future), 1)
         await ctx.close()
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+async def test_preview_admission_handoff_is_bounded_and_cancellable(env, monkeypatch, cancel):
+    import numpy as np
+
+    from embodied.hri.server import AppContext
+
+    sim, registry = env
+    registry._observations.timeout_s = 0.5
+    entered, release = threading.Event(), threading.Event()
+
+    def render(camera):
+        with sim._state_lock:
+            entered.set()
+            assert release.wait(2)
+            return np.zeros((8, 8, 3), dtype=np.uint8)
+
+    monkeypatch.setattr(sim, "render", render)
+    ctx = AppContext(sim, registry, None, None, None)
+    frame = asyncio.create_task(ctx.render_jpeg())
+    identity = OperationIdentity(task_id="task", operation_id="preview-wait")
+    try:
+        assert await asyncio.to_thread(entered.wait, 1)
+        before = sim.data.time
+        action = asyncio.create_task(registry.invoke("skill.arm.home", operation=identity))
+        await asyncio.sleep(0)
+        assert identity.operation_id in registry._preview_admissions
+        if cancel:
+            assert registry.cancel_operation(identity.operation_id) is None
+            with pytest.raises(asyncio.CancelledError):
+                await action
+            assert registry.get_operation(identity.operation_id) is None and sim.data.time == before
+        release.set()
+        await frame
+        if not cancel:
+            assert (await action).ok and sim.data.time > before
+        assert not registry._preview_admissions
+    finally:
+        release.set()
+        await asyncio.wait_for(asyncio.shield(ctx._frame_future), 1)
+        await ctx.close()

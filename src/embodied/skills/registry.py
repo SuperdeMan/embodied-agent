@@ -94,10 +94,11 @@ class SkillRegistry:
         self._effect_observer = None
         self._observations = ObservationLane(observation_timeout_s)
         self._read_barriers: list[Callable[[], bool]] = []
+        self._preview_admissions: dict[str, asyncio.Task] = {}
 
     @property
     def observation_pending(self) -> bool:
-        return self._observations.busy or any(barrier() for barrier in self._read_barriers)
+        return bool(self._preview_admissions) or self._observations.busy or any(barrier() for barrier in self._read_barriers)
 
     def add_read_barrier(self, barrier: Callable[[], bool]) -> None:
         self.check_thread()
@@ -179,7 +180,9 @@ class SkillRegistry:
         except KeyError:
             raise SkillNotFound(name) from None
         merged = self._parameters(manifest, params, confirmed)
-        with self._dispatch(manifest, merged, operation, "skill", name in self._tracked_skills) as dispatch:
+        identity = operation or OperationIdentity.fresh()
+        await self._await_preview(identity)
+        with self._dispatch(manifest, merged, identity, "skill", name in self._tracked_skills) as dispatch:
             if isinstance(dispatch, SkillResult):
                 return dispatch
             try:
@@ -189,6 +192,20 @@ class SkillRegistry:
                 return await self._finish_async(dispatch, SkillResult(ok=False, detail=reason), unavailable=reason)
             result = await self._execute(manifest, handler, merged, dispatch.permit)
             return await self._finish_async(dispatch, result)
+
+    async def _await_preview(self, identity):
+        if (self.ledger.get(identity.operation_id) is not None or self._preview_admissions
+                or self._observations.busy or not any(barrier() for barrier in self._read_barriers)):
+            return
+        # 仅允许一个准入请求等待当前帧；等待时禁止启动替代预览帧。
+        # Only one admission may await the current frame; no replacement preview starts meanwhile.
+        self._preview_admissions[identity.operation_id] = asyncio.current_task()
+        deadline = time.monotonic() + self._observations.timeout_s
+        try:
+            while any(barrier() for barrier in self._read_barriers) and time.monotonic() < deadline:
+                await asyncio.sleep(min(0.005, max(0.0, deadline - time.monotonic())))
+        finally:
+            self._preview_admissions.pop(identity.operation_id, None)
 
     def invoke_operator(self, manifest: SkillManifest, handler, params: dict | None = None, *,
                         operation: OperationIdentity | None = None, confirmed: bool = False) -> SkillResult:
@@ -506,6 +523,10 @@ class SkillRegistry:
 
     def cancel_operation(self, operation_id: str) -> OperationRecord | None:
         self.check_thread()
+        pending = self._preview_admissions.get(operation_id)
+        if pending is not None:
+            pending.cancel()
+            return self.ledger.get(operation_id)
         active = self._active.get(operation_id)
         if active:
             task, permit, lease = active
@@ -521,7 +542,7 @@ class SkillRegistry:
         return self.ledger.get(operation_id)
 
     def cancel_all(self) -> None:
-        for operation_id in list(self._active):
+        for operation_id in list(self._preview_admissions) + list(self._active):
             self.cancel_operation(operation_id)
 
     def close(self) -> None:

@@ -111,8 +111,16 @@ talkBtn.addEventListener("pointerdown", talkStart);
 talkBtn.addEventListener("pointerup", talkEnd);
 talkBtn.addEventListener("pointerleave", talkEnd);
 
-// 场景约每秒刷新五帧。
-// scene refresh ~5 fps
-setInterval(() => { sceneEl.src = `/api/scene.jpg?t=${Date.now()}`; }, 200);
+  // 上一帧完成后再刷新，避免慢渲染时反复中止图片请求。
+  // Refresh after the previous frame finishes; do not abort slow image requests repeatedly.
+  function refreshScene() {
+    const next = () => {
+      sceneEl.onload = sceneEl.onerror = null;
+      setTimeout(refreshScene, 200);
+    };
+    sceneEl.onload = sceneEl.onerror = next;
+    sceneEl.src = `/api/scene.jpg?t=${Date.now()}`;
+  }
+  refreshScene();
 
 connect();
