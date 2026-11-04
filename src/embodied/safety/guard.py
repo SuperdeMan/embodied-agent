@@ -67,6 +67,7 @@ class Guard:
         self._on_event = on_event
         self.halted = False
         self.halt_reason = ""
+        self.generation = 0
 
     # 生命周期管理。
     # -- lifecycle -------------------------------------------------------------
@@ -78,6 +79,8 @@ class Guard:
         self._on_event = on_event
 
     def reset(self) -> None:
+        # 生命周期代次防止审查漏掉一次闩锁后复位。 / Lifecycle generation exposes latch-reset cycles to review.
+        self.generation += 1
         self.halted = False
         self.halt_reason = ""
         self._emit(GuardEvent(kind="reset", reason="guard reset"))
@@ -157,6 +160,7 @@ class Guard:
     # -- internals -------------------------------------------------------------
 
     def _latch(self, reason: str, kind: str) -> None:
+        self.generation += 1
         self.halted = True
         self.halt_reason = reason
         self._emit(GuardEvent(kind=kind, reason=reason))

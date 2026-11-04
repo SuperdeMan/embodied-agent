@@ -46,6 +46,8 @@ async def test_remote_engine_persists_plan_intents_and_readonly_report():
         assert all(s["call_state"] == "RETURNED" and s["current_effect"]["verdict"] == "unknown" for s in report["steps"])
         assessed = await remote.reconcile_task(turn.task_id)
         assert not assessed["automatic_resume_allowed"] and registry.ledger._db.total_changes == before
+        assert assessed["recovery_review"]["coherent"] and not assessed["recovery_review"]["execution_authorized"]
+        assert assessed["recovery_review"]["authenticated_subject"] is None
         assert (await remote.list_tasks())[0]["task_id"] == turn.task_id
         with pytest.raises(TaskJournalError):
             await remote.list_tasks(100)

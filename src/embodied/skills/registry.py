@@ -186,16 +186,8 @@ class SkillRegistry:
         return result
 
     async def reconcile_task(self, task_id):
-        report = self.get_task(task_id)
-        report["assessment"] = "current_eligibility_only"
-        for step in report.get("steps", []):
-            evidence = step["historical_effect"]
-            if not evidence or not step["manifest_matches"]:
-                continue
-            check = await self.check_effect_async(step["operation_id"], step["attempt_id"], evidence["evidence_id"],
-                                                   effect_digest(self.get(step["skill"]).verification))
-            step["current_effect"] = {key: check[key] for key in ("eligible", "verdict", "age_s", "reason")}
-        return report
+        from embodied.runtime.recovery import assess_task
+        return await assess_task(self, task_id)
 
     def configure_effect_observer(self, embodiment) -> None:
         self.check_thread()

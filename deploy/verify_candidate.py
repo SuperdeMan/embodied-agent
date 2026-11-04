@@ -79,6 +79,10 @@ async def main():
             task=await response.json()
             assert response.status==200 and task['workflow']=='FINISHED'
             assert task['read_only'] and not task['automatic_resume_allowed'] and len(task['steps'])==2
+            from embodied.contracts.recovery import RecoveryReview
+            review=RecoveryReview.model_validate(task['recovery_review'])
+            assert review.coherent and not review.execution_authorized and review.authenticated_subject is None
+            assert len(review.operations)==2 and all(o.request_digest and o.attempt_id for o in review.operations)
         with sqlite3.connect('/app/outputs/runtime/operations.sqlite3') as db:
             assert db.execute('SELECT count(*) FROM task_events').fetchone()[0]==journal_before
             assert db.execute('SELECT count(*) FROM operations').fetchone()[0]==2

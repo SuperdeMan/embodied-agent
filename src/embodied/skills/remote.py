@@ -151,13 +151,27 @@ class RemoteSkillRegistry:
         return json.loads(reply.tasks_json)
 
     async def reconcile_task(self, task_id):
+        from embodied.contracts.recovery import RecoveryReview
+        from embodied.runtime.recovery import expire_effect
+
         started = time.monotonic()
         report = self._task_result(await self._stub.ReconcileTask(self._pb2.TaskRequest(task_id=task_id), timeout=5))
         elapsed = time.monotonic() - started
+        try:
+            review = RecoveryReview.model_validate(report["recovery_review"])
+            if (review.task_id != task_id or report.get("task_id") != task_id
+                    or report.get("automatic_resume_allowed") is not False or report.get("read_only") is not True
+                    or report.get("found") and report.get("robot_id") != review.robot_id):
+                raise ValueError("invalid recovery review identity or authority")
+        except (KeyError, ValueError, TypeError) as exc:
+            raise TaskJournalError("recovery_review_unavailable_or_invalid") from exc
         for step in report.get("steps", []):
             current = step["current_effect"]
-            if current.get("eligible") and not 0 <= current.get("age_s", EFFECT_MAX_AGE_S) + elapsed < EFFECT_MAX_AGE_S:
-                step["current_effect"] = {"eligible": False, "verdict": "unknown", "reason": "task_report_transport_stale"}
+            if not review.coherent:
+                step["current_effect"] = {"eligible": False, "verdict": "unknown", "reason": "recovery_snapshot_changed"}
+            else:
+                expire_effect(current, elapsed, "task_report_transport_stale")
+        report["assessment_transport_rtt_s"] = elapsed
         return report
 
     async def reconcile_effect(self, operation_id: str, attempt_id: str):

@@ -40,6 +40,7 @@ async def test_task_id_history_and_assessment_do_not_repeat_actions():
         assessed = await (await client.get("/api/tasks/" + task_id + "?assess=1")).json()
         listed = await (await client.get("/api/tasks")).json()
         assert history["workflow"] == "FINISHED" and not assessed["automatic_resume_allowed"]
+        assert assessed["recovery_review"]["coherent"] and not assessed["recovery_review"]["execution_authorized"]
         assert listed[0]["task_id"] == task_id and registry.ledger._db.total_changes == before
         assert (await client.get("/api/tasks/missing")).status == 404
         assert (await client.get("/api/tasks?limit=1000")).status == 400
