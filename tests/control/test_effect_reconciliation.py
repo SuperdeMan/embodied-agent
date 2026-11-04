@@ -207,7 +207,8 @@ async def main():
     registry = SkillRegistry(robot_id=sim.spec().embodiment_id)
     register_sim_skills(registry, wrapped)
     try:
-        assert (await registry.invoke("skill.manip.pick")).ok
+        picked = await registry.invoke("skill.manip.pick")
+        assert picked.ok, repr(picked)
         placed = await registry.invoke("skill.manip.place")
         assert placed.ok and placed.data["_effect"]["verdict"] == "sat"
         t = sim.data.time
