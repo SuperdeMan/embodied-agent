@@ -21,6 +21,10 @@ service ControlService {
   rpc CancelOperation(OperationRequest) returns (OperationReply);
   // 停止对账需明确确认；证据由控制器产生。 / Stop reconciliation requires confirmation; the controller supplies evidence.
   rpc ReconcileStop(StopReconciliationRequest) returns (OperationReply);
+  // 检查已有证据的当前资格，不执行动作。 / Check current evidence eligibility without executing actions.
+  rpc CheckEffect(EffectRequest) returns (EffectReply);
+  // 空闲本体上的显式只读效果重查。 / Explicit read-only effect observation on an idle body.
+  rpc ReconcileEffect(EffectRequest) returns (OperationReply);
   // 低频世界快照，校验版本与新鲜度。 / Low-rate world snapshot with version and freshness validation.
   rpc GetWorldState(WorldStateRequest) returns (WorldStateReply);
   rpc StreamState(StateRequest) returns (stream embodied.common.v1.RobotState);
@@ -95,6 +99,22 @@ message OperationReply {
   uint64 lease_epoch = 8;
   string stop_evidence_json = 9;
   string reconciliation_error = 10;
+  string effect_evidence_json = 11;
+}
+
+message EffectRequest {
+  string operation_id = 1;
+  string attempt_id = 2;
+  string evidence_id = 3;
+  string verification_digest = 4;
+}
+
+message EffectReply {
+  string verdict = 1;
+  bool eligible = 2;
+  double age_s = 3;
+  string reason = 4;
+  string evidence_json = 5;
 }
 
 message SkillEvent {

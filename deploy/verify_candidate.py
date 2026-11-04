@@ -40,8 +40,13 @@ async def main():
         assert len(steps) == 2 and all(step['status']=='ok' and step['operation_id'] for step in steps)
         with sqlite3.connect('/app/outputs/runtime/operations.sqlite3') as db:
             states = [row[0] for row in db.execute('SELECT state FROM operations')]
+            evidence = [json.loads(row[0]) for row in db.execute(
+                "SELECT payload_json FROM operation_events WHERE event_type='effect_observed' ORDER BY rowid")]
         assert states == ['RETURNED','RETURNED']
-        print(json.dumps({'passed':True,'health':health,'jpeg_bytes':len(image),'steps':steps,'operation_states':states}))
+        from embodied.contracts.effect import EffectEvidence
+        assert len(evidence) == 2 and all(e['verdict']=='sat' and EffectEvidence.model_validate(e).intact() for e in evidence)
+        print(json.dumps({'passed':True,'health':health,'jpeg_bytes':len(image),'steps':steps,
+                          'operation_states':states,'effect_verdicts':[e['verdict'] for e in evidence]}))
 asyncio.run(main())
 '''
 

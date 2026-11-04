@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from embodied.contracts.effect import EffectEvidence, EffectRejected, effect_digest
 from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.stopping import StopEvidence, StopProfile, StopRejected, StopRequest, validate_stop_evidence
 
@@ -77,6 +78,7 @@ class OperationRecord:
     robot_id: str = ""
     stop_context: dict[str, Any] = field(default_factory=dict)
     stop_evidence: dict[str, Any] | None = None
+    effect_evidence: dict[str, Any] | None = None
 
 
 class OperationLedger:
@@ -164,7 +166,10 @@ class OperationLedger:
             result=json.loads(row["evidence_json"]) if row["evidence_json"] else None,
             robot_id=row["robot_id"], stop_context=stop_context if isinstance(stop_context, dict) else {},
             stop_evidence=evidence,
+            effect_evidence=self._event_payload(operation_id, row["attempt_id"], "effect_observed"),
         )
+        if record.effect_evidence is not None and not self.valid_effect(record):
+            record = replace(record, effect_evidence=None)
         if record.stop_state == "MOTION_STOPPED_OBSERVED" and not self._valid_stored_stop(record):
             return replace(record, stop_state="STOP_UNCONFIRMED", stop_evidence=None)
         return record
@@ -181,6 +186,38 @@ class OperationLedger:
             return payload if isinstance(payload, dict) else None
         except ValueError:
             return None
+
+    @staticmethod
+    def valid_effect(record: OperationRecord) -> bool:
+        try:
+            evidence = EffectEvidence.model_validate_json(json.dumps(record.effect_evidence))
+            context = record.stop_context["effect_context"]
+            return (evidence.intact() and evidence.operation_id == record.operation_id
+                    and evidence.attempt_id == record.attempt_id and evidence.robot_id == record.robot_id
+                    and evidence.request_digest == record.request_digest
+                    and evidence.verification_digest == effect_digest(context["verification"])
+                    and all(getattr(evidence, key) == context[key]
+                            for key in ("controller_boot_id", "scene_epoch", "profile_digest")))
+        except (ValueError, TypeError, KeyError, AttributeError):
+            return False
+
+    def newer_conflict(self, record: OperationRecord) -> bool:
+        rows = self._db.execute("SELECT resources_json FROM attempts WHERE lease_epoch>?", (record.lease_epoch,))
+        resources = record.stop_context.get("effect_context", {}).get("resources", record.resources)
+        return any(set(json.loads(row[0])).intersection(resources) for row in rows)
+
+    def record_effect(self, evidence: EffectEvidence) -> OperationRecord:
+        with self._db:
+            self._db.execute("BEGIN IMMEDIATE")
+            record = self.get(evidence.operation_id)
+            if (record is None or record.state == "RUNNING" or evidence.observer_boot_id != self.boot_id
+                    or not self.valid_effect(replace(record, effect_evidence=evidence.model_dump(mode="json")))):
+                raise EffectRejected("invalid_effect_evidence")
+            payload = evidence.model_dump(mode="json")
+            if len(json.dumps(payload).encode()) > MAX_RESULT_BYTES:
+                raise EffectRejected("effect_evidence_too_large")
+            self._event(record.operation_id, record.attempt_id, "effect_observed", payload)
+        return self.get(record.operation_id)
 
     @staticmethod
     def _valid_stored_stop(record: OperationRecord, *, historical: bool = True) -> bool:

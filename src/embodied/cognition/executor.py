@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import inspect
 import json
 import logging
 import os
@@ -227,6 +228,15 @@ class DagExecutor:
 
     async def _evaluate(self, step: Step, result: StepResult) -> str:
         try:
+            if result.data.get("_operation_replay"):
+                return _verify.UNKNOWN
+            evidence = result.data.get("_effect")
+            if evidence is not None and (step.verification or {}).get("mode") == _verify.MODE_STATE:
+                checker = getattr(self._registry, "effect_verdict", None)
+                if checker is None:
+                    return _verify.UNKNOWN
+                verdict = checker(result.operation_id, result.attempt_id, evidence["evidence_id"], step.verification)
+                return await verdict if inspect.isawaitable(verdict) else verdict
             return await _verify.evaluate(
                 step.verification or {}, result.data or {},
                 world_fn=self._world_fn, params=dict(step.params or {}),

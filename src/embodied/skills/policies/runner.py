@@ -164,6 +164,7 @@ def register_policy_sim_skills(
     action_controller = getattr(emb, "action_controller", None)
     if action_controller is not None:
         registry.configure_execution_controller(action_controller)
+        registry.configure_effect_observer(emb)
     controller = getattr(emb, "stop_controller", None)
     if controller is not None:
         registry.configure_stop_controller(controller)

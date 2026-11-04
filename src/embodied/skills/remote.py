@@ -18,6 +18,7 @@ from typing import Any
 
 import grpc
 
+from embodied.contracts.effect import EFFECT_MAX_AGE_S, EffectEvidence, effect_digest
 from embodied.contracts.observation import ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
 from embodied.runtime.rpcgen import import_control
@@ -113,6 +114,30 @@ class RemoteSkillRegistry:
 
     async def get_operation(self, operation_id: str):
         return await self._stub.GetOperation(self._pb2.OperationRequest(operation_id=operation_id), timeout=5)
+
+    async def reconcile_effect(self, operation_id: str, attempt_id: str):
+        return await self._stub.ReconcileEffect(self._pb2.EffectRequest(
+            operation_id=operation_id, attempt_id=attempt_id,
+        ), timeout=5)
+
+    async def effect_verdict(self, operation_id: str, attempt_id: str, evidence_id: str, verification: dict) -> str:
+        started = time.monotonic()
+        try:
+            reply = await self._stub.CheckEffect(self._pb2.EffectRequest(
+                operation_id=operation_id, attempt_id=attempt_id, evidence_id=evidence_id,
+                verification_digest=effect_digest(verification),
+            ), timeout=EFFECT_MAX_AGE_S)
+            age = reply.age_s + time.monotonic() - started
+            if not reply.eligible or not 0 <= age < EFFECT_MAX_AGE_S:
+                return "unknown"
+            evidence = EffectEvidence.model_validate_json(reply.evidence_json)
+            if (not evidence.intact() or evidence.operation_id != operation_id or evidence.attempt_id != attempt_id
+                    or evidence.evidence_id != evidence_id or evidence.verification_digest != effect_digest(verification)
+                    or reply.verdict != evidence.verdict):
+                return "unknown"
+            return evidence.verdict
+        except (grpc.aio.AioRpcError, ValueError):
+            return "unknown"
 
     async def cancel_operation(self, operation_id: str):
         return await self._stub.CancelOperation(self._pb2.OperationRequest(operation_id=operation_id), timeout=5)

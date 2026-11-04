@@ -21,6 +21,7 @@ from typing import Any, Callable
 
 import grpc
 
+from embodied.contracts.effect import EffectRejected
 from embodied.contracts.observation import ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.stopping import StopRejected
@@ -105,6 +106,8 @@ def build_servicer(state: ControlState):
                 result_json=json.dumps(asdict(state.registry._from_record(record)), ensure_ascii=False, allow_nan=False),
                 stop_evidence_json=json.dumps(record.stop_evidence, ensure_ascii=False, allow_nan=False)
                 if record.stop_evidence else "",
+                effect_evidence_json=json.dumps(record.effect_evidence, ensure_ascii=False, allow_nan=False)
+                if record.effect_evidence else "",
             )
 
         async def GetOperation(self, request, context):
@@ -112,6 +115,23 @@ def build_servicer(state: ControlState):
 
         async def CancelOperation(self, request, context):
             return self._operation_reply(state.registry.cancel_operation(request.operation_id))
+
+        async def CheckEffect(self, request, context):
+            result = state.registry.check_effect(request.operation_id, request.attempt_id,
+                                                 request.evidence_id, request.verification_digest)
+            evidence = result.pop("evidence")
+            return pb2.EffectReply(**result, evidence_json=json.dumps(evidence) if evidence else "")
+
+        async def ReconcileEffect(self, request, context):
+            try:
+                return self._operation_reply(state.registry.reconcile_effect(request.operation_id, request.attempt_id))
+            except EffectRejected as exc:
+                reason = str(exc)
+            except Exception:
+                reason = "effect_reconciliation_failed"
+            reply = self._operation_reply(state.registry.get_operation(request.operation_id))
+            reply.reconciliation_error = reason
+            return reply
 
         async def ReconcileStop(self, request, context):
             try:

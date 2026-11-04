@@ -101,6 +101,7 @@ def main(argv: list[str] | None = None) -> int:
     maintenance = operation.add_mutually_exclusive_group()
     maintenance.add_argument("--cancel", action="store_true")
     maintenance.add_argument("--reconcile-stop", action="store_true")
+    maintenance.add_argument("--reconcile-effect", action="store_true")
     operation.add_argument("--attempt", default="")
     operation.add_argument("--confirm", action="store_true")
 
@@ -111,6 +112,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.cmd == "operation" and args.reconcile_stop and (not args.attempt or not args.confirm):
         parser.error("--reconcile-stop requires --attempt and --confirm")
+    if args.cmd == "operation" and args.reconcile_effect and not args.attempt:
+        parser.error("--reconcile-effect requires --attempt")
     if args.cmd in (None, "chat"):
         return asyncio.run(_chat(getattr(args, "provider", "auto"), bool(getattr(args, "yes", False))))
     if args.cmd == "sim":
@@ -271,6 +274,8 @@ async def _operation(args: argparse.Namespace) -> int:
         registry = RemoteSkillRegistry(channel)
         if args.reconcile_stop:
             result = await registry.reconcile_stop(args.id, args.attempt, confirmed=args.confirm)
+        elif args.reconcile_effect:
+            result = await registry.reconcile_effect(args.id, args.attempt)
         else:
             action = registry.cancel_operation if args.cancel else registry.get_operation
             result = await action(args.id)

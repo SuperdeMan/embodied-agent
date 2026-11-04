@@ -21,6 +21,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Awaitable, Callable
 from uuid import uuid4
 
+from embodied.contracts.effect import EFFECT_MAX_AGE_S, EffectRejected, effect_digest
 from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.stopping import StopEvidence, StopProfile, StopRejected, StopRequest, validate_stop_evidence
 from embodied.runtime.arbiter import Lease, ResourceArbiter, ResourceBusy
@@ -88,6 +89,16 @@ class SkillRegistry:
         self._execution_controller = None
         self._closed = False
         self._thread_id = threading.get_ident()
+        self._effect_observer = None
+
+    def configure_effect_observer(self, embodiment) -> None:
+        self.check_thread()
+        if embodiment.action_controller is not self._execution_controller:
+            raise SkillError("effect observer controller mismatch")
+        if self._effect_observer is not None and self._effect_observer.embodiment is not embodiment:
+            raise SkillError("effect observer already bound")
+        from embodied.runtime.effects import EffectObserver
+        self._effect_observer = EffectObserver(embodiment)
 
     def check_thread(self) -> None:
         if threading.get_ident() != self._thread_id:
@@ -197,6 +208,8 @@ class SkillRegistry:
             previous = self.ledger.lookup(identity, digest)
             if previous:
                 outcome = self._from_record(previous)
+                if manifest.verification.get("mode") == "state_predicate":
+                    outcome.data["_operation_replay"] = True
             else:
                 try:
                     lease = self.arbiter.acquire(identity.operation_id, self.ledger.next_epoch(), manifest.resources)
@@ -207,6 +220,8 @@ class SkillRegistry:
                     try:
                         stop = self._stop_controller
                         context = {"tracked_workers": tracked, "stop_profile": None, "execution_source": source}
+                        if self._effect_observer is not None and manifest.verification.get("mode") == "state_predicate":
+                            context["effect_context"] = self._effect_observer.context(manifest.verification, params)
                         if stop is not None and set(lease.resources) == set(stop.profile.resources):
                             context["stop_profile"] = stop.profile.model_dump(mode="json")
                         record = self.ledger.begin(identity, self.robot_id, manifest.name, digest,
@@ -249,6 +264,8 @@ class SkillRegistry:
 
     def _finish(self, dispatch, result):
         permit = dispatch.permit
+        result.data.pop("_effect", None)
+        result.data.pop("_operation_replay", None)
         unknown = result.data.get("_execution", {}).get("outcome") == "OUTCOME_UNKNOWN"
         if permit.rejection_reason or not permit.drained:
             if not unknown:
@@ -260,6 +277,14 @@ class SkillRegistry:
         state = "OUTCOME_UNKNOWN" if unknown else "RETURNED" if result.ok else "FAILED"
         dispatch.record = self.ledger.finish(dispatch.record.operation_id, state, asdict(result),
                                              "STOP_UNCONFIRMED" if unknown else "NOT_REQUESTED")
+        if self._effect_observer is not None and "effect_context" in dispatch.record.stop_context:
+            unavailable = "call_outcome_unknown" if unknown else ""
+            if not set(self._effect_observer.controller.profile.resources).issubset(dispatch.record.resources):
+                unavailable = "effect_resources_not_owned"
+            evidence = self._effect_observer.capture(
+                dispatch.record, self.ledger.boot_id, unavailable=unavailable,
+            )
+            dispatch.record = self.ledger.record_effect(evidence)
         return self._from_record(dispatch.record)
 
     @staticmethod
@@ -274,10 +299,60 @@ class SkillRegistry:
         result.attempt_id = record.attempt_id
         result.invocation_state = record.state
         result.stop_state = record.stop_state
+        result.data.pop("_effect", None)
+        if record.effect_evidence is not None:
+            result.data["_effect"] = dict(record.effect_evidence)
+        elif "effect_context" in record.stop_context:
+            result.data["_effect"] = {"evidence_id": ""}
         if record.state == "OUTCOME_UNKNOWN":
             result.ok = False
             result.data["_execution"] = {"outcome": "OUTCOME_UNKNOWN", "stop_state": record.stop_state}
         return result
+
+    def check_effect(self, operation_id: str, attempt_id: str, evidence_id: str,
+                     verification_digest: str) -> dict:
+        self.check_thread()
+        record = self.ledger.get(operation_id)
+        answer = {"eligible": False, "verdict": "unknown", "age_s": 0.0,
+                  "reason": "effect_unavailable", "evidence": None}
+        if record is None or record.attempt_id != attempt_id or record.effect_evidence is None:
+            return answer
+        evidence = record.effect_evidence
+        answer["evidence"] = evidence
+        age = time.monotonic() - evidence["captured_monotonic"]
+        if (evidence["evidence_id"] != evidence_id or evidence["verification_digest"] != verification_digest
+                or evidence["observer_boot_id"] != self.ledger.boot_id or age < 0 or age >= EFFECT_MAX_AGE_S):
+            answer["reason"] = "effect_identity_or_age_mismatch"
+            return answer
+        if (self._effect_observer is None or not self._effect_observer.matches(record.stop_context["effect_context"])
+                or self.ledger.newer_conflict(record)
+                or not self.arbiter.idle(self._effect_observer.controller.profile.resources)
+                or not self._effect_observer.evidence_current(evidence)):
+            answer["reason"] = "effect_context_or_owner_changed"
+            return answer
+        answer.update(eligible=True, verdict=evidence["verdict"], age_s=age, reason=evidence["reason"])
+        return answer
+
+    def effect_verdict(self, operation_id: str, attempt_id: str, evidence_id: str, verification: dict) -> str:
+        return self.check_effect(operation_id, attempt_id, evidence_id, effect_digest(verification))["verdict"]
+
+    def reconcile_effect(self, operation_id: str, attempt_id: str) -> OperationRecord:
+        self.check_thread()
+        record = self.ledger.get(operation_id)
+        if record is None or record.attempt_id != attempt_id or record.state == "RUNNING":
+            raise EffectRejected("effect_attempt_unavailable")
+        observer = self._effect_observer
+        if observer is None or "effect_context" not in record.stop_context:
+            raise EffectRejected("effect_context_unavailable")
+        if (operation_id in self._active or any(not permit.drained for permit in self._stop_contexts.values())
+                or record.state == "OUTCOME_UNKNOWN" and record.stop_state != "MOTION_STOPPED_OBSERVED"):
+            raise EffectRejected("effect_stop_unconfirmed")
+        with observer.controller.admission():
+            if not self.arbiter.idle(observer.controller.profile.resources):
+                raise EffectRejected("effect_resources_busy")
+            if not observer.matches(record.stop_context["effect_context"]) or self.ledger.newer_conflict(record):
+                raise EffectRejected("effect_context_or_owner_changed")
+            return self.ledger.record_effect(observer.capture(record, self.ledger.boot_id))
 
     def get_operation(self, operation_id: str) -> OperationRecord | None:
         return self.ledger.get(operation_id)
