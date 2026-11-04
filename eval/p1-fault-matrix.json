@@ -36,6 +36,14 @@
       "scope": "Consistent read-only snapshot, Guard lifecycle, evidence age and denial of authority claims; no execution authorization"
     },
     {
+      "id": "operator_authorization",
+      "tests": [
+        "tests/runtime/test_operator_policy.py",
+        "tests/hri/test_operator_authorization.py"
+      ],
+      "scope": "Exact proxy and subject policy, one-use effect-only authority, audit failure/expiry/replay refusal; no task execution authority"
+    },
+    {
       "id": "incompatible_ledger",
       "tests": [
         "tests/runtime/test_task_schema.py"

@@ -22,6 +22,8 @@ async def main():
         async with session.get('http://127.0.0.1:8390/healthz') as response:
             health = await response.json()
             assert response.status == 200 and health['runtime']['planner'] == 'offline'
+        async with session.get('http://127.0.0.1:8390/api/operator/identity') as response:
+            assert response.status == 503 and (await response.json())['error']=='operator_not_configured'
         frame_attempts=[]
         frame_deadline=time.monotonic()+6
         while True:

@@ -35,6 +35,7 @@ import io
 import json
 import logging
 import os
+import sqlite3
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextvars import Context
@@ -44,8 +45,11 @@ from urllib.parse import urlsplit
 
 from aiohttp import WSMsgType, web
 
+from embodied.contracts.effect import EffectRejected
+from embodied.contracts.operator import EffectAuthorizationRequest, OperatorConfirmation, OperatorPolicy
 from embodied.runtime.invocation import OBSERVATION_ONLY
 from embodied.runtime.observation import OBSERVATION_TIMEOUT_S, ObservationUnavailable
+from embodied.runtime.operator import OperatorAuthority, OperatorDenied
 
 logger = logging.getLogger("hri.server")
 
@@ -229,9 +233,11 @@ class AppContext:
         self, sim: Any, registry: Any, make_engine, asr: Any, tts_stream: Any,
         tts_sample_rate: int = 24000,
         runtime_info: dict[str, str] | None = None,
+        operator_policy: OperatorPolicy | None = None,
     ):
         self.sim = sim
         self.registry = registry
+        self.operator = OperatorAuthority(registry, operator_policy) if operator_policy is not None else None
         # 从确认回调构建规划引擎。
         self.make_engine = make_engine  # (confirm_cb) -> PlannerEngine
         self._asr = asr
@@ -399,6 +405,36 @@ async def tasks_handler(request: web.Request) -> web.Response:
         return web.json_response({"error": "task_query_unavailable", "automatic_resume_allowed": False}, status=400)
 
 
+async def operator_handler(request: web.Request) -> web.Response:
+    ctx = request.app[CTX_KEY]
+    headers = {"Cache-Control": "no-store"}
+    if ctx.operator is None:
+        return web.json_response({"error": "operator_not_configured"}, status=503, headers=headers)
+    try:
+        principal = ctx.operator.authenticate(request.remote, request.headers, mutation=request.method == "POST")
+    except OperatorDenied as exc:
+        return web.json_response({"error": str(exc)}, status=403, headers=headers)
+    if request.method == "GET":
+        return web.json_response({"authenticated": True, "subject_hash": principal.subject_hash,
+            "issuer": principal.issuer, "policy_digest": principal.policy_digest,
+            "scopes": ["reconcile_effect"], "task_execution_authorized": False}, headers=headers)
+    try:
+        raw = await request.read()
+        if len(raw) > 4096 or request.content_type != "application/json":
+            raise ValueError("operator_request_too_large")
+        if request.path.endswith("/authorizations"):
+            result = await ctx.operator.issue(principal, EffectAuthorizationRequest.model_validate_json(raw))
+        else:
+            result = await ctx.operator.consume(principal, OperatorConfirmation.model_validate_json(raw))
+        return web.json_response(result, headers=headers)
+    except (OperatorDenied, EffectRejected) as exc:
+        return web.json_response({"error": str(exc), "task_execution_authorized": False}, status=409, headers=headers)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid_operator_request"}, status=400, headers=headers)
+    except sqlite3.DatabaseError:
+        return web.json_response({"error": "operator_audit_unavailable", "task_execution_authorized": False}, status=503, headers=headers)
+
+
 def build_app(ctx: AppContext) -> web.Application:
     app = web.Application()
     app[CTX_KEY] = ctx
@@ -408,6 +444,9 @@ def build_app(ctx: AppContext) -> web.Application:
     app.router.add_get("/healthz", health_handler)
     app.router.add_get("/api/tasks", tasks_handler)
     app.router.add_get("/api/tasks/{task_id}", tasks_handler)
+    app.router.add_get("/api/operator/identity", operator_handler)
+    app.router.add_post("/api/operator/authorizations", operator_handler)
+    app.router.add_post("/api/operator/confirmations", operator_handler)
     app.router.add_static("/console", CONSOLE_DIR)
     async def cleanup(app):
         await ctx.close()

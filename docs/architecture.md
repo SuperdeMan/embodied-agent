@@ -77,6 +77,14 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 八类契约字段与接线位置以[执行计划 §3](platform-upgrade.md#3-八类契约与冻结顺序)为迁移清单。纯契约不依赖适配器、ROS、GPU；跨进程 proto 先行，未知版本不静默接受。
 
+### 5.12 D030 代理身份与一次性效果重查授权
+
+控制台可显式加载只读 OperatorPolicy：精确的代理 peer IP、HTTPS origin 和主体 allowlist。只接受该 socket peer 上由 Tailscale Serve 覆盖的单一身份头，拒绝直连、重复/变体头、未列入主体及 tagged/Funnel 无用户身份请求；不信任 X-Forwarded-For 或客户端自报主体。宿主及策略发布者属于信任边界，不声称抵抗已攻陷宿主。普通本机/RPC 参考入口不因此获得跨机认证。
+
+新增 HTTP 操作者接口仅授权 `reconcile_effect`，不在模型技能目录，不提供停止、复位、动作重试或续跑。准备阶段核对 D029 审查摘要、目标 task/operation/attempt/请求、manifest、控制上下文和停止/资源条件，生成 30 秒、同主体同 boot 的有界内存 challenge，并在既有 operation_events 追加签发审计。消费需相同受信身份、精确 challenge 和严格布尔确认；先烧毁内存凭据并提交消费意图，再调用已有只读效果重查。结果单独审计；写失败、过期、变更、重复或重启均拒绝，不补发、不重放。
+
+审计使用现有操作/尝试外键与新事件类别，不改 schema，不写 task_events；旧读取器忽略这些类别。主体用稳定摘要及策略摘要关联私有 allowlist，审计不记录密钥。D029 仍不签发任务执行权限；本批仅打通受信 HTTP 操作者到有审计的效果重查。部署须证明代理头覆盖、网络唯一后端与精确 peer 绑定，见 [操作者授权](operator-authorization.md)。
+
 ### 5.11 D029 恢复审查快照与权限拒绝契约
 
 恢复评估仅返回审查材料，不签发执行权限。快照绑定任务/计划版本、operation/attempt/请求摘要、账本 boot、控制器/场景/profile 和变更指纹；摘要用于比对，不是签名或 bearer token。当前没有受信操作者身份适配，明确返回 `execution_authorized=false`、`authenticated_subject=null`。未来授权必须绑定明确动作范围、期限、一次性消费和持久审计，不能把 `confirmed=true` 当身份认证。

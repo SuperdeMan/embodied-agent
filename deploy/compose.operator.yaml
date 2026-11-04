@@ -1,0 +1,10 @@
+# 身份策略单独只读挂载；使用前验证代理 peer、网络隔离及主体名单。
+# Mount identity policy read-only; verify proxy peer, network isolation and subjects before enabling.
+services:
+  console:
+    command: ["console", "--host", "0.0.0.0", "--port", "8390", "--provider", "offline", "--operator-policy", "/app/operator-policy.json"]
+    volumes:
+      - type: bind
+        source: ${EMBODIED_OPERATOR_POLICY:?set the verified absolute policy path}
+        target: /app/operator-policy.json
+        read_only: true

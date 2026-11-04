@@ -86,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     console.add_argument("--port", type=int, default=8390)
     console.add_argument("--seed", type=int, default=0)
     console.add_argument("--ledger", default="outputs/runtime/operations.sqlite3")
+    console.add_argument("--operator-policy", default="", help="explicit trusted proxy and operator allowlist JSON")
 
     sc = sub.add_parser("serve-control", help="realtime-control process (gRPC ControlService)")
     sc.add_argument("--port", type=int, default=8391)
@@ -614,7 +615,10 @@ def _convert(args: argparse.Namespace) -> int:
 
 
 def _console(args: argparse.Namespace) -> int:
+    from pathlib import Path
+
     from embodied.cognition.offline import SIM_PLAN_RULES
+    from embodied.contracts.operator import OperatorPolicy
     from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.hri.server import AppContext, run_console
     from embodied.providers.audio import (
@@ -627,6 +631,7 @@ def _console(args: argparse.Namespace) -> int:
     from embodied.skills.registry import SkillRegistry
     from embodied.skills.scripted.manip import register_sim_skills
 
+    policy = OperatorPolicy.model_validate_json(Path(args.operator_policy).read_text(encoding="utf-8")) if args.operator_policy else None
     sim = TabletopSim(seed=int(args.seed))
     registry = SkillRegistry(ledger=OperationLedger(args.ledger), robot_id=sim.spec().embodiment_id)
     register_sim_skills(registry, sim)
@@ -640,7 +645,7 @@ def _console(args: argparse.Namespace) -> int:
     # Factory returns None when streaming TTS is unconfigured (origin semantics: off);
     # the console always speaks, so fall back to the silent mock.
     tts = build_tts_stream_provider() or MockStreamingTTSProvider()
-    ctx = AppContext(sim, registry, make_engine, asr, tts,
+    ctx = AppContext(sim, registry, make_engine, asr, tts, operator_policy=policy,
                      runtime_info={"environment": "simulation", "planner": args.provider,
                                    "audio": "mock" if isinstance(asr, MockASRProvider) else "configured"})
     try:

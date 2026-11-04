@@ -9,7 +9,7 @@ from embodied.contracts.effect import EFFECT_MAX_AGE_S, effect_digest
 from embodied.contracts.recovery import RecoveryOperationBinding, RecoveryReview
 
 
-def review_state(registry, report):
+def review_state(registry, report, *, include_storage=True):
     """Fingerprint receiver-visible state without sampling or writing.
 
     对接收端可见状态计算指纹，不采样物理状态、不写入。
@@ -33,6 +33,9 @@ def review_state(registry, report):
     state = {"ledger_boot_id": registry.ledger.boot_id, "changes": registry.ledger._db.total_changes,
              "data_version": registry.ledger._db.execute("PRAGMA data_version").fetchone()[0],
              "context": context, "manifests": manifests, "active": sorted(registry._active), "permits": permits}
+    if not include_storage:
+        state.pop("changes")
+        state.pop("data_version")
     return effect_digest(state), context
 
 
