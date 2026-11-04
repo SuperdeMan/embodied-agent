@@ -26,3 +26,6 @@
 | 2026-11-03 | fed99f0 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D022 统一动作包络与遥操作准入后的干净提交；脚本 + 真值 + 离线规划，原参数不变，UTC 文件 20261103-154940。完整测试 579 passed；证据见 `eval/action-admission-20261103.json` |
 | 2026-11-03 | fed99f0 | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | pick-v1 ONNX + 脚本 place + 真值，干净提交；第 14 局 horizon reached，模型 SHA256 与前批一致，UTC 文件 20261103-155021。*仍未达到“不劣于脚本”DoD |
 | 2026-11-03 | fed99f0 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + color 感知 + 独立真值裁判，干净提交，UTC 文件 20261103-155223。验证新增本体反馈/动作包络未破坏本参考感知链路；不推及 DINO 或真机 |
+| 2026-11-04 | 2f943a9 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | D023 对象时效与消费点校验后的干净提交；脚本 + 真值 + 离线规划，原参数不变，UTC 文件 20261104-010658；完整测试 610 passed，证据见 `eval/object-freshness-20261104.json` |
+| 2026-11-04 | 2f943a9 | tabletop_pick_place@v1 | 29/30 (97%) | PASS* | pick-v1 ONNX + 脚本 place + 真值，干净提交；模型摘要、失败详情均与 D022 一致，第 14 局 horizon reached，UTC 文件 20261104-010726。*仍未达到“不劣于脚本”DoD |
+| 2026-11-04 | 2f943a9 | tabletop_pick_place@v1 | 30/30 (100%) | PASS | 脚本 + color + 独立真值裁判，干净提交，UTC 文件 20261104-010825；对象 TTL 保持 2 秒仿真/2 秒墙钟，未为回归放宽预算；不推及 DINO、跨机视觉或真机 |

@@ -1,0 +1,163 @@
+{
+  "date_local": "2026-11-04",
+  "timezone": "Asia/Singapore",
+  "feature_commit": "2f943a93c177efa2db3c56b210126a2708cf9af9",
+  "source_tree": "d4f752ada84c5c9cb03d6af75d080287f51a9161",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_ddl_unchanged": true,
+  "schema_version": 1,
+  "rpc_wire_unchanged": true,
+  "full_suite": {
+    "command": "uv run pytest -q -o addopts= --import-mode=importlib --junitxml=outputs/object-freshness-20261104.xml",
+    "junit_file": "outputs/object-freshness-20261104.xml",
+    "sha256": "61f6372263e7d50873f579f4502cdc092f429c918c5ee90670ce960220786c45",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "610",
+      "time": "40.611",
+      "timestamp": "2026-11-04T09:06:00.972876+08:00"
+    },
+    "warnings": 4,
+    "new_object_freshness_tests": 31,
+    "rpc_tests_included": 16
+  },
+  "ruff": "uv run ruff check .: passed",
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "command": "uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261104-010658.json",
+      "sha256": "3f05bac9a19a0e75c52de86dc2c554fc092eddc9ca74496285e58c735215f280",
+      "result": {
+        "commit": "2f943a9",
+        "finished_at": "2026-11-04T01:06:58.717139+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "pick_v1_truth",
+      "command": "uv run --group sim --group policy embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --pick-policy outputs/policies/pick-v1.onnx",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261104-010726.json",
+      "sha256": "38d8f10a572b6e9c5a3d0ab99ba6d2966df9f3611422116810fd9258df899d62",
+      "result": {
+        "commit": "2f943a9",
+        "finished_at": "2026-11-04T01:07:27.071835+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "scripted_color",
+      "command": "uv run --group sim --group perceive embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml --perception color",
+      "source_file": "outputs/eval/tabletop_pick_place@v1-20261104-010825.json",
+      "sha256": "ced04f9b2a2f62ccf3805714257f0596f3fc7f0199cf222ce8073fcc681b38f1",
+      "result": {
+        "commit": "2f943a9",
+        "finished_at": "2026-11-04T01:08:25.511450+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "budgets": {
+    "object_ttl_sim_s": 2.0,
+    "object_ttl_wall_s": 2.0,
+    "either_expiry_rejects": true,
+    "unchanged_after_fault_or_regression_tests": true
+  },
+  "artifacts": {
+    "uv.lock": "226d7d13f79771c31143b417c87723efde8ca15c4e3b7e378cf1e49daec38acf",
+    "eval/tasks/tabletop_pick_place_v1.yaml": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+    "outputs/policies/pick-v1.onnx": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd"
+  },
+  "dependencies": {
+    "mujoco": "3.11.0",
+    "numpy": "2.5.1",
+    "pydantic": "2.13.4",
+    "onnxruntime": "1.28.0",
+    "torch": "2.10.0",
+    "grpcio": "1.83.0"
+  },
+  "fault_test_cases": [
+    "test_missed_detection_expires_without_read_refresh[simulation]",
+    "test_missed_detection_expires_without_read_refresh[wall]",
+    "test_kinematic_estimate_keeps_original_detection_deadline",
+    "test_identity_changes_discard_cache_and_retained_policy_input[epoch]",
+    "test_identity_changes_discard_cache_and_retained_policy_input[calibration]",
+    "test_identity_changes_discard_cache_and_retained_policy_input[sim_rollback]",
+    "test_identity_changes_discard_cache_and_retained_policy_input[wall_rollback]",
+    "test_inference_result_cannot_cross_identity_or_expiry[epoch]",
+    "test_inference_result_cannot_cross_identity_or_expiry[calibration]",
+    "test_inference_result_cannot_cross_identity_or_expiry[slow]",
+    "test_inference_result_cannot_cross_identity_or_expiry[bad_pose]",
+    "test_camera_failure_does_not_renew_and_recovery_needs_real_detection",
+    "test_slow_camera_does_not_get_a_completion_timestamp",
+    "test_all_spatial_predicates_treat_bad_evidence_as_unknown[missing]",
+    "test_all_spatial_predicates_treat_bad_evidence_as_unknown[expired]",
+    "test_all_spatial_predicates_treat_bad_evidence_as_unknown[future]",
+    "test_all_spatial_predicates_treat_bad_evidence_as_unknown[wrong_scene]",
+    "test_all_spatial_predicates_treat_bad_evidence_as_unknown[wrong_clock]",
+    "test_all_spatial_predicates_treat_bad_evidence_as_unknown[wrong_calibration]",
+    "test_invalid_ttl_rejected_before_capture[0]",
+    "test_invalid_ttl_rejected_before_capture[-1]",
+    "test_invalid_ttl_rejected_before_capture[nan]",
+    "test_invalid_ttl_rejected_before_capture[inf]",
+    "test_evidence_contract_rejects_nonfinite_time",
+    "test_retained_snapshot_expires_without_a_new_read",
+    "test_expired_effect_blocks_dependent_handler",
+    "test_policy_keeps_semantic_input_identity_through_inference_and_chunk[slow_inference]",
+    "test_policy_keeps_semantic_input_identity_through_inference_and_chunk[chunk_age]",
+    "test_policy_keeps_semantic_input_identity_through_inference_and_chunk[calibration_change]",
+    "test_policy_keeps_semantic_input_identity_through_inference_and_chunk[scene_change]",
+    "test_policy_keeps_semantic_input_identity_through_inference_and_chunk[slow_target_solve]"
+  ],
+  "pick_v1_failure_details_identical_to_d022": true,
+  "qualified_limits": [
+    "Local simulated camera pipeline only; no new RPC perception API",
+    "Kinematic propagation remains bounded geometric belief, not contact evidence",
+    "TTL checks do not make provider calls interruptible",
+    "Object targets admitted at segment boundaries; no continuous obstacle replanning",
+    "Reference fixtures without semantic metadata retain legacy behavior",
+    "No schema migration, cloud deployment or live cloud health recheck",
+    "Task effect persistence and reconciliation remain next priority",
+    "pick-v1 remains below the 30/30 scripted baseline"
+  ]
+}

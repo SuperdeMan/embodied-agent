@@ -87,6 +87,6 @@ D019 远端状态进展见 [remote-world-state.md](remote-world-state.md)；D020
 
 D021 停止与受信恢复的实际边界见 [stop-reconciliation.md](stop-reconciliation.md)：只对绑定正确本体与 profile 的受跟踪操作生效，原 UNKNOWN 目标不被改成成功。
 
-D022 统一动作准入见 [action-admission.md](action-admission.md)。包络在控制进程消费，不增设跨主机 raw-action RPC；慢推理沿用原输入观察引用，遥操作不加入模型工具目录。下一批优先补对象级 TTL 与失效传播，再接任务效果恢复；不能用本体反馈的新时间戳代替语义感知的新鲜度。
+D022 统一动作准入见 [action-admission.md](action-admission.md)。包络在控制进程消费，不增设跨主机 raw-action RPC；慢推理沿用原输入观察引用，遥操作不加入模型工具目录。后续 D023 已接入本地对象 TTL 与失效传播；不能用本体反馈的新时间戳代替语义感知的新鲜度。
 
 D023 已接入本地对象级 TTL，实际范围见 [object-freshness.md](object-freshness.md)。下一批任务效果对账先定义“调用结果、效果证据、停止状态”三者的关联与恢复规则，再实现持久证据；UNKNOWN 不自动翻转、不盲目重试。既有五表 schema 本批不变，后续如需新 DDL 将另列具体变更范围。
