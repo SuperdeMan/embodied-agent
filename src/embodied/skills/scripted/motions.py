@@ -22,6 +22,14 @@ def _phys_per_write(emb: Any, hz: float) -> int:
     return max(1, round((1.0 / hz) / emb.timestep))
 
 
+def body_feedback(emb: Any):
+    """Read joints and end-effector state without starting semantic perception.
+
+    读取关节与末端状态，不启动语义感知。
+    """
+    return getattr(emb, "read_control_feedback", emb.read)()
+
+
 def object_target_current(emb: Any, observation: Any) -> bool:
     """Admit a solved semantic target before starting its bounded motion segment.
 
@@ -48,7 +56,7 @@ def move_to_q(
     gripper: float | None = None,
     object_observation: Any = None,
 ) -> bool:
-    q0 = np.asarray(emb.read().qpos, dtype=float)
+    q0 = np.asarray(body_feedback(emb).qpos, dtype=float)
     if not object_target_current(emb, object_observation):
         return False
     qt = np.asarray(q_target, dtype=float)
@@ -65,10 +73,11 @@ def move_to_q(
 
 
 def set_gripper(emb: Any, opening: float, *, seconds: float = 0.5, hz: float = 50.0, settle_steps: int = 100) -> bool:
-    hold = tuple(emb.read().qpos)
+    feedback = body_feedback(emb)
+    hold = tuple(feedback.qpos)
     steps = max(2, int(seconds * hz))
     per = _phys_per_write(emb, hz)
-    start = emb.read().gripper_opening
+    start = feedback.gripper_opening
     for k in range(1, steps + 1):
         g = start + (opening - start) * (k / steps)
         result = write_action(emb, ActionCommand(joint_targets=hold, gripper=g))

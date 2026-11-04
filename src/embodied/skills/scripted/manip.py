@@ -90,7 +90,7 @@ def _jaw_x_world(emb: Any) -> np.ndarray:
 
     计算抓取框架固定指一侧正 X 的水平世界方向。
     """
-    w, x, y, z = emb.read().ee_pose.quat
+    w, x, y, z = motions.body_feedback(emb).ee_pose.quat
     xa = np.array([1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y)])
     xa[2] = 0.0
     n = np.linalg.norm(xa)
@@ -138,6 +138,9 @@ def _pick_sync(emb: Any, obj: str) -> SkillResult:
         return SkillResult(ok=False, detail="grasp descent unreachable or denied")
     if not motions.set_gripper(emb, 0.0, seconds=0.6):
         return SkillResult(ok=False, detail="guard denied gripper close")
+    # 闭合后显式更新附着信念，不依赖关节原语顺带执行视觉采样。
+    # Update attachment after closure explicitly, not as an incidental read inside joint primitives.
+    _snap(emb)
     # 抬升返回已知预抓姿态，避免深抓配置下朝下轴逆解病态。
     # Lift by returning to the known pregrasp posture: no IK from the deep grasp
     # configuration, where the axis-down solve is poorly conditioned.

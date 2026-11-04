@@ -68,7 +68,8 @@
       "id": "observation_availability",
       "tests": [
         "tests/runtime/test_observation_lane.py",
-        "tests/cognition/test_object_freshness.py"
+        "tests/cognition/test_object_freshness.py",
+        "tests/control/test_body_feedback.py"
       ],
       "scope": "Blocked read-only workers, stale or missing local perception; no real camera disconnect"
     }
