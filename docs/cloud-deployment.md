@@ -1,8 +1,20 @@
 # 云端仿真控制台
 
-> 2026-11-04，当前 **activated**：应用镜像固定 `a29ad0e`，运行配置仍为 `cfb5997`，私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D028/D027/D026/D025/D024/2026-10-30 记录保留为历史。
+> 2026-11-04，当前 **activated**：应用镜像固定 `5b080dd`，运行配置包含 D030 的只读操作者策略挂载（配置摘要见下），私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D029/D028/D027/D026/D025/D024/2026-10-30 记录保留为历史。
 
-## D029 最近升级（2026-11-04）
+## D030/D031 最近升级（2026-11-04）
+
+应用由 `a29ad0e` 升级至 `5b080dd9d5add932e236aebbc73e581a656687d2`，激活回执 `20261104T150233Z`，镜像 ID `sha256:c5ba7f40c28a4911dcc4495c18b56b307705a1c5468107948260fecbac102f82`。新增受控 HTTP 的 Serve 身份和一次性效果重查审计；同时分离本体反馈与语义采样，TTL 与物理参数不变。
+
+运行文件为 `/home/ubuntu/embodied-agent/runtime/compose-302d04dae607c0a7.json`，SHA-256 `302d04dae607c0a72cd334ce21cebb6e068d6f39099b329f2c81cb9735156b98`，只增加操作者策略的只读 bind mount 和对应 CLI 参数；其他资源/环境配置保持。策略精确绑定代理网关及一个登录主体，没有修改 Tailnet 策略、新增密钥或发布宿主端口。旧 `9b1c4be840f31b21` 配置保留为历史。
+
+升级前 12 tasks / 24 operations / 24 attempts / 82 operation_events / 6 task_plans / 36 task_events 逐行保留。最终 14 tasks / 28 RETURNED operations / 28 attempts / 101 operation_events / 8 task_plans / 48 task_events。效果重查新增一条效果记录及签发/消费/结束审计，另一次待确认签发在重启后失效；七表行摘要在该重启前后相同，没有自动重放。
+
+真实入口验证：Serve 覆盖伪造身份头，直连伪造身份被拒绝，成功消费一次、重复消费拒绝，旧 challenge 在重启后拒绝。其他 39 个容器和 Serve 映射保持，Funnel 关闭，仍为仿真/离线规划/模拟音频。普通 HRI/RPC 不因此获得统一认证；只开放效果重查，不授权停止、复位、技能重试或任务续跑。证据见 [cloud-operator-upgrade-20261104.json](../eval/cloud-operator-upgrade-20261104.json)。
+
+中间候选 `be8cc7d/e1b2706` 未激活，失败运行和配置预演均保留。color 稳定性边界与最终回归见 [body-feedback.md](body-feedback.md)，不把后续通过当成所有早期失败已归因。
+
+## D029 升级（2026-11-04 历史）
 
 应用由 `c1fc926` 升级至 `a29ad0e796c201d7ea1eb1ead5f7d3d946553f4f`，激活回执 `20261104T123844Z`，镜像 ID `sha256:615787e0467da6996ef1da776d51969fa56c0c7beb60c08d9f2a212e749809ab`。恢复评估新增一致快照、操作身份绑定与明确拒绝执行授权；Guard 生命周期变化和传输/等待老化均纳入失效检查。
 

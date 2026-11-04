@@ -1,0 +1,450 @@
+{
+  "date_local": "2026-11-04",
+  "qualified_commit": "5b080dd9d5add932e236aebbc73e581a656687d2",
+  "source_tree": "4b6e6fe1fcb02804ce6791badfec757f11ba719d",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_version": 2,
+  "schema_changed": false,
+  "rpc_wire_changed": false,
+  "ruff": "passed",
+  "full_suite": {
+    "file": "outputs/operator-5b080dd.xml",
+    "sha256": "40dc6892c0fac75a07894d11042094dc7321a82209754be5977ff5266d06f02e",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "822",
+      "time": "94.913",
+      "timestamp": "2026-11-04T22:54:56.281246+08:00"
+    },
+    "warnings": 4,
+    "new_tests": 35
+  },
+  "rpc_suite": {
+    "file": "outputs/operator-rpc-5b080dd.xml",
+    "sha256": "6b5e13690b99f9be62812a31226e9058cc95145d6e909ca090f2941d7dca33a6",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "38",
+      "time": "3.965",
+      "timestamp": "2026-11-04T22:56:34.095687+08:00"
+    },
+    "included_in_full_suite": true
+  },
+  "fault_matrix": {
+    "file": "outputs/p1-faults/20261104T145638Z-5b080dd/report.json",
+    "sha256": "3ef4b20e82d60646cec738691dfd3179017ebb5eead1d8317684c4c8be367c24",
+    "result": {
+      "schema": "embodied.p1-fault-matrix/v1",
+      "commit": "5b080dd9d5add932e236aebbc73e581a656687d2",
+      "working_tree_clean": true,
+      "matrix_sha256": "5cda84cab5a0d200bc32736f0597311cfa590e7823917e7ce15e179022445763",
+      "reference_checks_passed": true,
+      "p1_complete": false,
+      "groups": [
+        {
+          "id": "storage_cancel",
+          "tests": [
+            "tests/runtime/test_cancel_storage_faults.py",
+            "tests/rpc/test_halt_storage_faults.py"
+          ],
+          "scope": "SQLite page-cap FULL, read/write failure, cancellation, Guard latch and watchdog",
+          "total": 8,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.121,
+            "max": 0.121
+          }
+        },
+        {
+          "id": "operation_crash_and_replay",
+          "tests": [
+            "tests/runtime/test_operations.py",
+            "tests/rpc/test_operation_protocol.py"
+          ],
+          "scope": "Abrupt owner exit, duplicate identity, restart and loopback RPC",
+          "total": 15,
+          "passed": 15,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.676,
+            "max": 0.676
+          }
+        },
+        {
+          "id": "task_recovery",
+          "tests": [
+            "tests/runtime/test_task_journal.py",
+            "tests/control/test_task_recovery.py",
+            "tests/rpc/test_task_protocol.py"
+          ],
+          "scope": "Task corruption, interrupted intent, scene change, read-only assessment",
+          "total": 29,
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.616,
+            "max": 0.881
+          }
+        },
+        {
+          "id": "recovery_review",
+          "tests": [
+            "tests/runtime/test_recovery_review.py",
+            "tests/control/test_recovery_review.py",
+            "tests/rpc/test_recovery_review.py"
+          ],
+          "scope": "Consistent read-only snapshot, Guard lifecycle, evidence age and denial of authority claims; no execution authorization",
+          "total": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.056,
+            "max": 0.061
+          }
+        },
+        {
+          "id": "operator_authorization",
+          "tests": [
+            "tests/runtime/test_operator_policy.py",
+            "tests/hri/test_operator_authorization.py"
+          ],
+          "scope": "Exact proxy and subject policy, one-use effect-only authority, audit failure/expiry/replay refusal; no task execution authority",
+          "total": 33,
+          "passed": 33,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.074,
+            "max": 0.077
+          }
+        },
+        {
+          "id": "incompatible_ledger",
+          "tests": [
+            "tests/runtime/test_task_schema.py"
+          ],
+          "scope": "Unknown schema, live-owner refusal, atomic migration rollback",
+          "total": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.047,
+            "max": 0.047
+          }
+        },
+        {
+          "id": "compute_process",
+          "tests": [
+            "tests/runtime/test_compute_process.py"
+          ],
+          "scope": "Worker timeout, crash, bad protocol, process reaping and no request replay",
+          "total": 20,
+          "passed": 20,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 1.558,
+            "max": 2.09
+          }
+        },
+        {
+          "id": "supervision_link",
+          "tests": [
+            "tests/rpc/test_process_split.py"
+          ],
+          "scope": "Loopback control/Guardian link loss, stale heartbeat, confirmation and latch",
+          "total": 9,
+          "passed": 9,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.609,
+            "max": 0.609
+          }
+        },
+        {
+          "id": "observation_availability",
+          "tests": [
+            "tests/runtime/test_observation_lane.py",
+            "tests/cognition/test_object_freshness.py",
+            "tests/control/test_body_feedback.py"
+          ],
+          "scope": "Blocked read-only workers, stale or missing local perception; no real camera disconnect",
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.075,
+            "max": 0.108
+          }
+        }
+      ],
+      "open_gates": [
+        "Real storage-medium I/O failure and power loss",
+        "Physical control process native hang and independent hardware stop",
+        "Real camera disconnection and cross-host sensor clock validation",
+        "Authenticated cross-host recovery authority and multi-attempt protocol",
+        "Real network partition and field-device supervision",
+        "Physical stop latency, stale-action rate and real episode data loss metrics",
+        "Release compatibility and downgrade/recovery rehearsal after new v2 writes"
+      ],
+      "wall_duration_s": 31.00314350007102,
+      "returncode": 0,
+      "junit_sha256": "8cd3449e2fe3f7817dc770734c948d0c7f08caaab1ded12219b8edb118a41a79"
+    }
+  },
+  "prior_diagnostics": {
+    "not_release_qualification": true,
+    "initial_full_failures": [
+      {
+        "file": "outputs/operator-be8cc7d.xml",
+        "sha256": "82a735f9e2204641c329ed65dfd04076315dc227d89afd29dac7714c15c338f3",
+        "result": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "1",
+          "skipped": "0",
+          "tests": "820",
+          "time": "179.346",
+          "timestamp": "2026-11-04T22:25:32.620960+08:00"
+        }
+      },
+      {
+        "file": "outputs/operator-be8cc7d-recheck.xml",
+        "sha256": "98b93ce23d0418be7f7ba8b08030b57edcf08970daa5de86fc857d21eb60672e",
+        "result": {
+          "name": "pytest",
+          "errors": "0",
+          "failures": "1",
+          "skipped": "0",
+          "tests": "820",
+          "time": "174.827",
+          "timestamp": "2026-11-04T22:30:53.420348+08:00"
+        }
+      }
+    ],
+    "instrumented_full": {
+      "file": "outputs/operator-full-color-diagnostic.xml",
+      "sha256": "49ba79066c9bde8a9a905b13992f4b027c244d76d5146c5a8c3c0f8244dbbc41",
+      "result": {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "820",
+        "time": "122.294",
+        "timestamp": "2026-11-04T22:37:21.009933+08:00"
+      }
+    },
+    "diagnostic_only_commit_full": {
+      "file": "outputs/operator-e1b2706.xml",
+      "sha256": "2e11521fa4e69b8ec7644c77154ca082dd86949733314f57becb24d608daac23",
+      "result": {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "820",
+        "time": "114.240",
+        "timestamp": "2026-11-04T22:40:47.321730+08:00"
+      }
+    },
+    "known_failed_test": "tests/control/test_effect_reconciliation.py::test_color_place_binding_and_effect_recheck_do_not_hold_render_lock",
+    "scope": "Initial failed picks lacked result detail; they are not proven to share the later semantic_target_stale cause. No success assertion, timeout or TTL was relaxed."
+  },
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-145806.json",
+      "sha256": "d67dbbc2e6230c974de2e00ce2423927aabbbe213dd85a55fc5b2876847edcb7",
+      "result": {
+        "commit": "5b080dd",
+        "finished_at": "2026-11-04T14:58:06.141638+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "isolated_pick_v1_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-145831.json",
+      "sha256": "6aa64d2086707640b468acb222520fc36f282166eab81900a0dd0e91c2965108",
+      "result": {
+        "commit": "5b080dd",
+        "finished_at": "2026-11-04T14:58:31.433400+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "isolated_color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-150026.json",
+      "sha256": "2bd1c9e8c1d5bb56893600ae8e9e621df6f8173855fca6c36378b5c2b5baff3e",
+      "result": {
+        "commit": "5b080dd",
+        "finished_at": "2026-11-04T15:00:27.036854+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "prior_regressions": [
+    {
+      "mode": "scripted_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-144441.json",
+      "sha256": "3bf86da60b5677e3f7a152211ad2dc97ee7158e9440e6cd5d33772a4f73ed997",
+      "result": {
+        "commit": "e1b2706",
+        "finished_at": "2026-11-04T14:44:41.910044+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "isolated_pick_v1_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-144505.json",
+      "sha256": "0c4ff343570ab1da945362be4c7acafae47f2d1d729d2a6f3b167f171cba8bb0",
+      "result": {
+        "commit": "e1b2706",
+        "finished_at": "2026-11-04T14:45:05.375839+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "isolated_color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261104-144844.json",
+      "sha256": "b9f8a2dc06f333b5602ae4748b25eb9dd15fc0fe8a021d5eef66231936d2eb02",
+      "result": {
+        "commit": "e1b2706",
+        "finished_at": "2026-11-04T14:48:44.529809+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 30,
+            "seed": 2,
+            "start_pos": [
+              0.0033,
+              -0.2111,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "semantic_target_stale"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：semantic_target_stale\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    }
+  ],
+  "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+  "pick_v1_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+  "interpretation": {
+    "body_feedback_fix": "Remove semantic perception from joint/gripper/frame reads; explicitly preserve attachment update before lift",
+    "budgets_unchanged": true,
+    "physical_parameters_unchanged": true,
+    "e1b2706_color_failure": "episode 30 semantic_target_stale, dependent skipped",
+    "initial_be8cc7d_failures_fully_explained": false,
+    "all_historical_perception_stability_issues_closed": false
+  }
+}
