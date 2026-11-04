@@ -156,15 +156,18 @@ class ComputeProcess:
                     except OSError:
                         pass
 
-    def _cancelled(self):
+    def _external_cancelled(self):
         token = OBSERVATION_CANCELLED.get()
-        if self._stop.is_set() or token is not None and token.is_set():
+        if token is not None and token.is_set():
             return True
         permit = CURRENT_INVOCATION.get()
         if permit is not None:
             with permit.access() as allowed:
                 return not allowed
         return False
+
+    def _cancelled(self):
+        return self._stop.is_set() or self._external_cancelled()
 
     def _wait(self, future, timeout):
         deadline = time.monotonic() + timeout
@@ -202,6 +205,8 @@ class ComputeProcess:
         if not self._lock.acquire(blocking=False):
             raise ComputeUnavailable("compute_busy")
         try:
+            if self._external_cancelled():
+                raise ComputeUnavailable("compute_cancelled_before_dispatch")
             try:
                 return self._start()
             except BaseException:
@@ -216,6 +221,8 @@ class ComputeProcess:
         if not self._lock.acquire(blocking=False):
             raise ComputeUnavailable("compute_busy")
         try:
+            if self._external_cancelled():
+                raise ComputeUnavailable("compute_cancelled_before_dispatch")
             try:
                 self._start()
                 request = self._request("call", encoded)

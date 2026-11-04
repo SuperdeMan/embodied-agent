@@ -220,3 +220,23 @@ def test_invocation_revocation_terminates_compute_without_response(tmp_path):
         CURRENT_INVOCATION.reset(binding)
         timer.join()
         worker.close()
+
+
+def test_already_revoked_caller_does_not_kill_a_healthy_worker(tmp_path):
+    worker = fixture_worker(tmp_path)
+    worker.start()
+    boot = worker.boot_id
+    permit = InvocationPermit(10)
+    permit.revoke()
+    token = CURRENT_INVOCATION.set(permit)
+    try:
+        with pytest.raises(ComputeUnavailable, match="before_dispatch"):
+            worker.call("echo", {"value": "late"})
+        assert worker.state == "READY" and worker.boot_id == boot
+        assert not (tmp_path / "calls.txt").exists()
+    finally:
+        CURRENT_INVOCATION.reset(token)
+    try:
+        assert worker.call("echo", {"value": "fresh"})["value"] == "fresh"
+    finally:
+        worker.close()
