@@ -25,6 +25,8 @@ import math
 import os
 from typing import Any, Callable
 
+from embodied.contracts.object_state import object_available
+
 logger = logging.getLogger("cognition.verify")
 
 SAT, UNSAT, UNKNOWN = "sat", "unsat", "unknown"
@@ -104,7 +106,7 @@ def eval_schema(expect: dict, data: dict) -> str:
 
 def _pred_object_in_region(snap: Any, args: dict) -> str:
     obj, region = str(args.get("object", "")), str(args.get("region", ""))
-    if obj not in snap.objects or region not in snap.regions:
+    if not object_available(snap, obj) or region not in snap.regions:
         return UNKNOWN
     margin = float(args.get("margin", 0.005))
     return SAT if snap.regions[region].contains(snap.objects[obj].pos, margin=margin) else UNSAT
@@ -112,7 +114,7 @@ def _pred_object_in_region(snap: Any, args: dict) -> str:
 
 def _pred_object_near(snap: Any, args: dict) -> str:
     obj = str(args.get("object", ""))
-    if obj not in snap.objects:
+    if not object_available(snap, obj):
         return UNKNOWN
     try:
         pos = tuple(float(v) for v in args.get("pos", ()))
@@ -126,7 +128,7 @@ def _pred_object_near(snap: Any, args: dict) -> str:
 
 def _pred_gripper_holding(snap: Any, args: dict) -> str:
     obj = str(args.get("object", ""))
-    if obj not in snap.objects:
+    if not object_available(snap, obj):
         return UNKNOWN
     min_z = float(args.get("min_z", 0.055))
     radius = float(args.get("radius", 0.06))

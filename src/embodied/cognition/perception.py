@@ -12,13 +12,21 @@ AGENT sees perceived objects while proprioception stays real and judges keep
 
 from __future__ import annotations
 
+import hashlib
+import json
+import math
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import Any
+from uuid import uuid4
 
 import numpy as np
 
 from embodied.cognition.world_state import GRASP_HOLD_RADIUS
+from embodied.contracts.object_state import ObjectContext, ObjectEvidence, object_available
+from embodied.contracts.observation import ObjectPose
 from embodied.control.camera import CameraModel
 from embodied.control.hal import Observation, Pose
 from embodied.providers.perception import BasePerceptionProvider, Detection
@@ -172,7 +180,7 @@ class PerceivedSim:
       a fresh sighting contradicts the belief (slipped grasp -> detach, honest fail).
 
 
-    包装器只替换物体表，不改变关节、夹爪与末端反馈；按仿真时间节流。遮挡时依次尝试相机、保留最后位姿、根据闭合夹爪建立运动学附着信念；重新看到矛盾位置或张开夹爪时解除，重置清空注册表，时效标记留后续。
+    包装器只替换物体表，不改变关节、夹爪与末端反馈；按仿真时间节流。遮挡时尝试相机后备与有期限的附着信念；推算不刷新检测时间，重置或时效/标定失效后清空旧位置。
     """
 
     def __init__(
@@ -184,13 +192,28 @@ class PerceivedSim:
         width: int = 640,
         height: int = 480,
         min_interval_s: float = 0.25,
+        object_ttl_sim_s: float = 2.0,
+        object_ttl_wall_s: float = 2.0,
     ) -> None:
         self._sim = sim
         self._pipeline = pipeline
         self._cameras = tuple(cameras)
         self._size = (width, height)
         self._min_interval = min_interval_s
+        if any(not math.isfinite(v) or v <= 0 for v in (min_interval_s, object_ttl_sim_s, object_ttl_wall_s)):
+            raise ValueError("perception intervals must be finite and positive")
+        self._ttl_sim, self._ttl_wall = object_ttl_sim_s, object_ttl_wall_s
+        self._clock = time.monotonic
+        self._clock_id = uuid4().hex
+        self._fallback_epoch = uuid4().hex
+        self._context: ObjectContext | None = None
+        self._evidence: dict[str, ObjectEvidence] = {}
+        self._sequence = 0
+        self._last_t = self._last_wall = -math.inf
+        self._lock = threading.RLock()
+        self.last_error = ""
         self._cache_t = -1e9
+        self._cache_wall = -math.inf
         self._registry: dict[str, Pose] = {}
         # 物体及末端到物体的偏移。
         self._attached: tuple[str, np.ndarray] | None = None  # (object, ee->object offset)
@@ -206,21 +229,60 @@ class PerceivedSim:
     # -- the perception seam ------------------------------------------------------
 
     def read(self) -> Observation:
-        obs = self._sim.read()
+        with self._lock:
+            return self._decorate(self._sim.read())
+
+    def _decorate(self, obs: Observation) -> Observation:
         obs.objects = dict(self._perceive(obs))
+        obs.object_evidence = dict(self._evidence)
+        obs.object_context = self._context
         return obs
 
     def read_truth(self) -> Observation:
         return self._sim.read()
 
     def reset(self, **kwargs: Any) -> Observation:
-        obs = self._sim.reset(**kwargs)
-        self._cache_t = -1e9
-        # 场景变化后不跨局保留旧感知。
-        self._registry = {}  # scene changed: no stale carryover across episodes
+        with self._lock:
+            obs = self._sim.reset(**kwargs)
+            self._fallback_epoch = uuid4().hex
+            self._clear()
+            return self._decorate(obs)
+
+    def _clear(self) -> None:
+        self._cache_t = -math.inf
+        self._cache_wall = -math.inf
+        self._registry.clear()
+        self._evidence.clear()
         self._attached = None
-        obs.objects = dict(self._perceive(obs))
-        return obs
+
+    def _identity(self, obs: Observation) -> ObjectContext:
+        width, height = self._size
+        calibration = {camera: asdict(self._sim.camera_model(camera, width=width, height=height))
+                       for camera in self._cameras}
+        payload = json.dumps({"cameras": calibration, "order": self._cameras,
+                              "objects": {name: asdict(spec) for name, spec in self._pipeline.objects.items()},
+                              "push": CAMERA_PUSH_FRAC}, sort_keys=True, allow_nan=False)
+        ref = obs.reference
+        epoch = self._fallback_epoch if ref is None else f"{ref.controller_boot_id}:{ref.control_epoch}:{ref.scene_epoch}"
+        return ObjectContext(clock_id=self._clock_id, scene_epoch=epoch,
+                             calibration_id=hashlib.sha256(payload.encode()).hexdigest())
+
+    def validate_object_observation(self, obs: Observation) -> bool:
+        """Validate old policy input without taking a new visual observation.
+
+        校验旧策略输入，不采集新视觉观察给旧输入续期。
+        """
+        with self._lock:
+            try:
+                read_body = getattr(self._sim, "read_control_feedback", self._sim.read)
+                current = read_body()
+                context = self._identity(current)
+                now = self._clock()
+                return (obs.object_evidence is not None and bool(self._pipeline.objects)
+                        and all(object_available(obs, name, now=now, sim_t=current.t, context=context)
+                                for name in self._pipeline.objects))
+            except Exception:
+                return False
 
     def close(self) -> None:
         """Tear renderers down ON the thread that owns their GL contexts.
@@ -258,25 +320,76 @@ class PerceivedSim:
         return self._render_thread.submit(self._sim.render_rgbd, camera, width, height).result()
 
     def _perceive(self, obs: Observation) -> dict[str, Pose]:
-        if obs.t - self._cache_t >= self._min_interval:
+        now = self._clock()
+        if not math.isfinite(now) or not math.isfinite(obs.t):
+            self._clear()
+            return {}
+        if obs.t < self._last_t or now < self._last_wall:
+            self._clear()
+            self._clock_id = uuid4().hex
+        self._last_t, self._last_wall = obs.t, now
+        try:
+            context = self._identity(obs)
+        except Exception as exc:
+            self._clear()
+            self.last_error = type(exc).__name__
+            return {}
+        if self._context != context:
+            self._clear()
+            self._context = context
+        self._expire(obs.t, now)
+        if obs.t - self._cache_t >= self._min_interval or now - self._cache_wall >= self._min_interval:
             width, height = self._size
             wanted = set(self._pipeline.objects)
             seen: dict[str, Pose] = {}
+            self.last_error = ""
             for camera in self._cameras:
-                rgb, depth = self._render_rgbd(camera, width, height)
-                cam = self._sim.camera_model(camera, width=width, height=height)
-                push = CAMERA_PUSH_FRAC.get(camera, DEFAULT_PUSH_FRAC)
-                for name, pose in self._pipeline.locate(rgb, depth, cam, push_frac=push).items():
-                    # 相机按可信度排序，前者优先。
-                    seen.setdefault(name, pose)  # earlier cameras win (listed by trust)
+                try:
+                    rgb, depth = self._render_rgbd(camera, width, height)
+                    cam = self._sim.camera_model(camera, width=width, height=height)
+                    push = CAMERA_PUSH_FRAC.get(camera, DEFAULT_PUSH_FRAC)
+                    detected = self._pipeline.locate(rgb, depth, cam, push_frac=push)
+                    for name, pose in detected.items():
+                        if name in seen or name not in wanted:
+                            continue
+                        ObjectPose(pos=pose.pos, quat=pose.quat)
+                        seen[name] = pose
+                        self._sequence += 1
+                        self._evidence[name] = ObjectEvidence(
+                            **context.model_dump(), sensor_id=camera, sequence=self._sequence,
+                            captured_sim_t=obs.t, captured_monotonic=now,
+                            ttl_sim_s=self._ttl_sim, ttl_wall_s=self._ttl_wall,
+                        )
+                except Exception as exc:
+                    self.last_error = type(exc).__name__
                 if wanted <= set(seen):
                     # 目标全部找到后省略剩余渲染。
                     break  # all found: skip the remaining renders
-            # 短时缺测保留最后位姿。
-            self._registry.update(seen)  # persistence: a missed object keeps its last pose
+            # 推理期间跨代次或标定改变时丢弃结果，不能提交到新场景。
+            # Discard results crossing a scene or calibration change during inference.
+            try:
+                current = self._sim.read()
+                if self._identity(current) != context or current.t < obs.t:
+                    self._clear()
+                    return {}
+            except Exception as exc:
+                self._clear()
+                self.last_error = type(exc).__name__
+                return {}
+            self._registry.update(seen)
+            self._expire(current.t, self._clock())
             self._update_attachment(obs, seen)
             self._cache_t = obs.t
+            self._cache_wall = now
         return self._registry
+
+    def _expire(self, sim_t: float, now: float) -> None:
+        for name in list(self._registry):
+            evidence = self._evidence.get(name)
+            if evidence is None or not evidence.current(self._context, sim_t, now):
+                self._registry.pop(name)
+                if self._attached is not None and self._attached[0] == name:
+                    self._attached = None
 
     def _update_attachment(self, obs: Observation, seen: dict[str, Pose]) -> None:
         """Belief update from proprioception: closed hand at an object => it moves with us.
@@ -310,6 +423,7 @@ class PerceivedSim:
             if name not in seen:  # unseen this tick: carried by the hand per the belief
                 p = ee + off
                 self._registry[name] = Pose(pos=(float(p[0]), float(p[1]), float(p[2])), quat=_IDENTITY_QUAT)
+                self._evidence[name] = self._evidence[name].model_copy(update={"source": "kinematic"})
 
     # 其他能力透传。
     # -- everything else passes through -------------------------------------------

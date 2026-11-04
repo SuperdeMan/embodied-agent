@@ -13,6 +13,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+from embodied.contracts.object_state import ObjectContext, ObjectEvidence, object_available
 from embodied.control.hal import Observation, Pose
 
 Vec3 = tuple[float, float, float]
@@ -34,6 +35,8 @@ class WorldSnapshot:
     gripper_opening: float
     objects: dict[str, Pose] = field(default_factory=dict)
     regions: dict[str, Region] = field(default_factory=dict)
+    object_evidence: dict[str, ObjectEvidence] | None = None
+    object_context: ObjectContext | None = None
 
     @classmethod
     def from_observation(cls, obs: Observation) -> "WorldSnapshot":
@@ -45,19 +48,21 @@ class WorldSnapshot:
             t=obs.t,
             ee_pos=obs.ee_pose.pos,
             gripper_opening=obs.gripper_opening,
-            objects=dict(obs.objects),
+            objects={name: pose for name, pose in obs.objects.items() if object_available(obs, name)},
             regions=regions,
+            object_evidence=None if obs.object_evidence is None else dict(obs.object_evidence),
+            object_context=obs.object_context,
         )
 
 
 def object_in_region(snap: WorldSnapshot, obj: str, region: str, margin: float = 0.0) -> bool:
-    if obj not in snap.objects or region not in snap.regions:
+    if not object_available(snap, obj) or region not in snap.regions:
         return False
     return snap.regions[region].contains(snap.objects[obj].pos, margin=margin)
 
 
 def object_near(snap: WorldSnapshot, obj: str, pos: Vec3, radius: float) -> bool:
-    if obj not in snap.objects:
+    if not object_available(snap, obj):
         return False
     p = snap.objects[obj].pos
     return math.dist(p, pos) <= radius
@@ -79,7 +84,7 @@ def held_object(
     返回已抬升且靠近抓取点的持有物体名，否则为空。
     """
     for name, pose in snap.objects.items():
-        if pose.pos[2] > min_z and math.dist(pose.pos, snap.ee_pos) < radius:
+        if object_available(snap, name) and pose.pos[2] > min_z and math.dist(pose.pos, snap.ee_pos) < radius:
             return name
     return None
 
@@ -87,7 +92,7 @@ def held_object(
 def gripper_holding(
     snap: WorldSnapshot, obj: str, *, min_z: float = GRASP_MIN_Z, radius: float = GRASP_HOLD_RADIUS
 ) -> bool:
-    if obj not in snap.objects:
+    if not object_available(snap, obj):
         return False
     p = snap.objects[obj].pos
     return p[2] > min_z and math.dist(p, snap.ee_pos) < radius

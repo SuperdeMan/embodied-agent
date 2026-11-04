@@ -106,23 +106,35 @@ def _pick_sync(emb: Any, obj: str) -> SkillResult:
     pregrasp = emb.solve_reach(target + [0, 0, PREGRASP_DZ])
     if pregrasp.pos_err > 0.008:
         return SkillResult(ok=False, detail=f"pregrasp unreachable ({pregrasp.pos_err * 1000:.0f}mm)")
+    if not motions.object_target_current(emb, snap):
+        return SkillResult(ok=False, detail="object target expired during solve")
     if not emb.guard.check_target(tuple(target + [0, 0, GRASP_DZ])):
         return SkillResult(ok=False, detail="grasp target outside safety fence")
     if not motions.set_gripper(emb, OPEN_FOR_GRASP):
         return SkillResult(ok=False, detail="guard denied gripper open")
-    if not motions.move_to_q(emb, pregrasp.qpos, gripper=OPEN_FOR_GRASP):
+    if not motions.move_to_q(emb, pregrasp.qpos, gripper=OPEN_FOR_GRASP, object_observation=snap):
         return SkillResult(ok=False, detail="pregrasp motion denied")
     # 两段下降在中间高度重新观测并瞄准，修正扇区边缘斜向接近时固定指推动物体的偏差。
     # Two-stage descent with mid-height re-aim: at oblique approach angles (sector edges)
     # the fixed finger can clip and shove the object during descent; whatever the first
     # stage did to it, the final stage re-reads the LIVE pose and aims there.
-    fresh = np.asarray(_snap(emb).objects[obj].pos)
+    current = _snap(emb)
+    if obj not in current.objects:
+        return SkillResult(ok=False, detail="object observation unavailable during pick",
+                           data={"_execution": {"outcome": "OUTCOME_UNKNOWN"}})
+    fresh = np.asarray(current.objects[obj].pos)
     mid_target = fresh + GRASP_LATERAL_OFF * _jaw_x_world(emb) + [0, 0, MID_DZ]
-    if not motions.reach(emb, mid_target, max_pos_err=0.008, seconds=0.8, gripper=OPEN_FOR_GRASP):
+    if not motions.reach(emb, mid_target, max_pos_err=0.008, seconds=0.8, gripper=OPEN_FOR_GRASP,
+                         object_observation=current):
         return SkillResult(ok=False, detail="mid descent unreachable or denied")
-    fresh2 = np.asarray(_snap(emb).objects[obj].pos)
+    current = _snap(emb)
+    if obj not in current.objects:
+        return SkillResult(ok=False, detail="object observation unavailable during pick",
+                           data={"_execution": {"outcome": "OUTCOME_UNKNOWN"}})
+    fresh2 = np.asarray(current.objects[obj].pos)
     grasp_target = fresh2 + GRASP_LATERAL_OFF * _jaw_x_world(emb) + [0, 0, GRASP_DZ]
-    if not motions.reach(emb, grasp_target, max_pos_err=0.006, seconds=0.7, gripper=OPEN_FOR_GRASP):
+    if not motions.reach(emb, grasp_target, max_pos_err=0.006, seconds=0.7, gripper=OPEN_FOR_GRASP,
+                         object_observation=current):
         return SkillResult(ok=False, detail="grasp descent unreachable or denied")
     if not motions.set_gripper(emb, 0.0, seconds=0.6):
         return SkillResult(ok=False, detail="guard denied gripper close")

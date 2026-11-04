@@ -27,6 +27,7 @@ from embodied.cognition.world_state import (
     held_object,
     object_in_region,
 )
+from embodied.contracts.object_state import object_available
 from embodied.control.actions import write_action
 from embodied.control.hal import ActionCommand
 from embodied.providers.policy import BasePolicyProvider
@@ -67,6 +68,7 @@ class PolicyRunner:
 
     def observe(self) -> tuple[np.ndarray, np.ndarray]:
         obs = self.emb.read()
+        obs.objects = {name: pose for name, pose in obs.objects.items() if object_available(obs, name)}
         self._input_observation = obs
         state = np.asarray([*obs.qpos, obs.gripper_opening], dtype=np.float32)
         if obs.objects:

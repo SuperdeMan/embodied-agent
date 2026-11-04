@@ -12,7 +12,7 @@ from dataclasses import asdict
 from uuid import uuid4
 
 from embodied.contracts.action import ActionEnvelope, ActionProfile, ControlObservationRef
-from embodied.control.hal import ActionCommand
+from embodied.control.hal import ActionCommand, WriteResult
 from embodied.runtime.invocation import CURRENT_INVOCATION
 
 
@@ -155,6 +155,12 @@ def write_action(emb, command: ActionCommand, *, observation=None):
 
     使用生产方真实观察，不在推理后刷新策略输入时间戳。
     """
+    if observation is not None and observation.object_evidence is not None:
+        validator = getattr(emb, "validate_object_observation", None)
+        if validator is None or not validator(observation):
+            reject = getattr(emb, "reject_action", None)
+            return (reject("semantic_observation_stale") if reject is not None
+                    else WriteResult(applied=False, reason="semantic_observation_stale"))
     prepare = getattr(emb, "prepare_action", None)
     if prepare is None or emb.action_controller.runtime is None:
         return emb.write(command)

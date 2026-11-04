@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 from embodied.contracts.action import ActionEnvelope, ControlObservationRef
+from embodied.contracts.object_state import ObjectContext, ObjectEvidence
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,8 @@ class Observation:
     objects: dict[str, Pose] = field(default_factory=dict)  # sim ground truth; perception fills this from M2
     extras: dict[str, Any] = field(default_factory=dict)
     reference: ControlObservationRef | None = None
+    object_evidence: dict[str, ObjectEvidence] | None = None
+    object_context: ObjectContext | None = None
 
 
 @dataclass

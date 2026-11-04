@@ -22,6 +22,22 @@ def _phys_per_write(emb: Any, hz: float) -> int:
     return max(1, round((1.0 / hz) / emb.timestep))
 
 
+def object_target_current(emb: Any, observation: Any) -> bool:
+    """Admit a solved semantic target before starting its bounded motion segment.
+
+    有界运动段开始前检查目标所依据的语义观察，求解耗时不能续期。
+    """
+    if observation is None or observation.object_evidence is None:
+        return True
+    validate = getattr(emb, "validate_object_observation", None)
+    if validate is not None and validate(observation):
+        return True
+    reject = getattr(emb, "reject_action", None)
+    if reject is not None:
+        reject("semantic_target_stale")
+    return False
+
+
 def move_to_q(
     emb: Any,
     q_target: np.ndarray,
@@ -30,8 +46,11 @@ def move_to_q(
     hz: float = 50.0,
     settle_steps: int = 60,
     gripper: float | None = None,
+    object_observation: Any = None,
 ) -> bool:
     q0 = np.asarray(emb.read().qpos, dtype=float)
+    if not object_target_current(emb, object_observation):
+        return False
     qt = np.asarray(q_target, dtype=float)
     steps = max(2, int(seconds * hz))
     per = _phys_per_write(emb, hz)
@@ -68,6 +87,7 @@ def reach(
     max_pos_err: float = 0.006,
     seconds: float = 1.2,
     gripper: float | None = None,
+    object_observation: Any = None,
 ) -> bool:
     """IK to a cartesian grasp-site target, then joint-space move. Fails closed:
     unreachable target (per tolerance) or fence-vetoed target → no motion at all.
@@ -80,4 +100,4 @@ def reach(
     res = emb.solve_reach(target)
     if res.pos_err > max_pos_err:
         return False
-    return move_to_q(emb, res.qpos, seconds=seconds, gripper=gripper)
+    return move_to_q(emb, res.qpos, seconds=seconds, gripper=gripper, object_observation=object_observation)
