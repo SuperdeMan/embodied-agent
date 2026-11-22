@@ -156,9 +156,9 @@ async def test_mtls_rpc_perceived_object_expiry_blocks_dependent_steps_without_t
     tls, policy = _make_pki(tmp_path)
     body = _MockPerceivedBody()
     pipeline = _BlinkingPipeline()
-    # 故意设置偏移的远端生产单调时钟，证明跨进程不比较两端原始 monotonic。
-    # Offset producer monotonic by +500,000 s to prove cross-host admission never compares raw monotonic values.
-    producer_clock = [500_000.0]
+    # 故意设置远超本机当前单调时钟 500,000 秒的生产端时钟，证明跨进程不比较两端原始 monotonic。
+    # Offset producer monotonic by +500,000 s above local uptime to prove cross-host admission never compares raw monotonic values.
+    producer_clock = [time.monotonic() + 500_000.0]
     wrapped = PerceivedSim(
         body,
         pipeline,
@@ -204,7 +204,9 @@ async def test_mtls_rpc_perceived_object_expiry_blocks_dependent_steps_without_t
         assert snap_fresh is not None
         assert "obj_cube" in snap_fresh.objects
         assert snap_fresh.object_evidence is not None
-        assert snap_fresh.object_evidence["obj_cube"].captured_monotonic < 400_000.0  # 已重基准到本地时钟 / rebased locally
+        rebased_mono = snap_fresh.object_evidence["obj_cube"].captured_monotonic
+        assert abs(rebased_mono - time.monotonic()) < 5.0  # 已重基准到接收端本地时钟 / rebased onto receiver local clock
+        assert rebased_mono < producer_clock[0] - 400_000.0
         assert eval_state_predicate(verification["expect"], snap_fresh) == SAT
 
         # 2. 遮挡后推进生产端墙钟 0.25s（尚未超 0.40s TTL）-> 仍可见但剩余 TTL 收紧至 <= 0.15s。
@@ -341,14 +343,17 @@ async def test_mtls_rpc_isolated_sim_and_color_perception_world_state(tmp_path):
 
     tls, policy = _make_pki(tmp_path)
     iso = IsolatedTabletopSim(seed=0)
+    iso.prepare_renderer()
+    # 使用 320x240 适配 1 CPU 软件 OSMesa 渲染预算，不放宽 1.0s 观察窗或 1.0s 跨机鲜度预算。
+    # Use 320x240 to fit 1-CPU software OSMesa within the strict 1.0s observation lane and 1.0s freshness budget.
     perceived = PerceivedSim(
         iso,
         PerceptionPipeline(ColorBlobProvider(), dict(TABLETOP_OBJECTS)),
+        width=320,
+        height=240,
         min_interval_s=0.25,
     )
     registry = SkillRegistry(robot_id=iso.spec().embodiment_id)
-    # 预先热身离屏渲染子进程，避免首帧 GL 初始化挤占 1s 观察窗。
-    # Warm up offscreen render worker once before RPC so initial GL init does not consume the 1s observation lane budget.
     warm_obs = perceived.read()
     assert "obj_cube" in warm_obs.objects
     assert warm_obs.object_evidence is not None
