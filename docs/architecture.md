@@ -77,6 +77,14 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 八类契约字段与接线位置以[执行计划 §3](platform-upgrade.md#3-八类契约与冻结顺序)为迁移清单。纯契约不依赖适配器、ROS、GPU；跨进程 proto 先行，未知版本不静默接受。
 
+### 5.15 D033 控制与监督 RPC 的 mTLS 传输认证与角色隔离
+
+`ControlService` 与 `SafetyService` 支持显式双向 TLS（mTLS）与只读 `RpcAccessPolicy` 角色策略。策略固定根 CA 证书指纹 `ca_cert_sha256` 及每个允许对端的叶证书 SHA-256 指纹、唯一名称、角色（`agent` / `guardian` / `operator`）、可选 `spiffe_id` 及操作者显式作用域（`read_only`、`cancel`、`reconcile_effect`、`reconcile_stop`、`halt`、`reset_guard`）。
+
+监听任何非回环地址或 CLI 连接非回环远端时，必须成对提供 mTLS 证书与策略，缺任一项均在启动阶段拒绝（fail-closed）；回环地址保留既有未认证本地开发参考模式，不宣称跨机身份认证。服务端直接从 BoringSSL `auth_context()` 提取传输类型、叶证书指纹与 URI SAN，不信任客户端自报 gRPC metadata 或仅靠 `confirmed=true` 标志。
+
+方法级角色矩阵在内核写死，策略不能越权放大：`InvokeSkill` 与任务日志写接口仅限 `agent`；`SupervisorLink` 仅限 `guardian`；`Heartbeat` 仅限 `agent`；`ReconcileEffect`、`ReconcileStop` 与 `Reset` 仅限显式拥有对应作用域的 `operator`，`agent` 与 `guardian` 均不能清除急停闩锁。未认证或越权调用在触达任何状态或账本之前以 `UNAUTHENTICATED` / `PERMISSION_DENIED` 中止。已认证 RPC 维护操作（`ReconcileStop`、`ReconcileEffect`）在执行前写入 `rpc_operator_action_started` 至既有 schema v2 `operation_events`（写失败拒绝执行），结束后写 `rpc_operator_action_finished`；`Halt` 与 `CancelOperation` 继续遵守 D028，撤销与驱动闩锁绝不因数据库写失败被阻断。详见 [RPC mTLS 与角色授权](rpc-mtls-authorization.md)。
+
 ### 5.14 D032 受控停止授权与作用域隔离
 
 `OperatorPolicy` 显式声明允许的操作作用域集合 `scopes`；未填写时默认仅为 `["reconcile_effect"]`，保证已有策略文件在应用升级后不会隐式获得物理停止对账权限。只有策略显式包含 `reconcile_stop` 时，受控 HTTP 入口才受理该作用域；未授权作用域直接返回拒绝且不写审计。

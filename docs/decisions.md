@@ -333,3 +333,16 @@ D030/D031 验收补记（2026-11-04）：`5b080dd` 已部署。822 项完整测�
 **边界**：本批仅打通单机受控 HTTP 到现有 MuJoCo `SimStopController` 的受信停止对账；不改变本机参考 RPC 的未认证边界，不增加数据库表，不开放 Guard 复位、多 attempt、自动续跑或真机停止证明。跨主机控制身份、父进程物理控制隔离和真机停止控制器仍须独立验收。
 
 D032 验收补记（2026-11-22）：`90135f0` 已部署激活（回执 `20261122T012458Z`）。859 项完整测试、38 项 RPC、10 组 222 项参考矩阵全通过；真值/color 各 30/30，ONNX 29/30。Linux 隔离容器验证缺省策略拒止停止、保夹持停止、跨重启停止和 Guard 闩锁保持；真实 Serve HTTPS 8449 验证 WSS 中断隔离、停止拒绝/确认与 5 事件审计行序（114→118）、隔离解除后恢复执行及重启七表行摘要一致、旧凭据 409。未改 schema，未授权 Guard 复位或任务续跑。证据见 `eval/stop-authorization-20261122.json` 与 `eval/cloud-stop-upgrade-20261122.json`。
+
+
+## D033 · 控制与监督 RPC 启用 mTLS 证书固定与显式角色隔离
+
+**日期**：2026-11-22 · **状态**：实施中
+
+**问题**：`ControlService` 与 `SafetyService` 此前仅通过明文回环端口运行，任意可达客户端均可伪造 `SupervisorLink`、调用 `Reset` 解除急停，或仅凭布尔值 `confirmed=True` 触发 `ReconcileStop` / `ReconcileEffect`，缺少传输认证、角色分离与主体审计。
+
+**决策**：在不新增第三方依赖、不修改 proto wire、不修改 SQLite schema v2 的前提下，引入纯类型 `RpcAccessPolicy` 与 `RpcTlsPaths`（`embodied.dev/v1alpha1`）。使用 `grpc` 原生 BoringSSL mTLS（`require_client_auth=True`）及标准库 `ssl.PEM_cert_to_DER_cert` 计算根 CA 与叶证书 SHA-256 指纹固定；非回环监听与非回环客户端连接强制要求 mTLS + 策略。在服务端硬编码 `agent` / `guardian` / `operator` 角色方法矩阵，操作者再按最小权限显式配置作用域（`read_only`、`cancel`、`reconcile_effect`、`reconcile_stop`、`halt`、`reset_guard`），禁止 `agent`/`guardian` 复位 Guard 或调用维护对账，禁止非 `guardian` 接入 `SupervisorLink`。认证维护操作（`ReconcileEffect` / `ReconcileStop`）先落账 `rpc_operator_action_started` 再执行并在结束后落账 `rpc_operator_action_finished`；`Halt` / `CancelOperation` 继续维持 D028“撤权与闩锁先于数据库”不变式。
+
+**替代方案**：使用静态共享 bearer token 或环境变量密钥放进 gRPC metadata（易泄漏、无双向传输身份、需额外密钥管理，拒绝）；仅核对证书 CN 字符串而不固定叶证书 SHA-256 指纹（CA 签发同名证书即可绕过，拒绝）；新增 `cryptography` 依赖（无必要增加运行依赖，拒绝）；允许非回环明文监听并仅靠防火墙保护（违反纵深防御，拒绝）。
+
+**边界**：本批关闭本机/跨机参考 RPC 的未认证与角色混用缺口，但尚未引入在线证书吊销（CRL/OCSP）、自动证书轮换、跨机视觉传感器时钟同步、父进程物理控制隔离或真实硬件急停；回环无策略模式仅用于既有本地参考开发与回归，不宣称为已认证边界。

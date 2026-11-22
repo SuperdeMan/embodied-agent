@@ -42,6 +42,8 @@ def main(argv: list[str] | None = None) -> int:
     sim.add_argument("--snapshot", default="", help="save a scene PNG to this path on exit")
     sim.add_argument("--remote", default="", metavar="ADDR", help="drive a serve-control process instead of a local sim")
     sim.add_argument("--guardian", default="", metavar="ADDR", help="stream agent heartbeats to this guardian (with --remote)")
+    _add_rpc_tls(sim, server=False)
+    sim.add_argument("--guardian-tls-server-name", default="", help="optional TLS server-name override for guardian")
     sim.add_argument("--pick-policy", default="", metavar="ONNX",
                      help="serve skill.manip.pick from this learned policy (same manifest, needs --group policy)")
     sim.add_argument("--place-policy", default="", metavar="ONNX",
@@ -95,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
                     help="halt unless the safety guardian holds SupervisorLink (production topology)")
     sc.add_argument("--mock", action="store_true", help="serve mock skills instead of the sim (no mujoco)")
     sc.add_argument("--ledger", default="outputs/runtime/operations.sqlite3")
+    _add_rpc_tls(sc, server=True)
 
     operation = sub.add_parser("operation", help="query or request cancellation of an existing remote operation")
     operation.add_argument("--remote", required=True)
@@ -105,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
     maintenance.add_argument("--reconcile-effect", action="store_true")
     operation.add_argument("--attempt", default="")
     operation.add_argument("--confirm", action="store_true")
+    _add_rpc_tls(operation, server=False)
 
     upgrade = sub.add_parser("ledger-upgrade", help="preview or explicitly apply the task journal schema upgrade")
     upgrade.add_argument("--ledger", required=True)
@@ -116,10 +120,16 @@ def main(argv: list[str] | None = None) -> int:
     task_query.add_argument("--id", default="")
     task_query.add_argument("--reconcile", action="store_true")
     task_query.add_argument("--limit", type=int, default=20)
+    _add_rpc_tls(task_query, server=False)
 
     sg = sub.add_parser("serve-guardian", help="safety-guardian process (gRPC SafetyService)")
     sg.add_argument("--port", type=int, default=8392)
     sg.add_argument("--control", default="127.0.0.1:8391", metavar="ADDR")
+    _add_rpc_tls(sg, server=True)
+    sg.add_argument("--control-tls-ca", default="", help="optional CA PEM for guardian -> control mTLS (defaults to --tls-ca)")
+    sg.add_argument("--control-tls-cert", default="", help="optional client cert PEM for guardian -> control mTLS")
+    sg.add_argument("--control-tls-key", default="", help="optional client key PEM for guardian -> control mTLS")
+    sg.add_argument("--control-tls-server-name", default="", help="optional TLS server-name override for control")
 
     args = parser.parse_args(argv)
     if args.cmd == "operation" and args.reconcile_stop and (not args.attempt or not args.confirm):
@@ -165,6 +175,31 @@ def _add_common(p: argparse.ArgumentParser) -> None:
         help="auto: use the configured LLM when LLM_API_KEY is set, otherwise the offline scripted provider",
     )
     p.add_argument("--yes", action="store_true", help="auto-confirm dangerous skills (demos only)")
+
+
+def _add_rpc_tls(p: argparse.ArgumentParser, *, server: bool) -> None:
+    """Attach explicit mTLS certificate and policy flags to RPC commands.
+
+    为 RPC 命令挂载显式 mTLS 证书与策略参数。
+    """
+    if server:
+        p.add_argument("--host", default="127.0.0.1", help="bind host (non-loopback requires mTLS and --rpc-auth-policy)")
+        p.add_argument("--rpc-auth-policy", default="", help="pinned CA and peer role policy JSON (D033)")
+    else:
+        p.add_argument("--tls-server-name", default="", help="optional TLS server-name override")
+    p.add_argument("--tls-ca", default="", help="trusted root CA certificate PEM path for mTLS")
+    p.add_argument("--tls-cert", default="", help="leaf certificate PEM path for mTLS")
+    p.add_argument("--tls-key", default="", help="private key PEM path for mTLS")
+
+
+def _parse_tls(ca: str, cert: str, key: str):
+    if not (ca or cert or key):
+        return None
+    if not (ca and cert and key):
+        raise ValueError("incomplete_mtls_paths: --tls-ca, --tls-cert and --tls-key must all be provided")
+    from embodied.contracts.rpc_auth import RpcTlsPaths
+
+    return RpcTlsPaths(ca_cert=ca, cert=cert, key=key)
 
 
 def _build_provider(kind: str, plan_rules: Any = None) -> tuple[Any, str]:
@@ -257,9 +292,12 @@ async def _serve_control(args: argparse.Namespace) -> int:
 
     from embodied.control.service import ControlState, serve, watchdog_loop
     from embodied.runtime.operations import OperationLedger
+    from embodied.runtime.rpc_auth import load_rpc_policy
     from embodied.skills.registry import SkillRegistry
 
     logging.basicConfig(level=logging.INFO)
+    tls = _parse_tls(str(args.tls_ca), str(args.tls_cert), str(args.tls_key))
+    policy = load_rpc_policy(args.rpc_auth_policy) if args.rpc_auth_policy else None
     registry = SkillRegistry(ledger=OperationLedger(args.ledger),
                              robot_id="mock" if args.mock else "sim.mujoco.so_arm100")
     sim = None
@@ -275,9 +313,9 @@ async def _serve_control(args: argparse.Namespace) -> int:
         register_sim_skills(registry, sim)
     state = ControlState(registry, sim, require_supervisor=bool(args.require_supervisor),
                          world_reader=sim.read_reference_state if sim is not None else None)
-    server, bound = await serve(state, port=int(args.port))
-    print(f"realtime-control on 127.0.0.1:{bound} (skills={len(registry.catalog())}, "
-          f"require_supervisor={state.require_supervisor})")
+    server, bound = await serve(state, port=int(args.port), host=str(args.host), tls=tls, policy=policy)
+    print(f"realtime-control on {args.host}:{bound} (skills={len(registry.catalog())}, "
+          f"require_supervisor={state.require_supervisor}, mtls={tls is not None})")
     wd = asyncio.create_task(watchdog_loop(state))
     try:
         await server.wait_for_termination()
@@ -293,12 +331,13 @@ async def _serve_control(args: argparse.Namespace) -> int:
 async def _operation(args: argparse.Namespace) -> int:
     import json
 
-    import grpc
     from google.protobuf.json_format import MessageToDict
 
+    from embodied.runtime.rpc_auth import build_client_channel
     from embodied.skills.remote import RemoteSkillRegistry
 
-    async with grpc.aio.insecure_channel(args.remote) as channel:
+    tls = _parse_tls(str(args.tls_ca), str(args.tls_cert), str(args.tls_key))
+    async with build_client_channel(str(args.remote), tls, server_name=str(args.tls_server_name)) as channel:
         registry = RemoteSkillRegistry(channel)
         if args.reconcile_stop:
             result = await registry.reconcile_stop(args.id, args.attempt, confirmed=args.confirm)
@@ -314,11 +353,11 @@ async def _operation(args: argparse.Namespace) -> int:
 async def _task_query(args: argparse.Namespace) -> int:
     import json
 
-    import grpc
-
+    from embodied.runtime.rpc_auth import build_client_channel
     from embodied.skills.remote import RemoteSkillRegistry
 
-    async with grpc.aio.insecure_channel(args.remote) as channel:
+    tls = _parse_tls(str(args.tls_ca), str(args.tls_cert), str(args.tls_key))
+    async with build_client_channel(str(args.remote), tls, server_name=str(args.tls_server_name)) as channel:
         registry = RemoteSkillRegistry(channel)
         if not args.id:
             result = await registry.list_tasks(args.limit)
@@ -333,13 +372,26 @@ async def _task_query(args: argparse.Namespace) -> int:
 async def _serve_guardian(args: argparse.Namespace) -> int:
     import logging
 
+    from embodied.runtime.rpc_auth import load_client_credentials, load_rpc_policy
     from embodied.safety.guard import GuardLimits
     from embodied.safety.guardian import GuardianState, agent_watchdog_loop, serve, supervisor_link_loop
 
     logging.basicConfig(level=logging.INFO)
-    state = GuardianState(str(args.control), GuardLimits(joint_lower=(), joint_upper=()))
-    server, bound = await serve(state, port=int(args.port))
-    print(f"safety-guardian on 127.0.0.1:{bound}, supervising control at {args.control}")
+    tls = _parse_tls(str(args.tls_ca), str(args.tls_cert), str(args.tls_key))
+    policy = load_rpc_policy(args.rpc_auth_policy) if args.rpc_auth_policy else None
+    control_tls = _parse_tls(
+        str(args.control_tls_ca or args.tls_ca),
+        str(args.control_tls_cert or args.tls_cert),
+        str(args.control_tls_key or args.tls_key),
+    )
+    control_creds = load_client_credentials(control_tls) if control_tls is not None else None
+    control_opts = [("grpc.ssl_target_name_override", str(args.control_tls_server_name))] if args.control_tls_server_name else None
+    state = GuardianState(
+        str(args.control), GuardLimits(joint_lower=(), joint_upper=()),
+        control_credentials=control_creds, control_options=control_opts,
+    )
+    server, bound = await serve(state, port=int(args.port), host=str(args.host), tls=tls, policy=policy)
+    print(f"safety-guardian on {args.host}:{bound}, supervising control at {args.control} (mtls={tls is not None})")
     tasks = [asyncio.create_task(agent_watchdog_loop(state)), asyncio.create_task(supervisor_link_loop(state))]
     try:
         await server.wait_for_termination()
@@ -354,21 +406,24 @@ async def _sim_remote(args: argparse.Namespace) -> int:
 
     使用有时效界限的远端快照进行规划与验证。
     """
-    import grpc
-
     from embodied.cognition.engine import PlannerEngine
     from embodied.cognition.offline import SIM_PLAN_RULES
     from embodied.runtime.liveness import agent_heartbeat_loop
+    from embodied.runtime.rpc_auth import build_client_channel, load_client_credentials
     from embodied.skills.remote import RemoteSkillRegistry
 
     provider, pname = _build_provider(args.provider, plan_rules=SIM_PLAN_RULES)
-    channel = grpc.aio.insecure_channel(str(args.remote))
+    tls = _parse_tls(str(args.tls_ca), str(args.tls_cert), str(args.tls_key))
+    channel = build_client_channel(str(args.remote), tls, server_name=str(args.tls_server_name))
     registry = await RemoteSkillRegistry(channel).connect()
     engine = PlannerEngine(provider, registry, confirm=_make_confirm(bool(args.yes)),
                            world_fn=registry.world_snapshot, context_fn=registry.world_context)
     beat = None
     if args.guardian:
-        beat = asyncio.create_task(agent_heartbeat_loop(str(args.guardian)))
+        g_creds = load_client_credentials(tls) if tls is not None else None
+        g_name = str(args.guardian_tls_server_name or args.tls_server_name)
+        g_opts = [("grpc.ssl_target_name_override", g_name)] if g_name else None
+        beat = asyncio.create_task(agent_heartbeat_loop(str(args.guardian), credentials=g_creds, options=g_opts))
         print(f"heartbeats -> guardian {args.guardian}")
     try:
         return await _repl(

@@ -6,8 +6,12 @@ link LATCHES the halt (only an explicit Reset releases it) — kill any upstream
 and the arm stops and stays stopped. The latch also drives the in-driver Guard when a
 sim is attached, so an in-flight motion is denied at the write path, not just new calls.
 
+When configured with mTLS and RpcAccessPolicy (D033), every RPC verifies the BoringSSL
+client certificate fingerprint and enforces the hardcoded agent/guardian/operator role
+matrix before touching state or the ledger. Non-loopback binds refuse plaintext.
 
-控制进程通过 gRPC 提供技能。监督链缺失或过期时闩锁，显式重置才释放；有仿真时同时闩锁驱动 Guard，阻断进行中的写入。
+
+控制进程通过 gRPC 提供技能。监督链缺失或过期时闩锁，显式重置才释放；有仿真时同时闩锁驱动 Guard，阻断进行中的写入。配置 mTLS 与策略后（D033），所有接口先验客户端证书指纹与角色矩阵，非回环地址拒绝明文监听。
 """
 
 from __future__ import annotations
@@ -15,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import sqlite3
 import time
 from dataclasses import asdict
 from typing import Any, Callable
@@ -24,8 +29,18 @@ import grpc
 from embodied.contracts.effect import EffectRejected
 from embodied.contracts.observation import ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
+from embodied.contracts.rpc_auth import RpcAccessPolicy, RpcTlsPaths
 from embodied.contracts.stopping import StopRejected
 from embodied.runtime.observation import ObservationUnavailable
+from embodied.runtime.rpc_auth import (
+    RpcAuthorizer,
+    RpcForbidden,
+    RpcPrincipal,
+    RpcUnauthenticated,
+    is_loopback_host,
+    load_server_credentials,
+    record_rpc_audit,
+)
 from embodied.runtime.rpcgen import import_common, import_control
 from embodied.skills.registry import ConfirmationRequired, SkillRegistry
 
@@ -37,7 +52,7 @@ SUPERVISOR_STALE_S = 1.5
 
 class ControlState:
     def __init__(self, registry: SkillRegistry, sim: Any = None, *, require_supervisor: bool = False,
-                 world_reader: Callable | None = None):
+                 world_reader: Callable | None = None, authorizer: RpcAuthorizer | None = None):
         self.registry = registry
         self.sim = sim
         self.require_supervisor = require_supervisor
@@ -48,6 +63,8 @@ class ControlState:
         self.supervisor_connected = False
         self.world_reader = world_reader
         self.world_sequence = 0
+        self.authorizer = authorizer
+        self.last_reset_audit: dict[str, Any] | None = None
 
     def halt(self, reason: str) -> None:
         if not self.halted:
@@ -62,8 +79,18 @@ class ControlState:
         finally:
             self.halt_persistence_errors.update(self.registry.cancel_all())
 
-    def reset(self, reason: str) -> None:
-        logger.info("reset (%s)", reason)
+    def reset(self, reason: str, *, principal: RpcPrincipal | None = None) -> None:
+        if principal is not None:
+            self.last_reset_audit = {
+                "api_version": "embodied.dev/v1alpha1", "issuer": principal.issuer,
+                "subject_hash": principal.subject_hash, "cert_sha256": principal.cert_sha256,
+                "role": principal.role, "policy_digest": principal.policy_digest,
+                "scope": "reset_guard", "reason": reason, "recorded_unix": time.time(),
+            }
+            logger.warning("rpc_guard_reset subject=%s cert=%s policy=%s reason=%s",
+                           principal.subject_hash, principal.cert_sha256, principal.policy_digest, reason)
+        else:
+            logger.info("reset (%s)", reason)
         self.halted = False
         self.halt_reason = ""
         if self.sim is not None and hasattr(self.sim, "guard"):
@@ -79,8 +106,34 @@ def build_servicer(state: ControlState):
     pb2, pb2_grpc = import_control()
     common = import_common()
 
+    async def _auth(context, method: str) -> RpcPrincipal | None:
+        if state.authorizer is None:
+            return None
+        try:
+            return state.authorizer.authorize(context.auth_context(), method)
+        except RpcUnauthenticated as exc:
+            await context.abort(grpc.StatusCode.UNAUTHENTICATED, str(exc))
+        except RpcForbidden as exc:
+            await context.abort(grpc.StatusCode.PERMISSION_DENIED, str(exc))
+
+    def _audit_body(principal: RpcPrincipal, scope: str, method: str, record, **extra) -> dict[str, Any]:
+        return {
+            "api_version": "embodied.dev/v1alpha1", "issuer": principal.issuer,
+            "subject_hash": principal.subject_hash, "cert_sha256": principal.cert_sha256,
+            "role": principal.role, "policy_digest": principal.policy_digest,
+            "scope": scope, "method": method, "task_id": record.task_id,
+            "request_digest": record.request_digest, "ledger_boot_id": state.registry.ledger.boot_id,
+            "recorded_unix": time.time(), **extra,
+        }
+
+    def _guard_halted() -> bool:
+        if state.sim is not None and hasattr(state.sim, "guard"):
+            return bool(state.sim.guard.halted)
+        return bool(state.halted)
+
     class Servicer(pb2_grpc.ControlServiceServicer):
         async def GetWorldState(self, request, context):
+            await _auth(context, "GetWorldState")
             if state.world_reader is None:
                 return pb2.WorldStateReply(available=False, reason="world_state_unavailable")
             started = time.monotonic()
@@ -116,6 +169,7 @@ def build_servicer(state: ControlState):
             )
 
         async def GetOperation(self, request, context):
+            await _auth(context, "GetOperation")
             return self._operation_reply(state.registry.get_operation(request.operation_id))
 
         def _task_reply(self, report=None, error=""):
@@ -124,6 +178,7 @@ def build_servicer(state: ControlState):
                                  error=error)
 
         async def RecordTaskPlan(self, request, context):
+            await _auth(context, "RecordTaskPlan")
             try:
                 payload = json.loads(request.plan_json)
                 state.registry.record_task_plan(payload)
@@ -132,6 +187,7 @@ def build_servicer(state: ControlState):
                 return self._task_reply(error=str(exc))
 
         async def RecordTaskStep(self, request, context):
+            await _auth(context, "RecordTaskStep")
             try:
                 payload = json.loads(request.payload_json)
                 if request.kind == "intent":
@@ -145,6 +201,7 @@ def build_servicer(state: ControlState):
                 return self._task_reply(error=str(exc))
 
         async def FinishTask(self, request, context):
+            await _auth(context, "FinishTask")
             try:
                 state.registry.finish_task(request.task_id, interrupted=request.interrupted)
                 return self._task_reply(state.registry.get_task(request.task_id))
@@ -152,66 +209,168 @@ def build_servicer(state: ControlState):
                 return self._task_reply(error=str(exc))
 
         async def GetTask(self, request, context):
+            await _auth(context, "GetTask")
             try:
                 return self._task_reply(state.registry.get_task(request.task_id))
             except Exception as exc:
                 return self._task_reply(error=str(exc))
 
         async def ReconcileTask(self, request, context):
+            await _auth(context, "ReconcileTask")
             try:
                 return self._task_reply(await state.registry.reconcile_task(request.task_id))
             except Exception as exc:
                 return self._task_reply(error=str(exc))
 
         async def ListTasks(self, request, context):
+            await _auth(context, "ListTasks")
             try:
                 return pb2.TaskListReply(tasks_json=json.dumps(state.registry.list_tasks(request.limit or 20), ensure_ascii=False))
             except Exception as exc:
                 return pb2.TaskListReply(error=str(exc))
 
         async def CancelOperation(self, request, context):
-            return self._operation_reply(state.registry.cancel_operation(request.operation_id))
+            principal = await _auth(context, "CancelOperation")
+            # 遵循 D028：先撤权取消，审计写入失败不得阻断取消本身。
+            # Follow D028: revoke and cancel first; audit persistence failure may never block cancellation.
+            record = state.registry.cancel_operation(request.operation_id)
+            if principal is not None and record is not None:
+                try:
+                    record_rpc_audit(state.registry, record, "rpc_operator_action_finished",
+                                     _audit_body(principal, "cancel", "CancelOperation", record, status="completed"))
+                except Exception as exc:
+                    logger.error("rpc cancel audit failed: operation=%s error=%s", record.operation_id, type(exc).__name__)
+            return self._operation_reply(record)
 
         async def CheckEffect(self, request, context):
+            await _auth(context, "CheckEffect")
             result = await state.registry.check_effect_async(request.operation_id, request.attempt_id,
                                                              request.evidence_id, request.verification_digest)
             evidence = result.pop("evidence")
             return pb2.EffectReply(**result, evidence_json=json.dumps(evidence) if evidence else "")
 
         async def ReconcileEffect(self, request, context):
+            principal = await _auth(context, "ReconcileEffect")
+            audit_record = None
+            audit_body = None
             try:
-                return self._operation_reply(await state.registry.reconcile_effect_async(request.operation_id, request.attempt_id))
+                if principal is not None:
+                    # 预检目标后再写开始审计；审计失败拒绝采样。 / Pre-check target before start audit; fail closed on DB error.
+                    audit_record, _, lease = state.registry._reserve_effect(request.operation_id, request.attempt_id)
+                    state.registry.arbiter.release(lease)
+                    audit_body = _audit_body(principal, "reconcile_effect", "ReconcileEffect", audit_record)
+                    try:
+                        record_rpc_audit(state.registry, audit_record, "rpc_operator_action_started", audit_body)
+                    except (sqlite3.DatabaseError, RuntimeError):
+                        reply = self._operation_reply(state.registry.get_operation(request.operation_id))
+                        reply.reconciliation_error = "rpc_audit_unavailable"
+                        return reply
+                updated = await state.registry.reconcile_effect_async(request.operation_id, request.attempt_id)
+                if principal is not None and audit_record is not None and audit_body is not None:
+                    try:
+                        record_rpc_audit(state.registry, updated, "rpc_operator_action_finished", dict(
+                            audit_body, status="completed",
+                            effect_evidence_id=updated.effect_evidence["evidence_id"],
+                            effect_verdict=updated.effect_evidence["verdict"],
+                        ))
+                    except (sqlite3.DatabaseError, RuntimeError):
+                        reply = self._operation_reply(updated)
+                        reply.reconciliation_error = "rpc_audit_unavailable"
+                        return reply
+                return self._operation_reply(updated)
             except EffectRejected as exc:
                 reason = str(exc)
-            except Exception:
+                error_name = type(exc).__name__
+            except Exception as exc:
                 reason = "effect_reconciliation_failed"
+                error_name = type(exc).__name__
+            if principal is not None and audit_record is not None and audit_body is not None:
+                try:
+                    record_rpc_audit(state.registry, audit_record, "rpc_operator_action_finished",
+                                     dict(audit_body, status="failed", error=error_name))
+                except Exception:
+                    pass
             reply = self._operation_reply(state.registry.get_operation(request.operation_id))
             reply.reconciliation_error = reason
             return reply
 
         async def ReconcileStop(self, request, context):
+            principal = await _auth(context, "ReconcileStop")
+            audit_record = None
+            audit_body = None
             try:
+                if principal is not None:
+                    if request.confirmed is not True:
+                        raise ConfirmationRequired("maintenance.reconcile_stop")
+                    existing = state.registry.get_operation(request.operation_id)
+                    if (existing is not None and existing.attempt_id == request.attempt_id
+                            and existing.state == "OUTCOME_UNKNOWN"
+                            and existing.stop_state == "MOTION_STOPPED_OBSERVED"):
+                        return self._operation_reply(existing)
+                    audit_record, _, profile = state.registry._validate_stop_reconciliation(
+                        request.operation_id, request.attempt_id, allow_already_observed=False, check_lock=True,
+                    )
+                    audit_body = _audit_body(
+                        principal, "reconcile_stop", "ReconcileStop", audit_record,
+                        confirmed=True, stop_profile_digest=profile.digest, guard_halted=_guard_halted(),
+                    )
+                    # 先持久化操作者停止意图，再允许控制器进入维护围栏。
+                    # Persist operator stop intent before allowing the controller to enter the maintenance fence.
+                    try:
+                        record_rpc_audit(state.registry, audit_record, "rpc_operator_action_started", audit_body)
+                    except (sqlite3.DatabaseError, RuntimeError):
+                        reply = self._operation_reply(state.registry.get_operation(request.operation_id))
+                        reply.reconciliation_error = "rpc_audit_unavailable"
+                        return reply
+                    updated = await state.registry.reconcile_stop(
+                        request.operation_id, request.attempt_id, confirmed=True, allow_already_observed=False,
+                    )
+                    try:
+                        record_rpc_audit(state.registry, updated, "rpc_operator_action_finished", dict(
+                            audit_body, status="completed", stop_state=updated.stop_state,
+                            stop_nonce=updated.stop_evidence["nonce"],
+                            stop_profile_digest=updated.stop_evidence["profile_digest"],
+                            gripper_strategy=updated.stop_evidence["gripper_strategy"],
+                            guard_halted=_guard_halted(),
+                        ))
+                    except (sqlite3.DatabaseError, RuntimeError):
+                        reply = self._operation_reply(updated)
+                        reply.reconciliation_error = "rpc_audit_unavailable"
+                        return reply
+                    return self._operation_reply(updated)
                 record = await state.registry.reconcile_stop(
                     request.operation_id, request.attempt_id, confirmed=request.confirmed,
                 )
                 return self._operation_reply(record)
-            except ConfirmationRequired:
+            except ConfirmationRequired as exc:
                 reason = "confirmation_required"
+                error_name = type(exc).__name__
             except StopRejected as exc:
                 reason = str(exc)
-            except Exception:
+                error_name = type(exc).__name__
+            except Exception as exc:
                 reason = "stop_reconciliation_failed"
+                error_name = type(exc).__name__
+            if principal is not None and audit_record is not None and audit_body is not None:
+                try:
+                    record_rpc_audit(state.registry, audit_record, "rpc_operator_action_finished",
+                                     dict(audit_body, status="failed", error=error_name))
+                except Exception:
+                    pass
             reply = self._operation_reply(state.registry.get_operation(request.operation_id))
             reply.reconciliation_error = reason
             return reply
 
         async def ListSkills(self, request, context):
+            await _auth(context, "ListSkills")
             reply = pb2.ListSkillsReply()
             for m in state.registry.catalog():
                 reply.skills.append(pb2.SkillInfo(manifest_json=m.model_dump_json()))
             return reply
 
         async def InvokeSkill(self, request, context):
+            await _auth(context, "InvokeSkill")
+
             def ev(phase, detail="", error_code="", data=None, result=None):
                 e = pb2.SkillEvent(command_id=request.command_id, phase=phase, detail=detail)
                 e.operation_id = request.operation_id or request.command_id
@@ -278,6 +437,7 @@ def build_servicer(state: ControlState):
             yield ev(phase, result.detail, "" if result.ok else "skill_failed", data=result.data, result=result)
 
         async def StreamState(self, request, context):
+            await _auth(context, "StreamState")
             interval = max(0.02, float(request.min_interval_ms or 100) / 1000.0)
             while not context.cancelled():
                 if state.sim is not None:
@@ -300,14 +460,19 @@ def build_servicer(state: ControlState):
                 await asyncio.sleep(interval)
 
         async def Halt(self, request, context):
+            await _auth(context, "Halt")
             state.halt(request.reason or "halt_requested")
             return pb2.HaltReply(halted=True)
 
         async def Reset(self, request, context):
-            state.reset(request.reason or "reset_requested")
+            principal = await _auth(context, "Reset")
+            state.reset(request.reason or "reset_requested", principal=principal)
             return pb2.ResetReply(reset=True)
 
         async def SupervisorLink(self, request_iterator, context):
+            # 必须在修改连接标志与进入 finally 前鉴权，避免未授权调用篡改监督状态。
+            # Authenticate before touching connection flags or entering finally so unauthorized callers cannot tamper liveness.
+            await _auth(context, "SupervisorLink")
             state.supervisor_connected = True
             state.last_supervisor_ping = time.monotonic()
             logger.info("supervisor link up")
@@ -341,11 +506,25 @@ async def watchdog_loop(state: ControlState, interval_s: float = 0.2) -> None:
         await asyncio.sleep(interval_s)
 
 
-async def serve(state: ControlState, port: int = DEFAULT_PORT, host: str = "127.0.0.1"):
+async def serve(
+    state: ControlState, port: int = DEFAULT_PORT, host: str = "127.0.0.1",
+    *, tls: RpcTlsPaths | None = None, policy: RpcAccessPolicy | None = None,
+):
+    if (tls is None) != (policy is None):
+        raise ValueError("rpc_tls_and_policy_must_be_paired")
+    if not is_loopback_host(host) and tls is None:
+        raise ValueError("non_loopback_rpc_requires_mtls_policy")
     _, pb2_grpc = import_control()
     server = grpc.aio.server()
-    pb2_grpc.add_ControlServiceServicer_to_server(build_servicer(state), server)
-    bound = server.add_insecure_port(f"{host}:{port}")
+    if tls is not None and policy is not None:
+        creds = load_server_credentials(tls, policy)
+        state.authorizer = RpcAuthorizer(policy, "control")
+        pb2_grpc.add_ControlServiceServicer_to_server(build_servicer(state), server)
+        bound = server.add_secure_port(f"{host}:{port}", creds)
+    else:
+        pb2_grpc.add_ControlServiceServicer_to_server(build_servicer(state), server)
+        bound = server.add_insecure_port(f"{host}:{port}")
     await server.start()
-    logger.info("control service on %s:%d (require_supervisor=%s)", host, bound, state.require_supervisor)
+    logger.info("control service on %s:%d (require_supervisor=%s, mtls=%s)",
+                host, bound, state.require_supervisor, tls is not None)
     return server, bound

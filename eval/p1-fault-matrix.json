@@ -51,6 +51,14 @@
       "scope": "Explicit stop scope isolation, one-use audited simulation stop reconciliation, cross-restart and latched-Guard boundaries; no Guard reset or task execution authority"
     },
     {
+      "id": "rpc_mtls_authorization",
+      "tests": [
+        "tests/runtime/test_rpc_auth_policy.py",
+        "tests/rpc/test_rpc_mtls_authorization.py"
+      ],
+      "scope": "Pinned-CA BoringSSL mTLS transport auth, hardcoded agent/guardian/operator role matrix, non-loopback fail-closed, audited RPC maintenance and D028 halt resilience; no CRL/OCSP or hardware stop"
+    },
+    {
       "id": "incompatible_ledger",
       "tests": [
         "tests/runtime/test_task_schema.py"

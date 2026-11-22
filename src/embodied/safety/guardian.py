@@ -10,7 +10,7 @@ ValidateCommand offers pre-motion geometric checks against the static fence conf
 independent of the in-driver Guard (defense in depth, not a replacement).
 
 
-Guardian 独立监督 Agent 心跳并连接控制进程；Agent 失联发停机，Guardian 死亡使控制闩锁，控制暂不可达时持续重连。静态几何预检是驱动 Guard 之外的纵深防线。
+Guardian 独立监督 Agent 心跳并连接控制进程；Agent 失联发停机，Guardian 死亡使控制闩锁，控制暂不可达时持续重连。静态几何预检是驱动 Guard 之外的纵深防线；启用 mTLS 后（D033）对所有入口与上联强制校验客户端证书与角色。
 """
 
 from __future__ import annotations
@@ -18,9 +18,19 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from typing import Any
 
 import grpc
 
+from embodied.contracts.rpc_auth import RpcAccessPolicy, RpcTlsPaths
+from embodied.runtime.rpc_auth import (
+    RpcAuthorizer,
+    RpcForbidden,
+    RpcUnauthenticated,
+    is_loopback_host,
+    is_loopback_target,
+    load_server_credentials,
+)
 from embodied.runtime.rpcgen import import_common, import_control, import_safety
 from embodied.safety.guard import GuardLimits
 
@@ -32,13 +42,20 @@ SUPERVISOR_PING_INTERVAL_S = 0.3
 
 
 class GuardianState:
-    def __init__(self, control_addr: str, limits: GuardLimits | None = None):
+    def __init__(
+        self, control_addr: str, limits: GuardLimits | None = None,
+        *, control_credentials: Any = None, control_options: list[tuple[str, Any]] | None = None,
+        authorizer: RpcAuthorizer | None = None,
+    ):
         self.control_addr = control_addr
         self.limits = limits or GuardLimits(joint_lower=(), joint_upper=())
         self.last_agent_beat = 0.0
         self.agent_connected = False
         self.ever_connected = False
         self.halt_sent = False
+        self.control_credentials = control_credentials
+        self.control_options = control_options
+        self.authorizer = authorizer
 
     def should_halt(self) -> tuple[bool, str]:
         """Single decision point, polled by the watchdog loop. Enforcement lives THERE and
@@ -57,9 +74,17 @@ class GuardianState:
         return False, ""
 
 
+def _open_control_channel(state: GuardianState):
+    if state.control_credentials is not None:
+        return grpc.aio.secure_channel(state.control_addr, state.control_credentials, options=state.control_options)
+    if not is_loopback_target(state.control_addr):
+        raise ValueError("non_loopback_rpc_requires_mtls")
+    return grpc.aio.insecure_channel(state.control_addr)
+
+
 async def _control_stub(state: GuardianState):
     _, pb2_grpc = import_control()
-    channel = grpc.aio.insecure_channel(state.control_addr)
+    channel = _open_control_channel(state)
     return channel, pb2_grpc.ControlServiceStub(channel)
 
 
@@ -82,8 +107,19 @@ async def send_halt(state: GuardianState, reason: str) -> bool:
 def build_servicer(state: GuardianState):
     s_pb2, s_pb2_grpc = import_safety()
 
+    async def _auth(context, method: str):
+        if state.authorizer is None:
+            return None
+        try:
+            return state.authorizer.authorize(context.auth_context(), method)
+        except RpcUnauthenticated as exc:
+            await context.abort(grpc.StatusCode.UNAUTHENTICATED, str(exc))
+        except RpcForbidden as exc:
+            await context.abort(grpc.StatusCode.PERMISSION_DENIED, str(exc))
+
     class Servicer(s_pb2_grpc.SafetyServiceServicer):
         async def ValidateCommand(self, request, context):
+            await _auth(context, "ValidateCommand")
             cur = request.current
             pos = (cur.ee_pose.x, cur.ee_pose.y, cur.ee_pose.z)
             fmin, fmax = state.limits.ee_fence_min, state.limits.ee_fence_max
@@ -93,6 +129,9 @@ def build_servicer(state: GuardianState):
             return s_pb2.ValidateReply(allowed=False, reason=f"ee_outside_fence:{pos}")
 
         async def Heartbeat(self, request_iterator, context):
+            # 必须在修改连接标志与进入 finally 前鉴权，避免未授权调用污染活性状态。
+            # Authenticate before mutating liveness flags or entering finally so unauthorized callers cannot spoof heartbeats.
+            await _auth(context, "Heartbeat")
             common = import_common()
             state.agent_connected = True
             state.ever_connected = True
@@ -112,6 +151,7 @@ def build_servicer(state: GuardianState):
                 logger.warning("agent heartbeat down")
 
         async def EStop(self, request, context):
+            await _auth(context, "EStop")
             ok = await send_halt(state, request.reason or "estop")
             return s_pb2.EStopReply(stopped=ok)
 
@@ -136,11 +176,12 @@ async def supervisor_link_loop(state: GuardianState) -> None:
 
     持续维持监督链，断开时控制闩锁并不断重连。
     """
-    pb2, pb2_grpc = import_control()
+    _, pb2_grpc = import_control()
     common = import_common()
     while True:
+        channel = None
         try:
-            channel = grpc.aio.insecure_channel(state.control_addr)
+            channel = _open_control_channel(state)
             stub = pb2_grpc.ControlServiceStub(channel)
 
             async def pings():
@@ -151,21 +192,37 @@ async def supervisor_link_loop(state: GuardianState) -> None:
             logger.info("supervisor link connecting to %s", state.control_addr)
             async for _pong in stub.SupervisorLink(pings()):
                 pass
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
             logger.warning("supervisor link dropped: %s", e)
         finally:
-            try:
-                await channel.close()
-            except Exception:
-                pass
+            if channel is not None:
+                try:
+                    await channel.close()
+                except Exception:
+                    pass
         await asyncio.sleep(0.5)
 
 
-async def serve(state: GuardianState, port: int = DEFAULT_PORT, host: str = "127.0.0.1"):
+async def serve(
+    state: GuardianState, port: int = DEFAULT_PORT, host: str = "127.0.0.1",
+    *, tls: RpcTlsPaths | None = None, policy: RpcAccessPolicy | None = None,
+):
+    if (tls is None) != (policy is None):
+        raise ValueError("rpc_tls_and_policy_must_be_paired")
+    if not is_loopback_host(host) and tls is None:
+        raise ValueError("non_loopback_rpc_requires_mtls_policy")
     _, s_pb2_grpc = import_safety()
     server = grpc.aio.server()
-    s_pb2_grpc.add_SafetyServiceServicer_to_server(build_servicer(state), server)
-    bound = server.add_insecure_port(f"{host}:{port}")
+    if tls is not None and policy is not None:
+        creds = load_server_credentials(tls, policy)
+        state.authorizer = RpcAuthorizer(policy, "safety")
+        s_pb2_grpc.add_SafetyServiceServicer_to_server(build_servicer(state), server)
+        bound = server.add_secure_port(f"{host}:{port}", creds)
+    else:
+        s_pb2_grpc.add_SafetyServiceServicer_to_server(build_servicer(state), server)
+        bound = server.add_insecure_port(f"{host}:{port}")
     await server.start()
-    logger.info("guardian on %s:%d, watching control at %s", host, bound, state.control_addr)
+    logger.info("guardian on %s:%d, watching control at %s (mtls=%s)", host, bound, state.control_addr, tls is not None)
     return server, bound
