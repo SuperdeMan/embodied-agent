@@ -45,3 +45,5 @@ D029 `execution_authorized=false` 继续表示未授权任务执行。D030 的�
 实际事件顺序为签发 rowid 97 → 消费 98 → 效果 99 → 结束 100；另有一次签发在重启后失效。当前为 28 次技能尝试、29 条效果事件，重查没有制造新的技能尝试。普通文本/语音入口及参考 RPC 沿用既有边界；本批只保护三个新增操作者 HTTP 接口，不宣称所有控制入口已统一认证。
 
 完整测试 822 项、RPC 38 项、参考矩阵 185 项通过；原任务真值/color 各 30/30，ONNX 29/30。中间版本的 color 波动与反馈分离修复见 [body-feedback.md](body-feedback.md)。[本地证据](../eval/operator-authorization-20261104.json) · [云端证据](../eval/cloud-operator-upgrade-20261104.json)。
+
+D032 增量：已在同组受控 HTTP 入口新增显式 `scopes` 隔离与一次性 `reconcile_stop` 授权（默认缺省仍仅 `reconcile_effect`），详见 [stop-authorization.md](stop-authorization.md)。

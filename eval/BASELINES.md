@@ -53,3 +53,6 @@
 | 2026-11-04 | 5b080dd | tabletop_pick_place@v1 | 30/30 | PASS | D030/D031；scripted_truth；原任务预算与物理参数不变。结果 outputs/eval/tabletop_pick_place@v1-20261104-145806.json；证据见 `eval/operator-authorization-20261104.json` |
 | 2026-11-04 | 5b080dd | tabletop_pick_place@v1 | 29/30 | PASS* | D030/D031；isolated_pick_v1_truth；保留第 14 局 horizon reached，未达不劣于脚本目标。结果 outputs/eval/tabletop_pick_place@v1-20261104-145831.json；证据见 `eval/operator-authorization-20261104.json` |
 | 2026-11-04 | 5b080dd | tabletop_pick_place@v1 | 30/30 | PASS | D030/D031；isolated_color；原任务预算与物理参数不变。结果 outputs/eval/tabletop_pick_place@v1-20261104-150026.json；证据见 `eval/operator-authorization-20261104.json` |
+| 2026-11-22 | 90135f0 | tabletop_pick_place@v1 | 30/30 | PASS | D032 受控停止授权与作用域隔离；scripted_truth；干净提交，原任务预算与物理参数不变。结果 outputs/eval/tabletop_pick_place@v1-20261122-012159.json；859 项测试，证据见 `eval/stop-authorization-20261122.json` |
+| 2026-11-22 | 90135f0 | tabletop_pick_place@v1 | 29/30 | PASS* | D032 受控停止授权与作用域隔离；isolated_pick_v1_truth；干净提交，保留第 14 局 horizon reached，未达不劣于脚本目标。结果 outputs/eval/tabletop_pick_place@v1-20261122-012218.json；证据见 `eval/stop-authorization-20261122.json` |
+| 2026-11-22 | 90135f0 | tabletop_pick_place@v1 | 30/30 | PASS | D032 受控停止授权与作用域隔离；isolated_color；干净提交，原任务预算与物理参数不变。结果 outputs/eval/tabletop_pick_place@v1-20261122-012328.json；证据见 `eval/stop-authorization-20261122.json` |

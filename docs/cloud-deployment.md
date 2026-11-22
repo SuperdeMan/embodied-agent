@@ -1,8 +1,18 @@
 # 云端仿真控制台
 
-> 2026-11-04，当前 **activated**：应用镜像固定 `5b080dd`，运行配置包含 D030 的只读操作者策略挂载（配置摘要见下），私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D029/D028/D027/D026/D025/D024/2026-10-30 记录保留为历史。
+> 2026-11-22，当前 **activated**：应用镜像固定 `90135f0`，运行配置包含 D032 的双作用域只读操作者策略挂载（配置摘要见下），私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D030/D031/D029/D028/D027/D026/D025/D024/2026-10-30 记录保留为历史。
 
-## D030/D031 最近升级（2026-11-04）
+## D032 最近升级（2026-11-22）
+
+应用由 `5b080dd` 升级至 `90135f05c95d5e974c4cb4e7b898346622fd9dd8`，激活回执 `20261122T012458Z`，镜像 ID `sha256:146a73f5933d2855c92db57a97fe962d915e61a9f5dcd721f99792cdf198c877`。在受控 HTTP 入口新增显式作用域隔离及一次性 `reconcile_stop` 审计授权，未改 schema v2。
+
+运行文件为 `/home/ubuntu/embodied-agent/runtime/compose-55a9bea3a639e02d.json`，SHA-256 `55a9bea3a639e02dc99b38ba9a6d07e73c608645b4f9fd8587a119755be7b0b7`，挂载只读策略 `/home/ubuntu/embodied-agent/runtime/operator-policy-4ad094e27f820e05.json`（SHA-256 `4ad094e27f820e05549aeab583c26755fa12a7be2f78c117649fc34a5755d46d`，`policy_digest` `33d665e9ba1dd084f07c038f13a5d7fb96ae7d632e0ad887e6062550780d9d00`）。策略仅显式补充 `scopes: ["reconcile_effect", "reconcile_stop"]`，保持原代理网关、原唯一登录主体、internal 网络、无宿主端口和 1 CPU / 1536 MiB / 128 PID 只读根限制；旧策略与旧 Compose 文件均保留。
+
+升级前 14 tasks / 28 operations / 28 attempts / 101 operation_events / 8 task_plans / 48 task_events 逐行保留。外部真实入口验收后最终为 19 tasks（12 FINISHED / 6 LEGACY / 1 INTERRUPTED）、34 operations（33 RETURNED / 1 OUTCOME_UNKNOWN）、34 attempts（33 NOT_REQUESTED / 1 MOTION_STOPPED_OBSERVED）、132 operation_events、13 task_plans、71 task_events。
+
+真实入口验证：Serve 覆盖伪造身份头，容器内直连伪造返回 403；实测 WSS 中断触发隔离与新指令拒绝、未停前效果重查拒绝、停止确认拒绝保持隔离、二次确认完成 `MOTION_STOPPED_OBSERVED`（审计行序 114→115→116→117→118）且原操作保持 `OUTCOME_UNKNOWN`、重复确认与重签停止拒绝、随后新 WSS 回零与抓放及一次性效果重查通过；容器重启后七表行摘要 `37251619081aff54...` 完全一致，预留待确认凭据被 409 拒绝。其他 39 个容器和 Serve 映射保持，Funnel 关闭，仍为仿真/离线规划/模拟音频，未授权 Guard 复位或任务续跑。证据见 [cloud-stop-upgrade-20261122.json](../eval/cloud-stop-upgrade-20261122.json)。
+
+## D030/D031 升级（2026-11-04 历史）
 
 应用由 `a29ad0e` 升级至 `5b080dd9d5add932e236aebbc73e581a656687d2`，激活回执 `20261104T150233Z`，镜像 ID `sha256:c5ba7f40c28a4911dcc4495c18b56b307705a1c5468107948260fecbac102f82`。新增受控 HTTP 的 Serve 身份和一次性效果重查审计；同时分离本体反馈与语义采样，TTL 与物理参数不变。
 

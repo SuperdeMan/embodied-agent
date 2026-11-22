@@ -1,0 +1,340 @@
+{
+  "date_local": "2026-11-22",
+  "qualified_commit": "90135f05c95d5e974c4cb4e7b898346622fd9dd8",
+  "source_tree": "542240b08c05f96feb5bde233d78accab6144432",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_version": 2,
+  "schema_changed": false,
+  "rpc_wire_changed": false,
+  "ruff": "passed",
+  "full_suite": {
+    "file": "outputs/stop-auth-90135f0.xml",
+    "sha256": "3f3cee52c90a61ab9aa1ac699317b520cb53d11b97a9d1a575b6515d9eadaa22",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "859",
+      "time": "97.656",
+      "timestamp": "2026-11-22T09:19:30.562663+08:00"
+    },
+    "warnings": 4,
+    "new_tests": 37
+  },
+  "rpc_suite": {
+    "file": "outputs/stop-auth-rpc-90135f0.xml",
+    "sha256": "019cb2efa5f187d96e28cc4d3f34d022e49930713c93e29bd13f52b98661163e",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "38",
+      "time": "3.617",
+      "timestamp": "2026-11-22T09:21:10.987280+08:00"
+    },
+    "included_in_full_suite": true
+  },
+  "fault_matrix": {
+    "file": "outputs/p1-faults/20261122T012115Z-90135f0/report.json",
+    "sha256": "11b07e3d1e9428e88adeb23827053bbbb13367d70cdcc347628bd37aad643690",
+    "result": {
+      "schema": "embodied.p1-fault-matrix/v1",
+      "commit": "90135f05c95d5e974c4cb4e7b898346622fd9dd8",
+      "working_tree_clean": true,
+      "matrix_sha256": "38210af2a73a549aa99eba2c42b380a21cf72cc2dcde2a6eeaa90090a204dbea",
+      "reference_checks_passed": true,
+      "p1_complete": false,
+      "groups": [
+        {
+          "id": "storage_cancel",
+          "tests": [
+            "tests/runtime/test_cancel_storage_faults.py",
+            "tests/rpc/test_halt_storage_faults.py"
+          ],
+          "scope": "SQLite page-cap FULL, read/write failure, cancellation, Guard latch and watchdog",
+          "total": 8,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.098,
+            "max": 0.098
+          }
+        },
+        {
+          "id": "operation_crash_and_replay",
+          "tests": [
+            "tests/runtime/test_operations.py",
+            "tests/rpc/test_operation_protocol.py"
+          ],
+          "scope": "Abrupt owner exit, duplicate identity, restart and loopback RPC",
+          "total": 15,
+          "passed": 15,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.568,
+            "max": 0.568
+          }
+        },
+        {
+          "id": "task_recovery",
+          "tests": [
+            "tests/runtime/test_task_journal.py",
+            "tests/control/test_task_recovery.py",
+            "tests/rpc/test_task_protocol.py"
+          ],
+          "scope": "Task corruption, interrupted intent, scene change, read-only assessment",
+          "total": 29,
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.499,
+            "max": 0.722
+          }
+        },
+        {
+          "id": "recovery_review",
+          "tests": [
+            "tests/runtime/test_recovery_review.py",
+            "tests/control/test_recovery_review.py",
+            "tests/rpc/test_recovery_review.py"
+          ],
+          "scope": "Consistent read-only snapshot, Guard lifecycle, evidence age and denial of authority claims; no execution authorization",
+          "total": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.05,
+            "max": 0.053
+          }
+        },
+        {
+          "id": "operator_authorization",
+          "tests": [
+            "tests/runtime/test_operator_policy.py",
+            "tests/hri/test_operator_authorization.py"
+          ],
+          "scope": "Exact proxy, subject and default scope policy, one-use effect-only authority, audit failure/expiry/replay refusal; no task execution authority",
+          "total": 41,
+          "passed": 41,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.071,
+            "max": 0.088
+          }
+        },
+        {
+          "id": "stop_authorization",
+          "tests": [
+            "tests/hri/test_stop_authorization.py"
+          ],
+          "scope": "Explicit stop scope isolation, one-use audited simulation stop reconciliation, cross-restart and latched-Guard boundaries; no Guard reset or task execution authority",
+          "total": 29,
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.304,
+            "max": 0.458
+          }
+        },
+        {
+          "id": "incompatible_ledger",
+          "tests": [
+            "tests/runtime/test_task_schema.py"
+          ],
+          "scope": "Unknown schema, live-owner refusal, atomic migration rollback",
+          "total": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.04,
+            "max": 0.04
+          }
+        },
+        {
+          "id": "compute_process",
+          "tests": [
+            "tests/runtime/test_compute_process.py"
+          ],
+          "scope": "Worker timeout, crash, bad protocol, process reaping and no request replay",
+          "total": 20,
+          "passed": 20,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 1.512,
+            "max": 2.076
+          }
+        },
+        {
+          "id": "supervision_link",
+          "tests": [
+            "tests/rpc/test_process_split.py"
+          ],
+          "scope": "Loopback control/Guardian link loss, stale heartbeat, confirmation and latch",
+          "total": 9,
+          "passed": 9,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.609,
+            "max": 0.609
+          }
+        },
+        {
+          "id": "observation_availability",
+          "tests": [
+            "tests/runtime/test_observation_lane.py",
+            "tests/cognition/test_object_freshness.py",
+            "tests/control/test_body_feedback.py"
+          ],
+          "scope": "Blocked read-only workers, stale or missing local perception; no real camera disconnect",
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.076,
+            "max": 0.11
+          }
+        }
+      ],
+      "open_gates": [
+        "Real storage-medium I/O failure and power loss",
+        "Physical control process native hang and independent hardware stop",
+        "Real camera disconnection and cross-host sensor clock validation",
+        "Authenticated cross-host recovery authority and multi-attempt protocol",
+        "Real network partition and field-device supervision",
+        "Physical stop latency, stale-action rate and real episode data loss metrics",
+        "Release compatibility and downgrade/recovery rehearsal after new v2 writes"
+      ],
+      "wall_duration_s": 33.730996899990714,
+      "returncode": 0,
+      "command": [
+        "D:\\Personal\\AI\\Claude Code\\产品\\embodied-agent\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/runtime/test_cancel_storage_faults.py",
+        "tests/rpc/test_halt_storage_faults.py",
+        "tests/runtime/test_operations.py",
+        "tests/rpc/test_operation_protocol.py",
+        "tests/runtime/test_task_journal.py",
+        "tests/control/test_task_recovery.py",
+        "tests/rpc/test_task_protocol.py",
+        "tests/runtime/test_recovery_review.py",
+        "tests/control/test_recovery_review.py",
+        "tests/rpc/test_recovery_review.py",
+        "tests/runtime/test_operator_policy.py",
+        "tests/hri/test_operator_authorization.py",
+        "tests/hri/test_stop_authorization.py",
+        "tests/runtime/test_task_schema.py",
+        "tests/runtime/test_compute_process.py",
+        "tests/rpc/test_process_split.py",
+        "tests/runtime/test_observation_lane.py",
+        "tests/cognition/test_object_freshness.py",
+        "tests/control/test_body_feedback.py",
+        "-q",
+        "-o",
+        "addopts=",
+        "--import-mode=importlib",
+        "--junitxml=D:\\Personal\\AI\\Claude Code\\产品\\embodied-agent\\outputs\\p1-faults\\20261122T012115Z-90135f0\\results.xml"
+      ],
+      "junit_sha256": "9edaecb3de8a042fcef42cbcd0d210f93de981bb1978124fbdfc53e475ff3ecd"
+    }
+  },
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261122-012159.json",
+      "sha256": "e7a813d957dd2eac52879dbb4152bd84e5b0c4e2c083ad467e8a7e98581b69d1",
+      "result": {
+        "commit": "90135f0",
+        "finished_at": "2026-11-22T01:21:59.307058+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "isolated_pick_v1_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261122-012218.json",
+      "sha256": "bcfbfcdfa16a3ebd2a7bcddd1addddcd178666c507886799b71b3a066f306330",
+      "result": {
+        "commit": "90135f0",
+        "finished_at": "2026-11-22T01:22:18.431734+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "isolated_color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261122-012328.json",
+      "sha256": "de069c7b6715cca778ca9230cc849814e3235cdff7d464212c1a44222c5766eb",
+      "result": {
+        "commit": "90135f0",
+        "finished_at": "2026-11-22T01:23:28.376768+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+  "pick_v1_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+  "boundaries": [
+    "Default policy without scopes remains effect-only; reconcile_stop requires explicit policy scope",
+    "Simulation stop evidence uses mujoco-hold-current-v1 only; never proves hardware stopping",
+    "Stop reconciliation preserves OUTCOME_UNKNOWN and never clears Guard estop latch",
+    "No task execution resume, skill retry, Guard reset, or cross-host RPC auth granted"
+  ]
+}

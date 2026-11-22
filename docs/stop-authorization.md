@@ -45,3 +45,11 @@
 - 沿用 schema v2 的 `operation_events`，无数据库迁移，不写 `task_events`。
 - 不修改普通 HRI WebSocket 或参考 gRPC 的认证边界；不新增 Guard 复位、任务续跑或多 attempt 接口。
 - 物理停止证明仍限定于 MuJoCo `mujoco-hold-current-v1` 参考控制器，不能转借真实机械臂。
+
+## 本批验收
+
+固定功能提交 `90135f05c95d5e974c4cb4e7b898346622fd9dd8`：ruff 通过，完整测试 859 项（含新增 37 项）、RPC 38 项、P1 参考故障矩阵 10 组 222 项全部通过、零跳过；三组 30 局原任务回归为真值 30/30、isolated color 30/30、isolated pick-v1 ONNX 29/30（保留既有第 14 局 horizon reached）。
+
+Linux 隔离候选容器独立验证了缺省策略拒止 `reconcile_stop`（403 且零写库）、双作用域持物停止对账（`maintain_contact`）与 5 事件审计序、重复消费与重签拒绝、跨重启停止（同时拒绝跨重启效果重查）以及 Guard 急停闩锁下完成停止且不清除闩锁。
+
+云端真栈激活回执 `20261122T012458Z`：仅新增显式双作用域只读策略文件与不可变 Compose 配置，主体名单、内部网络和资源限制不变，原七表全部行逐条保留。经真实 Tailscale Serve HTTPS 8449 验证身份头覆盖、实测 WSS 中断进入隔离、新 WSS 指令被仲裁拒绝、未停前效果重查拒绝、首次拒绝确认保持隔离、二次确认完成 `MOTION_STOPPED_OBSERVED`（精确审计行序 114→115→116→117→118）并解除隔离、原调用保持 `OUTCOME_UNKNOWN`、随后新 WSS 回零与抓放及一次性效果重查通过；容器重启后七表行摘要一致且旧待确认凭据返回 409。[本地证据](../eval/stop-authorization-20261122.json) · [云端证据](../eval/cloud-stop-upgrade-20261122.json)。
