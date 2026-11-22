@@ -378,3 +378,16 @@ D034 验收补记（2026-11-22）：`cb05aee` 已验收并部署激活（回执 
 **边界**：本批测量的是隔离仿真进程下的软件闩锁延迟、子进程强杀回收延迟、仿真停止观测耗时与本地文件增量持久化损失界限，`hardware_stop_measured` 固定为 `false`、`p1_complete` 固定为 `false`；真实硬件急停延迟、真实介质掉电与现场多模态录制仍保留为真机/现场门禁。
 
 D035 验收补记（2026-11-22）：`b723417` 已验收。ruff、904 项完整测试、46 项 RPC 测试及 13 组 267 项参考故障矩阵全通过（零跳过）；默认物理控制隔离下 3×30 回归保持真值/color 各 30/30、ONNX 29/30。Windows 本机（`guard_estop_latch` p95 `0.0090 ms`、`urgent_estop_kill` p95 `138.25 ms`、`stop_reconciliation_wall` p95 `11.11 ms`）与 Linux Docker 隔离容器镜像 `sha256:0ed21bd5...`（`0.0128 ms` / `130.85 ms` / `51.71 ms`，宿主机 40 容器不变）均录得仿真停止观测 `100.0 ms`、100% 过期与重放动作拦截、正常录制 0% 损失及 `os._exit(9)` 硬杀 50/57 步恢复（损失 `7 < 10`，容忍截断尾行并检出篡改）；`hardware_stop_measured=false`、`p1_complete=false`。线上 HTTP/WS 控制面与 schema v2 未变，云端常驻控制台维持已激活 `cb05aee`。证据见 `eval/p1-metrics-baseline-20261122.json`。
+
+
+## D036 · 跨机视觉/观察时钟契约与 RPC 对象级时效传播
+
+**日期**：2026-11-22 · **状态**：实施中
+
+**问题**：D019 远端 `ObservationEnvelope` 仅支持即时 `sim_truth`，既无法表达跨主机视觉观察的时钟域与偏斜/漂移界限，也无法传递 D023 逐对象感知年龄；同时 `PerceivedSim` 未覆写 `read_reference_state()`，通过 `__getattr__` 穿透到底层仿真直接泄漏真值，导致远端规划与效果验证器无法在感知遮挡、相机故障或网络延迟时收口为 `UNKNOWN`。
+
+**决策**：在不新增第三方依赖、不破坏 `control.proto` wire、不修改 SQLite schema v2 的前提下，扩展 `src/embodied/contracts/observation.py`（新增 `ClockMetadata`、`RemoteObjectEvidence`、`ClockAdmissionPolicy` 并向后兼容演化 `ObservationEnvelope`）与 `src/embodied/runtime/world_state.py`（升级 `SnapshotAdmission`）：强制禁止跨主机使用 `local_monotonic`；对 `wall_ntp`/`wall_ptp` 执行同步状态、偏斜/漂移预算、未来时间戳、本地墙钟跳变与 Cristian 中点往返偏斜反查；对 `simulation`/`rpc_rtt_bounded` 采用生产端自测年龄加接收端单调 RTT 与不确定度构造保守鲜度上界。在 `PerceivedSim` 显式实现 `read_reference_state()`、在 `Observation` 增加可选 `object_clock_now`、在 `ControlService.GetWorldState` 与 `embodied serve-control --perception` 透传感知对象证据；接收端剔除已超期对象并将新鲜对象的剩余 TTL 重基准到接收端本地单调时钟。将跨机时钟契约与 mTLS 感知 RPC 故障测试纳入 P1 故障矩阵第 14 组。
+
+**替代方案**：直接把生产端 `time.monotonic()` 放进 RPC 供接收端相减（跨主机单调时钟无共同零点，必然出错，拒绝）；仅依赖远端自报 UTC 墙钟而不做偏斜上界与 Cristian 往返交叉检验（远端时钟失步或恶意/异常超前会绕过过期门禁，拒绝）；把对象鲜度校验移到 SQLite 新表或修改 gRPC proto 字段破坏旧客户端（触发未授权 schema 变更且无必要，拒绝）。
+
+**边界**：本批关闭软件层跨机视觉时钟契约、时钟偏斜/跳变拒止与 RPC 对象级时效传播；不替代真实物理相机断连、真实硬件 PTP/NTP 同步测量或真机手眼标定验证。

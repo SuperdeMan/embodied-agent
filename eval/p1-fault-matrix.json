@@ -104,12 +104,20 @@
         "tests/data_engine/test_episode_integrity.py"
       ],
       "scope": "Simulation stop latency distribution, stale-action/replay interception counters, manual intervention rate, incremental episode journal SHA-256 audit and abrupt hard-kill recovery; hardware_stop_measured stays false"
+    },
+    {
+      "id": "cross_host_observation_clock",
+      "tests": [
+        "tests/runtime/test_cross_host_observation_clock.py",
+        "tests/rpc/test_cross_host_vision_rpc.py"
+      ],
+      "scope": "Cross-host ObservationEnvelope clock-domain admission, local_monotonic cross-host ban, wall NTP/PTP skew/drift/Cristian midpoint and local wall-step checks, PerceivedSim.read_reference_state non-leakage, and mTLS RPC per-object TTL rebase; real physical camera disconnect and hardware PTP sync stay open"
     }
   ],
   "open_gates": [
     "Real storage-medium I/O failure and power loss",
     "Independent hardware stop (SG-0) and real-device physical controller faults",
-    "Real camera disconnection and cross-host sensor clock validation",
+    "Real physical camera disconnection and hardware PTP/NTP clock synchronization (software cross-host clock-domain, skew/RTT freshness, and RPC per-object evidence contract verified in D036)",
     "Authenticated cross-host recovery authority and multi-attempt protocol",
     "Real network partition and field-device supervision",
     "Real-hardware physical stop latency and field-deployment episode data loss metrics (simulation isolated-process baseline measured in D035)",

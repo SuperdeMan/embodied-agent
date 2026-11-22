@@ -102,6 +102,8 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--mock", action="store_true", help="serve mock skills instead of the sim (no mujoco)")
     sc.add_argument("--in-process-sim", action="store_true",
                     help="run MuJoCo physics in-process instead of an isolated physical control worker (reference mode)")
+    sc.add_argument("--perception", choices=["off", "color", "dino"], default="off",
+                    help="serve perceived object poses with cross-host freshness metadata instead of sim ground truth (D036)")
     sc.add_argument("--ledger", default="outputs/runtime/operations.sqlite3")
     _add_rpc_tls(sc, server=True)
 
@@ -328,13 +330,14 @@ async def _serve_control(args: argparse.Namespace) -> int:
     else:
         from embodied.skills.scripted.manip import register_sim_skills
 
-        sim = _build_sim(int(args.seed), in_process=bool(args.in_process_sim))
+        sim = _wrap_perception(_build_sim(int(args.seed), in_process=bool(args.in_process_sim)), str(args.perception))
         register_sim_skills(registry, sim)
     state = ControlState(registry, sim, require_supervisor=bool(args.require_supervisor),
                          world_reader=sim.read_reference_state if sim is not None else None)
     server, bound = await serve(state, port=int(args.port), host=str(args.host), tls=tls, policy=policy)
     print(f"realtime-control on {args.host}:{bound} (skills={len(registry.catalog())}, "
           f"require_supervisor={state.require_supervisor}, mtls={tls is not None}, "
+          f"perception={args.perception if not args.mock else 'mock'}, "
           f"control_isolation={'mock' if args.mock else ('in_process' if args.in_process_sim else 'process')})")
     wd = asyncio.create_task(watchdog_loop(state))
     try:

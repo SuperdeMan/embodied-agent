@@ -59,6 +59,9 @@ class Observation:
     reference: ControlObservationRef | None = None
     object_evidence: dict[str, ObjectEvidence] | None = None
     object_context: ObjectContext | None = None
+    # 感知包装器在同一单调时钟域内生成对象证据时的采样时刻（仅供本机计算年龄，不直接跨机比较）。
+    # Producer-local monotonic timestamp when object_evidence was evaluated (for local age deltas only; never compared cross-host).
+    object_clock_now: float | None = None
 
 
 @dataclass

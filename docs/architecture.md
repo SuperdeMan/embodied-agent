@@ -77,6 +77,15 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 八类契约字段与接线位置以[执行计划 §3](platform-upgrade.md#3-八类契约与冻结顺序)为迁移清单。纯契约不依赖适配器、ROS、GPU；跨进程 proto 先行，未知版本不静默接受。
 
+### 5.18 D036 跨机视觉与观察时钟契约
+
+D019 远端世界状态仅发布即时 `sim_truth` 且未传递对象级感知年龄，D023 对象级时效仅覆盖本机同进程 `monotonic`。D036 在不破坏既有 gRPC proto wire、不改 SQLite schema v2、不增运行依赖的前提下，补齐跨机视觉/观察时钟契约与 RPC 对象级时效传播：
+
+- **显式时钟域与跨机单调时钟禁令**：`src/embodied/contracts/observation.py` 新增纯契约 `ClockMetadata`、`RemoteObjectEvidence` 与 `ClockAdmissionPolicy`（严格校验、拒绝非有限数与未知字段）。`local_monotonic` 仅允许同 `host_id` 消费，跨主机一律拒收（`cross_host_monotonic_forbidden`）；非 `simulation` 时钟域必须显式附带 `ClockMetadata`。
+- **偏斜/漂移/RTT 数学鲜度上界**：对 `wall_ntp` / `wall_ptp` 强制检查 `sync_status == "synchronized"`、最大偏斜与漂移预算、未来时间戳拒止、接收端本地墙钟阶跃跳变检测，并在存在 `publish_unix_s` 时执行 Cristian 中点往返偏斜反查（`|publish_unix_s - (rx_unix - rtt/2)| <= skew + rtt/2`），即使远端误报“已同步”也能检出超预算偏斜；对无共享墙钟的 `simulation` / `rpc_rtt_bounded` 则完全以生产端本地测得的对象年龄加接收端单调 RTT 与不确定度构造保守上界。
+- **RPC 对象级感知传播与本地重基准**：`PerceivedSim` 显式实现 `read_reference_state()`，阻断此前穿透到底层仿真泄漏真值的缺口；`ControlService.GetWorldState` 在感知包装下输出 `source="perceived_sim"` 与逐对象 `RemoteObjectEvidence`（不传输生产端原始 `monotonic` 供对端比较）。接收端 `SnapshotAdmission` 在入站即淘汰已过期对象，并将新鲜对象的剩余 TTL 重基准到接收端自身单调时钟，使跨机效果验证器在遮挡、传输延迟或缓存过期时一致返回 `UNKNOWN` 并阻断依赖步骤。
+- **诚实边界**：本批关闭软件层跨机视觉时钟契约与对象级 RPC 鲜度缺口，支持 `embodied serve-control --perception color` 跨进程实测；真实物理相机掉线与硬件 PTP/NTP 同步质量仍保留为实机门禁。详见 [跨机视觉与观察时钟契约](cross-host-observation-clock.md)。
+
 ### 5.17 D035 P1 可观测延迟、过期动作率与 Episode 崩溃完整性
 
 为收口 P1 故障矩阵中的仿真延迟与数据完整性测量缺口，引入纯契约 `src/embodied/contracts/metrics.py`（`embodied.p1-metrics/v1`）与轻量运行时采样 `src/embodied/runtime/metrics.py`，无新增运行依赖、无 SQLite schema 变更、无外部 proto 变更：

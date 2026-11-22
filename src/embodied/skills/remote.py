@@ -19,7 +19,8 @@ from typing import Any
 import grpc
 
 from embodied.contracts.effect import EFFECT_MAX_AGE_S, EffectEvidence, effect_digest
-from embodied.contracts.observation import ObservationEnvelope
+from embodied.contracts.object_state import object_available
+from embodied.contracts.observation import ClockAdmissionPolicy, ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.task import TaskJournalError
 from embodied.runtime.rpcgen import import_control
@@ -29,12 +30,12 @@ from embodied.skills.registry import ConfirmationRequired, SkillNotFound, SkillR
 
 
 class RemoteSkillRegistry:
-    def __init__(self, channel: grpc.aio.Channel):
+    def __init__(self, channel: grpc.aio.Channel, *, clock_policy: ClockAdmissionPolicy | None = None):
         _, pb2_grpc = import_control()
         self._pb2, _ = import_control()
         self._stub = pb2_grpc.ControlServiceStub(channel)
         self._manifests: dict[str, SkillManifest] = {}
-        self._snapshot_admission = SnapshotAdmission()
+        self._snapshot_admission = SnapshotAdmission(policy=clock_policy)
 
     async def connect(self) -> "RemoteSkillRegistry":
         reply = await self._stub.ListSkills(self._pb2.ListSkillsRequest(), timeout=5.0)
@@ -217,7 +218,14 @@ class RemoteSkillRegistry:
             if not reply.available:
                 return None
             envelope = ObservationEnvelope.model_validate_json(reply.envelope_json)
-            return self._snapshot_admission.accept(envelope, time.monotonic() - started, started)
+            ended = time.monotonic()
+            return self._snapshot_admission.accept(
+                envelope,
+                ended - started,
+                started,
+                received_monotonic=ended,
+                received_unix_s=time.time(),
+            )
         except (grpc.aio.AioRpcError, ValueError):
             return None
 
@@ -225,5 +233,7 @@ class RemoteSkillRegistry:
         snapshot = await self.world_snapshot()
         if snapshot is None:
             return "World state unavailable or stale; do not assume physical effects."
-        objects = ", ".join(f"{name}@{pose.pos}" for name, pose in snapshot.objects.items())
+        objects = ", ".join(
+            f"{name}@{pose.pos}" for name, pose in snapshot.objects.items() if object_available(snapshot, name)
+        )
         return f"simulated world: objects={objects}; regions={','.join(snapshot.regions)}"

@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import sqlite3
 import time
 from dataclasses import asdict
@@ -27,7 +28,7 @@ from typing import Any, Callable
 import grpc
 
 from embodied.contracts.effect import EffectRejected
-from embodied.contracts.observation import ObservationEnvelope
+from embodied.contracts.observation import ClockMetadata, ObservationEnvelope, RemoteObjectEvidence
 from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.rpc_auth import RpcAccessPolicy, RpcTlsPaths
 from embodied.contracts.stopping import StopRejected
@@ -53,7 +54,8 @@ SUPERVISOR_STALE_S = 1.5
 
 class ControlState:
     def __init__(self, registry: SkillRegistry, sim: Any = None, *, require_supervisor: bool = False,
-                 world_reader: Callable | None = None, authorizer: RpcAuthorizer | None = None):
+                 world_reader: Callable | None = None, authorizer: RpcAuthorizer | None = None,
+                 host_id: str | None = None, clock_provider: Callable[[], ClockMetadata] | None = None):
         self.registry = registry
         self.sim = sim
         self.require_supervisor = require_supervisor
@@ -65,6 +67,8 @@ class ControlState:
         self.world_reader = world_reader
         self.world_sequence = 0
         self.authorizer = authorizer
+        self.host_id = host_id or f"control:{registry.ledger.boot_id}"
+        self.clock_provider = clock_provider
         self.last_reset_audit: dict[str, Any] | None = None
 
     def halt(self, reason: str) -> None:
@@ -143,16 +147,114 @@ def build_servicer(state: ControlState):
             try:
                 epoch, obs = await state.registry.observe(state.world_reader)
                 state.world_sequence += 1
-                envelope = ObservationEnvelope(
-                    robot_id=state.registry.robot_id, boot_id=state.registry.ledger.boot_id,
-                    epoch=epoch, sequence=state.world_sequence, capture_timestamp=obs.t,
-                    capture_duration_s=time.monotonic() - started, calibration_version="mujoco_reference_v1",
-                    qpos=list(obs.qpos), qvel=list(obs.qvel),
-                    ee_pose={"pos": obs.ee_pose.pos, "quat": obs.ee_pose.quat},
-                    gripper_opening=obs.gripper_opening,
-                    objects={name: {"pos": pose.pos, "quat": pose.quat} for name, pose in obs.objects.items()},
-                    regions=obs.extras.get("regions", {}),
-                )
+                capture_duration_s = time.monotonic() - started
+                perceived = obs.object_evidence is not None
+                if perceived:
+                    # 感知模式缺失上下文或单调时钟无效时直接拒止，绝不回退为 sim_truth。
+                    # Fail closed if perceived context or local clock is missing; never fall back to sim_truth.
+                    if obs.object_context is None:
+                        return pb2.WorldStateReply(available=False, reason="perception_context_unavailable")
+                    now_mono = obs.object_clock_now if obs.object_clock_now is not None else time.monotonic()
+                    if not math.isfinite(now_mono):
+                        return pb2.WorldStateReply(available=False, reason="invalid_perception_clock")
+                    ctx = obs.object_context
+                    clock = (
+                        state.clock_provider()
+                        if state.clock_provider is not None
+                        else ClockMetadata(
+                            clock_domain="simulation",
+                            clock_id=ctx.clock_id,
+                            host_id=state.host_id,
+                            measurement_source="simulation_clock",
+                        )
+                    )
+                    ref_unix = clock.publish_unix_s if clock.publish_unix_s is not None else clock.source_unix_s
+                    published_objects = {}
+                    remote_evidence = {}
+                    for name, pose in obs.objects.items():
+                        ev = obs.object_evidence.get(name)
+                        if ev is None or ev.scene_epoch != ctx.scene_epoch or ev.calibration_id != ctx.calibration_id:
+                            continue
+                        age_sim_s = obs.t - ev.captured_sim_t
+                        age_wall_s = now_mono - ev.captured_monotonic
+                        if (
+                            not math.isfinite(age_sim_s)
+                            or not math.isfinite(age_wall_s)
+                            or age_sim_s < 0.0
+                            or age_wall_s < 0.0
+                            or age_sim_s >= ev.ttl_sim_s
+                            or age_wall_s >= ev.ttl_wall_s
+                        ):
+                            continue
+                        captured_unix_s = (
+                            ref_unix - age_wall_s
+                            if clock.clock_domain in ("wall_ntp", "wall_ptp") and ref_unix is not None and ref_unix - age_wall_s > 0.0
+                            else None
+                        )
+                        published_objects[name] = {"pos": pose.pos, "quat": pose.quat}
+                        remote_evidence[name] = RemoteObjectEvidence(
+                            source=ev.source,
+                            sensor_id=ev.sensor_id,
+                            sequence=ev.sequence,
+                            scene_epoch=ev.scene_epoch,
+                            calibration_id=ev.calibration_id,
+                            captured_sim_t=ev.captured_sim_t,
+                            age_sim_s=age_sim_s,
+                            age_wall_s=age_wall_s,
+                            ttl_sim_s=ev.ttl_sim_s,
+                            ttl_wall_s=ev.ttl_wall_s,
+                            captured_unix_s=captured_unix_s,
+                        )
+                    envelope = ObservationEnvelope(
+                        robot_id=state.registry.robot_id,
+                        boot_id=state.registry.ledger.boot_id,
+                        epoch=epoch,
+                        sequence=state.world_sequence,
+                        clock_domain=clock.clock_domain,
+                        capture_timestamp=obs.t,
+                        capture_duration_s=capture_duration_s,
+                        calibration_version=ctx.calibration_id,
+                        source="perceived_sim",
+                        qpos=list(obs.qpos),
+                        qvel=list(obs.qvel),
+                        ee_pose={"pos": obs.ee_pose.pos, "quat": obs.ee_pose.quat},
+                        gripper_opening=obs.gripper_opening,
+                        objects=published_objects,
+                        regions=obs.extras.get("regions", {}),
+                        clock=clock,
+                        object_evidence=remote_evidence,
+                        object_calibration_id=ctx.calibration_id,
+                        object_scene_epoch=ctx.scene_epoch,
+                    )
+                else:
+                    clock = (
+                        state.clock_provider()
+                        if state.clock_provider is not None
+                        else ClockMetadata(
+                            clock_domain="simulation",
+                            clock_id=f"sim:{state.registry.ledger.boot_id}",
+                            host_id=state.host_id,
+                            measurement_source="simulation_clock",
+                        )
+                    )
+                    envelope = ObservationEnvelope(
+                        robot_id=state.registry.robot_id,
+                        boot_id=state.registry.ledger.boot_id,
+                        epoch=epoch,
+                        sequence=state.world_sequence,
+                        clock_domain=clock.clock_domain,
+                        capture_timestamp=obs.t,
+                        capture_duration_s=capture_duration_s,
+                        calibration_version="mujoco_reference_v1",
+                        source="sim_truth",
+                        qpos=list(obs.qpos),
+                        qvel=list(obs.qvel),
+                        ee_pose={"pos": obs.ee_pose.pos, "quat": obs.ee_pose.quat},
+                        gripper_opening=obs.gripper_opening,
+                        objects={name: {"pos": pose.pos, "quat": pose.quat} for name, pose in obs.objects.items()},
+                        regions=obs.extras.get("regions", {}),
+                        clock=clock,
+                    )
                 return pb2.WorldStateReply(available=True, envelope_json=envelope.model_dump_json())
             except Exception:
                 return pb2.WorldStateReply(available=False, reason="invalid_world_state")

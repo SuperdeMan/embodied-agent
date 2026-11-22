@@ -242,7 +242,20 @@ class PerceivedSim:
         obs.objects = dict(self._perceive(obs))
         obs.object_evidence = dict(self._evidence)
         obs.object_context = self._context
+        obs.object_clock_now = self._clock()
         return obs
+
+    def read_reference_state(self) -> tuple[str, Observation]:
+        """Read scene epoch + perceived observation without leaking raw ground truth (D036).
+
+        读取场景代次与感知观察，显式经由感知包装器而非穿透到底层真值（D036）。
+        """
+        prepare = getattr(self._sim, "prepare_renderer", None)
+        if prepare is not None:
+            prepare()
+        with self._lock:
+            epoch, obs = self._sim.read_reference_state()
+            return epoch, self._decorate(obs)
 
     def read_truth(self) -> Observation:
         return self._sim.read()
