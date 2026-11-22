@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import threading
 import time
 from collections import OrderedDict
 from contextlib import contextmanager
@@ -12,8 +13,14 @@ from dataclasses import asdict
 from uuid import uuid4
 
 from embodied.contracts.action import ActionEnvelope, ActionProfile, ControlObservationRef
+from embodied.contracts.metrics import ActionMetricsSnapshot
 from embodied.control.hal import ActionCommand, WriteResult
 from embodied.runtime.invocation import CURRENT_INVOCATION
+from embodied.runtime.metrics import (
+    EPOCH_MISMATCH_REASONS,
+    REPLAY_REJECTION_REASONS,
+    STALE_REJECTION_REASONS,
+)
 
 
 class ActionRejected(RuntimeError):
@@ -37,6 +44,52 @@ class ActionAuthority:
         )
         self._references: OrderedDict[str, ControlObservationRef] = OrderedDict()
         self._read_sequence = 0
+        self._metrics_lock = threading.Lock()
+        self._metrics = {
+            "actions_submitted": 0,
+            "actions_accepted": 0,
+            "actions_rejected": 0,
+            "stale_actions_rejected": 0,
+            "replay_rejected": 0,
+            "epoch_mismatch_rejected": 0,
+            "guard_denied": 0,
+            "guard_clamped": 0,
+        }
+
+    def record_decision(
+        self, *, applied: bool, reason: str = "", clamped: bool = False, guard_denied: bool = False,
+    ) -> None:
+        """Record one receiver-side action admission outcome (D035).
+
+        记录单次接收端动作准入决策与过期/重放/Guard 拒绝分类（D035）。
+        """
+        with self._metrics_lock:
+            self._metrics["actions_submitted"] += 1
+            if applied:
+                self._metrics["actions_accepted"] += 1
+                if clamped:
+                    self._metrics["guard_clamped"] += 1
+                return
+            self._metrics["actions_rejected"] += 1
+            if reason in STALE_REJECTION_REASONS:
+                self._metrics["stale_actions_rejected"] += 1
+            if reason in REPLAY_REJECTION_REASONS:
+                self._metrics["replay_rejected"] += 1
+            if reason in EPOCH_MISMATCH_REASONS:
+                self._metrics["epoch_mismatch_rejected"] += 1
+            if guard_denied or reason.startswith(("halted:", "source_not_whitelisted:", "ee_fence_breach", "bad_command_shape", "invalid_command_value", "invalid_observation", "joint_outside_recovery_window")):
+                self._metrics["guard_denied"] += 1
+
+    def metrics_snapshot(self) -> ActionMetricsSnapshot:
+        """Return an immutable snapshot of action admission counters.
+
+        返回动作准入计数器的只读不可变快照。
+        """
+        with self._metrics_lock:
+            snap = dict(self._metrics)
+        submitted = snap["actions_submitted"]
+        stale_rate = round(snap["stale_actions_rejected"] / submitted, 6) if submitted > 0 else 0.0
+        return ActionMetricsSnapshot(**snap, stale_action_rate=stale_rate)
 
     @contextmanager
     def admission(self):

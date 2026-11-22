@@ -39,6 +39,7 @@ from embodied.control.stopping import _asset_digest
 from embodied.runtime.compute import ComputeProcess, ComputeUnavailable
 from embodied.runtime.control_process import ControlProcess, PhysicalControlUnavailable
 from embodied.runtime.invocation import CURRENT_INVOCATION, OBSERVATION_ONLY, invocation_access
+from embodied.runtime.metrics import LatencyRecorder
 from embodied.safety.guard import Guard, GuardEvent, GuardLimits
 
 StepHook = Callable[[Observation, ActionCommand | None], None]
@@ -128,7 +129,9 @@ class _IsolatedGuard(Guard):
     def estop(self, reason: str = "estop") -> None:
         # 先在父进程同步闩锁，确保任何子进程卡死或存储故障均无法阻断急停（D028）。
         # Latch locally first so a hung worker or storage failure can never block estop (D028).
+        started = time.monotonic()
         super().estop(reason)
+        self._owner.latency_metrics.record_ms("guard_estop_latch_ms", (time.monotonic() - started) * 1000.0)
         self._owner._sync_estop(reason)
 
     def _latch_local_only(self, reason: str, kind: str = "estop") -> None:
@@ -210,6 +213,11 @@ class IsolatedStopController:
                 raise StopRejected("stop_scene_changed")
             validate_stop_evidence(evidence, request, profile)
             self._issued = evidence
+            sim.latency_metrics.record_ms("stop_reconciliation_wall_ms", (completed - started) * 1000.0)
+            sim.latency_metrics.record_ms(
+                "stop_reconciliation_sim_ms",
+                (evidence.samples[-1].sim_t - evidence.samples[0].sim_t) * 1000.0,
+            )
             return evidence
         finally:
             sim._state_lock.release()
@@ -269,6 +277,7 @@ class IsolatedTabletopSim:
         self._render_process_lock = threading.Lock()
         self._on_step = on_step
         self._last_cmd: ActionCommand | None = None
+        self.latency_metrics = LatencyRecorder()
 
         scene = stage_tabletop()
         self._scene_path = scene
@@ -324,7 +333,10 @@ class IsolatedTabletopSim:
 
     def _sync_estop(self, reason: str) -> None:
         if hasattr(self, "_control_process"):
-            self._control_process.urgent_estop(reason)
+            started = time.monotonic()
+            soft = self._control_process.urgent_estop(reason)
+            if not soft and self._control_process.state == "FAILED":
+                self.latency_metrics.record_ms("urgent_estop_kill_ms", (time.monotonic() - started) * 1000.0)
 
     def _sync_guard_reset(self) -> None:
         if self._control_process.state != "READY":
@@ -397,6 +409,8 @@ class IsolatedTabletopSim:
             permit = CURRENT_INVOCATION.get()
             if permit is not None:
                 permit.reject(reason)
+            if self._action_controller is not None:
+                self._action_controller.record_decision(applied=False, reason=reason)
             return WriteResult(applied=False, reason=reason)
 
     def write(self, cmd: ActionCommand) -> WriteResult:
@@ -484,7 +498,9 @@ class IsolatedTabletopSim:
             if permit is not None:
                 permit.action_deadline = envelope.valid_until_monotonic
             self._last_cmd = applied
-            return WriteResult(applied=True, clamped=bool(reply.get("clamped", False)))
+            clamped = bool(reply.get("clamped", False))
+            self.action_controller.record_decision(applied=True, clamped=clamped)
+            return WriteResult(applied=True, clamped=clamped)
 
     def step(self, n: int = 1) -> None:
         with self._state_lock:

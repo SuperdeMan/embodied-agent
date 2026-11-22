@@ -226,6 +226,8 @@ class TabletopSim:
         permit = CURRENT_INVOCATION.get()
         if permit is not None:
             permit.reject(reason)
+        if self._action_controller is not None:
+            self._action_controller.record_decision(applied=False, reason=reason)
         return WriteResult(applied=False, reason=reason)
 
     @_state_locked
@@ -249,6 +251,7 @@ class TabletopSim:
             applied.envelope = envelope
             CURRENT_INVOCATION.get().action_deadline = envelope.valid_until_monotonic
             self._last_cmd = applied
+            self.action_controller.record_decision(applied=True, clamped=result.clamped)
             return result
 
     @_state_locked

@@ -77,6 +77,15 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 八类契约字段与接线位置以[执行计划 §3](platform-upgrade.md#3-八类契约与冻结顺序)为迁移清单。纯契约不依赖适配器、ROS、GPU；跨进程 proto 先行，未知版本不静默接受。
 
+### 5.17 D035 P1 可观测延迟、过期动作率与 Episode 崩溃完整性
+
+为收口 P1 故障矩阵中的仿真延迟与数据完整性测量缺口，引入纯契约 `src/embodied/contracts/metrics.py`（`embodied.p1-metrics/v1`）与轻量运行时采样 `src/embodied/runtime/metrics.py`，无新增运行依赖、无 SQLite schema 变更、无外部 proto 变更：
+
+- **停止延迟分项计量（绝不混同）**：分别记录 `guard_estop_latch_ms`（父进程 Guard 闩锁与调用撤权墙钟）、`urgent_estop_kill_ms`（对持 GIL 原生挂起物理子进程的强杀回收墙钟）、`stop_reconciliation_wall_ms` 与 `stop_reconciliation_sim_ms`（真实仿真保持与双侧接触观测墙钟/仿真毫秒时长），报告固定标注 `hardware_stop_measured=false`，严禁将仿真进程回收或测试执行时间冒充真机 SG-0 硬件急停延迟。
+- **动作准入与过期拦截计数**：在 `ActionAuthority` 维护只增内存计数器（`actions_submitted`、`actions_accepted`、`actions_rejected`、`stale_actions_rejected`、`replay_rejected`、`epoch_mismatch_rejected`、`guard_denied`、`guard_clamped`），区分正常执行过期率与故障注入过期拦截率（要求过期动作 0 放行）。
+- **操作与人工介入计数**：在 `SkillRegistry` 维护只读指标快照（总操作数、返回/失败/未知数、危险确认拒绝、取消、停止/效果对账成功与拒绝、物理控制重启次数及人工介入占比）。
+- **Episode 增量日志与崩溃恢复**：`EpisodeWriter` 在保持 `v0` 布局（`steps.npz` + `meta.json` + `events.jsonl`）及 LeRobot 转换完全兼容的前提下，按 `checkpoint_every`（默认 10 步）将步骤增量追加并刷新至 `steps.journal.jsonl`，正常收尾时写入 `steps_sha256` 并在原子替换 `steps.npz` 与 `meta.json` 后清理临时日志。遭遇进程硬杀（`os._exit` / `SIGKILL`）时，提供 `audit_episode()` 与 `recover_episode()` 容忍截断尾行并重建完整 `steps.npz`（标 `aborted=true`、`recovered_from_crash=true`），将单局骤停损失严格收敛到 `< checkpoint_every` 步而非 100% 丢失。可重复基准脚本见 `scripts/p1_metrics_baseline.py`，详情见 [P1 延迟与数据完整性基线](p1-metrics-baseline.md)。
+
 ### 5.16 D034 物理控制进程隔离与受控停机回收
 
 D026 将图像检测、ONNX 与状态副本渲染迁入独立计算子进程，但 MuJoCo 物理仿真、逆解与停止控制器仍运行在父进程内。D034 将仿真物理控制本体（`TabletopSim` 物理步进、逆解、驱动侧 Guard 与 `SimStopController`）迁入父进程监管的独立物理控制子进程（`IsolatedTabletopSim` + `ControlProcess` + `control_worker`），与 D026 渲染子进程保持分离：父进程只持有任务/操作账本、资源仲裁、`ActionAuthority`、HTTP/gRPC 控制面与镜像 `Guard`，不再在父进程内执行 MuJoCo 原生步进或逆解；渲染继续通过独立 `RenderBackend` 子进程消费状态副本。

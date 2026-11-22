@@ -96,6 +96,14 @@
         "tests/control/test_body_feedback.py"
       ],
       "scope": "Blocked read-only workers, stale or missing local perception; no real camera disconnect"
+    },
+    {
+      "id": "metrics_and_episode_integrity",
+      "tests": [
+        "tests/runtime/test_p1_metrics.py",
+        "tests/data_engine/test_episode_integrity.py"
+      ],
+      "scope": "Simulation stop latency distribution, stale-action/replay interception counters, manual intervention rate, incremental episode journal SHA-256 audit and abrupt hard-kill recovery; hardware_stop_measured stays false"
     }
   ],
   "open_gates": [
@@ -104,7 +112,7 @@
     "Real camera disconnection and cross-host sensor clock validation",
     "Authenticated cross-host recovery authority and multi-attempt protocol",
     "Real network partition and field-device supervision",
-    "Physical stop latency, stale-action rate and real episode data loss metrics",
+    "Real-hardware physical stop latency and field-deployment episode data loss metrics (simulation isolated-process baseline measured in D035)",
     "Release compatibility and downgrade/recovery rehearsal after new v2 writes"
   ]
 }

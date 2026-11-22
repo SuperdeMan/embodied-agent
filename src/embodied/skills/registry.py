@@ -23,6 +23,7 @@ from typing import Any, Awaitable, Callable
 from uuid import uuid4
 
 from embodied.contracts.effect import EFFECT_MAX_AGE_S, EffectRejected, effect_digest
+from embodied.contracts.metrics import OperationMetricsSnapshot
 from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.stopping import StopEvidence, StopProfile, StopRejected, StopRequest, validate_stop_evidence
 from embodied.runtime.arbiter import Lease, ResourceArbiter, ResourceBusy
@@ -99,6 +100,36 @@ class SkillRegistry:
         self._read_barriers: list[Callable[[], bool]] = []
         self._preview_admissions: dict[str, asyncio.Task] = {}
         self._compute_providers: list[Any] = []
+        self._op_metrics: dict[str, int] = {
+            "operations_started": 0,
+            "operations_returned": 0,
+            "operations_failed": 0,
+            "operations_unknown": 0,
+            "confirmations_denied": 0,
+            "cancellations_requested": 0,
+            "stop_reconciliations_succeeded": 0,
+            "stop_reconciliations_rejected": 0,
+            "effect_reconciliations_succeeded": 0,
+            "effect_reconciliations_rejected": 0,
+            "physical_control_restarts": 0,
+        }
+
+    def metrics_snapshot(self) -> OperationMetricsSnapshot:
+        """Return an immutable snapshot of operation outcomes and operator interventions (D035).
+
+        返回操作终态与人工介入统计的只读不可变快照（D035）。
+        """
+        m = dict(self._op_metrics)
+        interventions = (
+            m["confirmations_denied"]
+            + m["cancellations_requested"]
+            + m["stop_reconciliations_succeeded"]
+            + m["effect_reconciliations_succeeded"]
+            + m["physical_control_restarts"]
+        )
+        started = m["operations_started"]
+        rate = round(min(1.0, interventions / started), 6) if started > 0 else 0.0
+        return OperationMetricsSnapshot(**m, manual_intervention_rate=rate)
 
     def add_compute_provider(self, provider) -> None:
         self.check_thread()
@@ -128,7 +159,9 @@ class SkillRegistry:
         restart = getattr(self._execution_controller.sim, "restart_physical_control", None)
         if restart is None:
             raise SkillError("physical control isolation not enabled")
-        return restart()
+        result = restart()
+        self._op_metrics["physical_control_restarts"] += 1
+        return result
 
     async def drain_compute(self, timeout_s: float = 3.0) -> None:
         self.check_thread()
@@ -347,6 +380,7 @@ class SkillRegistry:
         if self._closed:
             raise SkillError("runtime is closed")
         if manifest.require_confirm and confirmed is not True:
+            self._op_metrics["confirmations_denied"] += 1
             raise ConfirmationRequired(manifest.name)
         return self._validate_params(manifest, {} if params is None else params)
 
@@ -392,6 +426,7 @@ class SkillRegistry:
                         raise EffectRejected("effect_context_changed")
                     record = self.ledger.begin(identity, self.robot_id, manifest.name, digest,
                                                lease.resources, lease.epoch, stop_context=context)
+                    self._op_metrics["operations_started"] += 1
                     permit = InvocationPermit(manifest.termination.timeout_s, lambda: self.arbiter.valid(lease))
                     permit.issuer = self
                     permit.operation_id, permit.attempt_id = record.operation_id, record.attempt_id
@@ -419,6 +454,7 @@ class SkillRegistry:
             if outcome.record.state not in {"RETURNED", "FAILED"}:
                 self.arbiter.quarantine(outcome.lease)
                 self.ledger.finish(identity.operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED")
+                self._op_metrics["operations_unknown"] += 1
             raise
         finally:
             outcome.permit.revoke()
@@ -456,6 +492,12 @@ class SkillRegistry:
         state = "OUTCOME_UNKNOWN" if unknown else "RETURNED" if result.ok else "FAILED"
         dispatch.record = self.ledger.finish(dispatch.record.operation_id, state, asdict(result),
                                              "STOP_UNCONFIRMED" if unknown else "NOT_REQUESTED")
+        if state == "RETURNED":
+            self._op_metrics["operations_returned"] += 1
+        elif state == "FAILED":
+            self._op_metrics["operations_failed"] += 1
+        else:
+            self._op_metrics["operations_unknown"] += 1
         if unknown:
             unavailable = "call_outcome_unknown"
         if self._effect_observer is not None and not set(self._effect_observer.controller.profile.resources).issubset(
@@ -600,29 +642,48 @@ class SkillRegistry:
         return self.ledger.record_effect(evidence)
 
     def reconcile_effect(self, operation_id: str, attempt_id: str) -> OperationRecord:
-        record, observer, lease = self._reserve_effect(operation_id, attempt_id)
+        try:
+            record, observer, lease = self._reserve_effect(operation_id, attempt_id)
+        except Exception:
+            self._op_metrics["effect_reconciliations_rejected"] += 1
+            raise
         try:
             try:
                 evidence = self._observations.call_sync(observer.capture, record, self.ledger.boot_id)
             except Exception as exc:
                 reason = str(exc) if isinstance(exc, ObservationUnavailable) else "effect_observation_failed"
                 evidence = self._unknown_effect(record, reason)
-            return self._commit_effect(record, observer, evidence)
+            updated = self._commit_effect(record, observer, evidence)
+            self._op_metrics["effect_reconciliations_succeeded"] += 1
+            return updated
+        except Exception:
+            self._op_metrics["effect_reconciliations_rejected"] += 1
+            raise
         finally:
             self.arbiter.release(lease)
 
     async def reconcile_effect_async(self, operation_id: str, attempt_id: str) -> OperationRecord:
-        record, observer, lease = self._reserve_effect(operation_id, attempt_id)
+        try:
+            record, observer, lease = self._reserve_effect(operation_id, attempt_id)
+        except Exception:
+            self._op_metrics["effect_reconciliations_rejected"] += 1
+            raise
         try:
             try:
                 evidence = await self.observe(observer.capture, record, self.ledger.boot_id)
             except asyncio.CancelledError:
                 self.ledger.record_effect(self._unknown_effect(record, "effect_observation_cancelled"))
+                self._op_metrics["effect_reconciliations_rejected"] += 1
                 raise
             except Exception as exc:
                 reason = str(exc) if isinstance(exc, ObservationUnavailable) else "effect_observation_failed"
                 evidence = self._unknown_effect(record, reason)
-            return self._commit_effect(record, observer, evidence)
+            updated = self._commit_effect(record, observer, evidence)
+            self._op_metrics["effect_reconciliations_succeeded"] += 1
+            return updated
+        except Exception:
+            self._op_metrics["effect_reconciliations_rejected"] += 1
+            raise
         finally:
             self.arbiter.release(lease)
 
@@ -633,10 +694,12 @@ class SkillRegistry:
         self.check_thread()
         pending = self._preview_admissions.get(operation_id)
         if pending is not None:
+            self._op_metrics["cancellations_requested"] += 1
             pending.cancel()
             return self.ledger.get(operation_id)
         active = self._active.get(operation_id)
         if active:
+            self._op_metrics["cancellations_requested"] += 1
             task, permit, lease = active
             permit.revoke()
             # 撤权与协程取消不依赖账本读写成功。 / Revocation and cancellation do not depend on ledger I/O.
@@ -742,13 +805,19 @@ class SkillRegistry:
     ) -> OperationRecord:
         self.check_thread()
         if confirmed is not True:
+            self._op_metrics["stop_reconciliations_rejected"] += 1
             raise ConfirmationRequired("maintenance.reconcile_stop")
         if self.observation_pending:
+            self._op_metrics["stop_reconciliations_rejected"] += 1
             raise StopRejected("observation_worker_still_running")
         async with self._stop_lock:
-            record, controller, profile = self._validate_stop_reconciliation(
-                operation_id, attempt_id, allow_already_observed=allow_already_observed,
-            )
+            try:
+                record, controller, profile = self._validate_stop_reconciliation(
+                    operation_id, attempt_id, allow_already_observed=allow_already_observed,
+                )
+            except Exception:
+                self._op_metrics["stop_reconciliations_rejected"] += 1
+                raise
             if controller is None:
                 return record
             request = StopRequest(
@@ -772,10 +841,16 @@ class SkillRegistry:
                                                 lambda: self.ledger.record_stop(evidence)),
                 )
             except asyncio.TimeoutError:
+                self._op_metrics["stop_reconciliations_rejected"] += 1
                 raise StopRejected("stop_observation_timeout") from None
             except (ValueError, TypeError):
+                self._op_metrics["stop_reconciliations_rejected"] += 1
                 raise StopRejected("invalid_stop_evidence") from None
+            except Exception:
+                self._op_metrics["stop_reconciliations_rejected"] += 1
+                raise
             self._stop_contexts.pop(operation_id, None)
+            self._op_metrics["stop_reconciliations_succeeded"] += 1
             return result
 
     async def _execute(

@@ -363,3 +363,16 @@ D033 验收补记（2026-11-22）：`25343fa` 已验收。ruff、878 项完整�
 **边界**：本批关闭仿真物理控制器原生挂起/崩溃对父进程控制面的连带失效，并支持经 D033 mTLS 监督链路触发对卡死仿真控制进程的强杀回收；不宣称 OS 文件/网络强沙箱，不代替真实机器人独立硬件急停（SG-0）、跨机视觉时钟同步或多 attempt 恢复（仍需 schema v3 审批）。
 
 D034 验收补记（2026-11-22）：`cb05aee` 已验收并部署激活（回执 `20261122T042559Z`）。ruff、897 项完整测试、46 项 RPC 测试及 12 组 260 项参考故障矩阵全通过；默认启用物理控制隔离下的 3×30 回归保持真值/color 各 30/30、ONNX 29/30。Linux Docker 候选镜像（`sha256:f4c5a494...`）通过控制台验收、`compute_smoke.py` 与 `control_smoke.py`（`urgent_estop` 0.130s 强杀 Linux GIL 挂起子进程），独立测试镜像（`sha256:cf445026...`）在 Linux 容器内通过全部 19 项 D034 + BoringSSL mTLS 集成测试。云端常驻控制台升级保留 schema v2 原七表历史行（19→20 tasks / 34→36 ops），实测容器内 PID 1 / 8 / 25 三进程分离、抓放、重启持久性与真实 HTTPS 8449 Serve 身份及双作用域全部通过，未宣称 SG-0 真机急停。证据见 `eval/physical-control-isolation-20261122.json` 与 `eval/cloud-physical-isolation-upgrade-20261122.json`。
+
+
+## D035 · P1 可观测延迟、过期动作率与 Episode 增量崩溃恢复基线
+
+**日期**：2026-11-22 · **状态**：实施中
+
+**问题**：既有 `p1_fault_matrix.py` 仅输出测试用例运行时间，缺少针对停止延迟（Guard 闩锁、挂起物理子进程强杀、仿真停止观测）、过期动作拦截率、人工介入率与 episode 数据损失率的专门计量；同时 `EpisodeWriter` 仅在 `finish()`/`abort()` 时一次性写出 `steps.npz`，若进程中途遭遇硬杀（`SIGKILL`/`os._exit`），已采步骤 100% 丢失。
+
+**决策**：新增纯契约 `src/embodied/contracts/metrics.py`（`embodied.p1-metrics/v1`）与轻量采样模块 `src/embodied/runtime/metrics.py`；在 `ActionAuthority`、`SkillRegistry` 与 `IsolatedTabletopSim` 挂载零额外依赖的内存计数与延迟采样（不改 SQLite schema v2、不改动作/停止协议或物理参数）。升级 `EpisodeWriter` 增加按 `checkpoint_every`（默认 10 步）增量刷盘的 `steps.journal.jsonl`、最终 `steps_sha256` 完整性摘要、`audit_episode()` 篡改/损坏审计与 `recover_episode()` 硬杀恢复（容忍截断尾行，向后兼容 `v0` 目录布局与 LeRobot 转换）。新增可重复提交绑定基准脚本 `scripts/p1_metrics_baseline.py`，同时在 Windows 本机与 Linux Docker 隔离容器采集分项延迟、100% 过期拦截与硬杀数据损失率，并将对应契约测试纳入 P1 故障矩阵第 13 组。
+
+**替代方案**：把指标直接写入 SQLite 新表（触发未授权的 schema 变更且增加控制路径存储耦合，拒绝）；用第三方 Prometheus/OpenTelemetry SDK（违背最小依赖原则，拒绝）；改用 MCAP 重写 v0 录制格式（破坏既有 `load_episode` 与 LeRobot 转换契约，留待后续需要多模态流容器时单独评审，拒绝）。
+
+**边界**：本批测量的是隔离仿真进程下的软件闩锁延迟、子进程强杀回收延迟、仿真停止观测耗时与本地文件增量持久化损失界限，`hardware_stop_measured` 固定为 `false`、`p1_complete` 固定为 `false`；真实硬件急停延迟、真实介质掉电与现场多模态录制仍保留为真机/现场门禁。

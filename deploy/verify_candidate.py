@@ -207,6 +207,20 @@ def main() -> None:
             }))
             raise
         result["isolated_physical_control"] = json.loads(control_probe.stdout)
+        try:
+            metrics_probe = run([
+                "docker", "exec", name, "/app/.venv/bin/python", "/app/scripts/p1_metrics_baseline.py",
+                "--report-file", "/app/outputs/p1-metrics.json",
+                "--stop-trials", "5", "--kill-trials", "5", "--episodes", "2",
+            ], timeout=180)
+            metrics_raw = run(["docker", "exec", name, "cat", "/app/outputs/p1-metrics.json"], timeout=30)
+        except subprocess.CalledProcessError as exc:
+            (artifacts / "metrics-failure.json").write_text(json.dumps({
+                "returncode": exc.returncode, "stdout": exc.stdout[-20000:], "stderr": exc.stderr[-20000:],
+            }))
+            raise
+        result["p1_metrics_summary"] = json.loads(metrics_probe.stdout)
+        result["p1_metrics"] = json.loads(metrics_raw.stdout)
         result["commit"] = args.sha
         result["image_id"] = run(["docker", "image", "inspect", f"embodied-agent:{args.sha}", "--format", "{{.Id}}"]
                                  ).stdout.strip()

@@ -19,7 +19,9 @@ Episode directory layout (``<root>/<YYYYMMDD-HHMMSS>-<NNN>/``):
 
 from __future__ import annotations
 
+import hashlib
 import json
+import math
 import os
 import time
 from dataclasses import dataclass
@@ -29,9 +31,12 @@ from typing import Any
 
 import numpy as np
 
+from embodied.contracts.metrics import EpisodeAuditResult
 from embodied.control.hal import ActionCommand, Observation
 
 SCHEMA_VERSION = "v0"
+DEFAULT_CHECKPOINT_EVERY = 10
+STEP_JOURNAL_FILENAME = "steps.journal.jsonl"
 
 # 仅允许已声明事件类型，其他类型是调用方错误。
 # The only event kinds the runtime may emit; anything else is a caller bug.
@@ -99,6 +104,9 @@ class EpisodeRecorder:
         embodiment_id: str,
         seed: int | None = None,
         extra_meta: dict[str, Any] | None = None,
+        *,
+        checkpoint_every: int = DEFAULT_CHECKPOINT_EVERY,
+        fsync_checkpoints: bool = False,
     ) -> EpisodeWriter:
         """Open a new episode directory ``<stamp>-<NNN>`` and return its writer.
 
@@ -117,7 +125,13 @@ class EpisodeRecorder:
             except FileExistsError:
                 continue
             return EpisodeWriter(
-                episode_dir, task=task, embodiment_id=embodiment_id, seed=seed, extra_meta=extra_meta
+                episode_dir,
+                task=task,
+                embodiment_id=embodiment_id,
+                seed=seed,
+                extra_meta=extra_meta,
+                checkpoint_every=checkpoint_every,
+                fsync_checkpoints=fsync_checkpoints,
             )
         raise RuntimeError(f"episode sequence exhausted for stamp {stamp} under {self.root}")
 
@@ -141,12 +155,18 @@ class EpisodeWriter:
         embodiment_id: str,
         seed: int | None = None,
         extra_meta: dict[str, Any] | None = None,
+        checkpoint_every: int = DEFAULT_CHECKPOINT_EVERY,
+        fsync_checkpoints: bool = False,
     ) -> None:
+        if type(checkpoint_every) is not int or checkpoint_every < 1:
+            raise ValueError("checkpoint_every must be a positive integer")
         self.path = Path(episode_dir)
         self._task = task
         self._embodiment_id = embodiment_id
         self._seed = seed
         self._extra_meta = dict(extra_meta or {})
+        self._checkpoint_every = checkpoint_every
+        self._fsync_checkpoints = bool(fsync_checkpoints)
         self._started_at = _now_iso()
         self._closed = False
 
@@ -157,6 +177,8 @@ class EpisodeWriter:
         self._objects: dict[str, list[tuple[float, ...]]] = {}
         self._state_dim: int | None = None
         self._command_identity: tuple[str, str] | None = None
+        self._journal_path = self.path / STEP_JOURNAL_FILENAME
+        self._pending_journal: list[str] = []
 
         # 开始即写元数据草稿，即使强杀也能关联任务与已写事件。
         # Meta stub on disk immediately: a hard kill (no chance to call abort())
@@ -224,6 +246,37 @@ class EpisodeWriter:
             if len(rows) == idx:  # object absent this step: NaN-pad to stay step-aligned
                 rows.append(_NAN_POSE)
 
+        # 按周期把步骤增量刷盘至 steps.journal.jsonl，将进程硬杀损失严格收敛到 < checkpoint_every 步。
+        # Periodically flush step rows to steps.journal.jsonl so an abrupt kill loses < checkpoint_every steps.
+        step_objs = {
+            name: [float(v) for v in (*pose.pos, *pose.quat)]
+            for name, pose in obs.objects.items()
+        }
+        journal_row = json.dumps(
+            {
+                "t": float(obs.t),
+                "state": list(state),
+                "action": list(row),
+                "ee_pos": list(self._ee_pos[-1]),
+                "objects": step_objs,
+            },
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        self._pending_journal.append(journal_row)
+        if len(self._pending_journal) >= self._checkpoint_every:
+            self._flush_journal()
+
+    def _flush_journal(self) -> None:
+        if not self._pending_journal:
+            return
+        with open(self._journal_path, "a", encoding="utf-8", newline="\n") as f:
+            f.write("\n".join(self._pending_journal) + "\n")
+            f.flush()
+            if self._fsync_checkpoints:
+                os.fsync(f.fileno())
+        self._pending_journal.clear()
+
     # 事件采集。
     # -- event capture ------------------------------------------------------------
 
@@ -275,14 +328,22 @@ class EpisodeWriter:
         return self._finalize(success=False, detail=reason, aborted=True)
 
     def _finalize(self, *, success: bool, detail: str, aborted: bool) -> Path:
-        # 先写数组再写最终元数据；成功标记意味着数据已完整写出。
-        # Arrays first, meta last: a meta.json with success set implies a complete episode.
-        self._write_steps()
-        self._write_meta(success=success, detail=detail, finished_at=_now_iso(), aborted=aborted)
+        # 先写数组再写最终元数据；成功标记意味着数据已完整写出，最后清理增量日志。
+        # Arrays first, meta last: a meta.json with success set implies a complete episode, then remove journal.
+        steps_sha256 = self._write_steps()
+        self._write_meta(
+            success=success, detail=detail, finished_at=_now_iso(), aborted=aborted, steps_sha256=steps_sha256,
+        )
+        self._pending_journal.clear()
+        if self._journal_path.exists():
+            try:
+                self._journal_path.unlink()
+            except OSError:
+                pass
         self._closed = True
         return self.path
 
-    def _write_steps(self) -> None:
+    def _write_steps(self) -> str:
         n = len(self._timestamps)
         dim = self._state_dim or 0
         arrays: dict[str, np.ndarray] = {
@@ -296,26 +357,37 @@ class EpisodeWriter:
         # 显式文件名避免 numpy 自动追加后缀。
         tmp = self.path / "steps.tmp.npz"  # named so numpy appends no extra suffix
         np.savez_compressed(tmp, **arrays)
+        digest = hashlib.sha256(tmp.read_bytes()).hexdigest()
         os.replace(tmp, self.path / "steps.npz")
+        return digest
 
-    def _write_meta(self, *, success: bool | None, detail: str, finished_at: str | None, aborted: bool) -> None:
-        _write_json(
-            self.path / "meta.json",
-            {
-                "schema_version": SCHEMA_VERSION,
-                "task": self._task,
-                "embodiment_id": self._embodiment_id,
-                "seed": self._seed,
-                "success": success,
-                "detail": detail,
-                "length": len(self._timestamps),
-                "started_at": self._started_at,
-                "finished_at": finished_at,
-                "aborted": aborted,
-                "extra_meta": self._extra_meta,
-                "lerobot_field_map": LEROBOT_FIELD_MAP,
-            },
-        )
+    def _write_meta(
+        self,
+        *,
+        success: bool | None,
+        detail: str,
+        finished_at: str | None,
+        aborted: bool,
+        steps_sha256: str | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
+            "schema_version": SCHEMA_VERSION,
+            "task": self._task,
+            "embodiment_id": self._embodiment_id,
+            "seed": self._seed,
+            "success": success,
+            "detail": detail,
+            "length": len(self._timestamps),
+            "started_at": self._started_at,
+            "finished_at": finished_at,
+            "aborted": aborted,
+            "checkpoint_every": self._checkpoint_every,
+            "extra_meta": self._extra_meta,
+            "lerobot_field_map": LEROBOT_FIELD_MAP,
+        }
+        if steps_sha256 is not None:
+            payload["steps_sha256"] = steps_sha256
+        _write_json(self.path / "meta.json", payload)
 
     def _ensure_open(self, op: str) -> None:
         if self._closed:
@@ -383,6 +455,237 @@ def load_episode(path: Path | str) -> Episode:
         objects=objects,
         events=events,
     )
+
+
+def audit_episode(path: Path | str) -> EpisodeAuditResult:
+    """Read-only integrity check for a recorded episode directory (D035).
+
+    对单个录制 episode 目录执行只读完整性审计（校验元数据、steps_sha256、维度对齐、有限值与时间单调性）。
+    """
+    episode_dir = Path(path)
+    issues: list[str] = []
+    meta_path = episode_dir / "meta.json"
+    steps_path = episode_dir / "steps.npz"
+    journal_path = episode_dir / STEP_JOURNAL_FILENAME
+    events_path = episode_dir / "events.jsonl"
+
+    if not meta_path.is_file():
+        return EpisodeAuditResult(
+            episode_dir=str(episode_dir),
+            intact=False,
+            needs_recovery=journal_path.is_file(),
+            recorded_steps=0,
+            steps_sha256_verified=False,
+            events_count=0,
+            issues=("missing_meta_json",),
+        )
+    try:
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        if not isinstance(meta, dict):
+            raise ValueError("meta must be object")
+    except Exception:
+        return EpisodeAuditResult(
+            episode_dir=str(episode_dir),
+            intact=False,
+            needs_recovery=journal_path.is_file(),
+            recorded_steps=0,
+            steps_sha256_verified=False,
+            events_count=0,
+            issues=("corrupt_meta_json",),
+        )
+
+    events_count = 0
+    if events_path.is_file():
+        for line in events_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                parsed = json.loads(line)
+                if not isinstance(parsed, dict) or parsed.get("kind") not in EVENT_KINDS:
+                    issues.append("invalid_event_record")
+                    break
+                events_count += 1
+            except Exception:
+                issues.append("corrupt_events_jsonl")
+                break
+
+    unfinalized = meta.get("finished_at") is None
+    if unfinalized:
+        issues.append("unfinalized_meta")
+    if not steps_path.is_file():
+        issues.append("missing_steps_npz")
+        return EpisodeAuditResult(
+            episode_dir=str(episode_dir),
+            intact=False,
+            needs_recovery=True,
+            recovered_from_crash=bool(meta.get("recovered_from_crash", False)),
+            recorded_steps=0,
+            steps_sha256_verified=False,
+            events_count=events_count,
+            issues=tuple(issues),
+        )
+
+    sha_ok = False
+    expected_sha = meta.get("steps_sha256")
+    if expected_sha is not None:
+        actual_sha = hashlib.sha256(steps_path.read_bytes()).hexdigest()
+        sha_ok = actual_sha == expected_sha
+        if not sha_ok:
+            issues.append("steps_sha256_mismatch")
+
+    recorded_steps = 0
+    try:
+        with np.load(steps_path) as z:
+            required = {"timestamp", "observation.state", "action", "ee_pos"}
+            if not required.issubset(set(z.files)):
+                issues.append("missing_required_arrays")
+            else:
+                ts = z["timestamp"]
+                state = z["observation.state"]
+                action = z["action"]
+                ee_pos = z["ee_pos"]
+                recorded_steps = int(ts.shape[0]) if ts.ndim == 1 else 0
+                if ts.ndim != 1:
+                    issues.append("bad_timestamp_ndim")
+                if recorded_steps != meta.get("length"):
+                    issues.append("length_mismatch")
+                if state.ndim != 2 or action.ndim != 2 or state.shape != action.shape or state.shape[0] != recorded_steps:
+                    issues.append("state_action_shape_mismatch")
+                if ee_pos.shape != (recorded_steps, 3):
+                    issues.append("ee_pos_shape_mismatch")
+                if not (np.isfinite(ts).all() and np.isfinite(state).all() and np.isfinite(action).all() and np.isfinite(ee_pos).all()):
+                    issues.append("nonfinite_step_values")
+                if recorded_steps >= 2 and bool(np.any(np.diff(ts) < -1e-6)):
+                    issues.append("non_monotonic_timestamps")
+                for key in z.files:
+                    if key.startswith("object/") and z[key].shape != (recorded_steps, _POSE_DIM):
+                        issues.append(f"object_shape_mismatch:{key}")
+    except Exception:
+        issues.append("corrupt_steps_npz")
+
+    return EpisodeAuditResult(
+        episode_dir=str(episode_dir),
+        intact=not issues,
+        needs_recovery=unfinalized,
+        recovered_from_crash=bool(meta.get("recovered_from_crash", False)),
+        recorded_steps=recorded_steps,
+        steps_sha256_verified=sha_ok,
+        events_count=events_count,
+        issues=tuple(issues),
+    )
+
+
+def _valid_finite_seq(values: Any, length: int | None = None) -> bool:
+    if not isinstance(values, list):
+        return False
+    if length is not None and len(values) != length:
+        return False
+    return all(type(v) in (int, float) and math.isfinite(float(v)) for v in values)
+
+
+def recover_episode(path: Path | str, *, detail: str = "recovered from abrupt crash journal") -> Episode:
+    """Recover an abruptly killed episode from steps.journal.jsonl into a valid v0 episode (D035).
+
+    从进程硬杀残留的 steps.journal.jsonl 重建完整 v0 episode（容忍截断尾行），标明 aborted 与 recovered_from_crash。
+    """
+    episode_dir = Path(path)
+    meta_path = episode_dir / "meta.json"
+    steps_path = episode_dir / "steps.npz"
+    journal_path = episode_dir / STEP_JOURNAL_FILENAME
+
+    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+    if steps_path.is_file() and meta.get("finished_at") is not None:
+        return load_episode(episode_dir)
+
+    timestamps: list[float] = []
+    states: list[tuple[float, ...]] = []
+    actions: list[tuple[float, ...]] = []
+    ee_pos: list[tuple[float, ...]] = []
+    objects: dict[str, list[tuple[float, ...]]] = {}
+    state_dim: int | None = None
+    dropped_corrupt_tail_lines = 0
+
+    if journal_path.is_file():
+        raw_lines = journal_path.read_bytes().splitlines()
+        for raw_line in raw_lines:
+            if not raw_line.strip():
+                continue
+            try:
+                rec = json.loads(raw_line.decode("utf-8"))
+                if not isinstance(rec, dict):
+                    raise ValueError("row must be object")
+                t_val = rec["t"]
+                if type(t_val) not in (int, float) or not math.isfinite(float(t_val)):
+                    raise ValueError("bad t")
+                st = rec["state"]
+                act = rec["action"]
+                ee = rec["ee_pos"]
+                objs = rec.get("objects", {})
+                if not (_valid_finite_seq(st) and _valid_finite_seq(act, len(st)) and _valid_finite_seq(ee, 3)):
+                    raise ValueError("bad vectors")
+                if not isinstance(objs, dict):
+                    raise ValueError("bad objects")
+                for pose_vals in objs.values():
+                    if not _valid_finite_seq(pose_vals, _POSE_DIM):
+                        raise ValueError("bad object pose")
+                if state_dim is None:
+                    state_dim = len(st)
+                elif len(st) != state_dim:
+                    raise ValueError("state dim mismatch")
+            except Exception:
+                # 仅保留最后一条损坏行之前的连续完整前缀，避免拼接失齐的时间轴。
+                # Keep the longest valid contiguous prefix before any torn/corrupt write.
+                dropped_corrupt_tail_lines += 1
+                break
+
+            idx = len(timestamps)
+            timestamps.append(float(t_val))
+            states.append(tuple(float(v) for v in st))
+            actions.append(tuple(float(v) for v in act))
+            ee_pos.append(tuple(float(v) for v in ee))
+            for name, pose_vals in objs.items():
+                rows = objects.setdefault(str(name), [])
+                if len(rows) < idx:
+                    rows.extend([_NAN_POSE] * (idx - len(rows)))
+                rows.append(tuple(float(v) for v in pose_vals))
+            for rows in objects.values():
+                if len(rows) == idx:
+                    rows.append(_NAN_POSE)
+
+    n = len(timestamps)
+    dim = state_dim or 0
+    arrays: dict[str, np.ndarray] = {
+        "timestamp": np.asarray(timestamps, dtype=np.float32),
+        "observation.state": np.asarray(states, dtype=np.float32).reshape(n, dim),
+        "action": np.asarray(actions, dtype=np.float32).reshape(n, dim),
+        "ee_pos": np.asarray(ee_pos, dtype=np.float32).reshape(n, 3),
+    }
+    for name, rows in objects.items():
+        arrays[f"object/{name}"] = np.asarray(rows, dtype=np.float32).reshape(n, _POSE_DIM)
+
+    tmp = episode_dir / "steps.tmp.npz"
+    np.savez_compressed(tmp, **arrays)
+    digest = hashlib.sha256(tmp.read_bytes()).hexdigest()
+    os.replace(tmp, steps_path)
+
+    updated_meta = dict(meta)
+    updated_meta.update({
+        "success": False,
+        "aborted": True,
+        "recovered_from_crash": True,
+        "dropped_corrupt_tail_lines": dropped_corrupt_tail_lines,
+        "detail": detail,
+        "length": n,
+        "finished_at": _now_iso(),
+        "steps_sha256": digest,
+    })
+    _write_json(meta_path, updated_meta)
+    if journal_path.is_file():
+        try:
+            journal_path.unlink()
+        except OSError:
+            pass
+    return load_episode(episode_dir)
 
 
 # LeRobot 数据转换。
