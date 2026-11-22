@@ -26,3 +26,24 @@
 ```bash
 uv run --group sim python scripts/p1_metrics_baseline.py --out outputs/p1-metrics
 ```
+
+## 本批验收
+
+固定干净提交 `b723417`（source tree `0f2b0a07...`，无新增运行依赖、无 SQLite schema 变更、无 proto 变更、`v0` 录制向后兼容）：
+
+- **本机回归**：`ruff` 通过；完整 5 组 `pytest` **904 项全通过**（+7 项新测，零跳过，4 条既有 ONNX 导出告警）；RPC 套件 **46 项全通过**；[P1 故障矩阵](p1-fault-matrix.md) 扩展至 **13 组 267 项全通过**（零跳过，`p1_complete: false`）。默认物理控制隔离下 3×30 `tabletop_pick_place@v1` 回归保持真值 30/30、color 30/30、ONNX 29/30（既有第 14 局 `horizon reached`）。
+- **Linux Docker 隔离候选容器**：镜像 `sha256:0ed21bd5...`（`--network none`、1 CPU / 1536 MiB、非 root UID 10001）同步通过控制台冒烟（`control_isolation: "process"`）、`compute_smoke.py`、`control_smoke.py` 与 `scripts/p1_metrics_baseline.py` 实测，宿主机既有 40 个容器全程未变。
+- **双平台实测基线对照**（均绑定 `b723417`，`hardware_stop_measured: false`、`p1_complete: false`）：
+
+| 指标 | Windows (`Windows-AMD64-py3.13.12`) | Linux Docker (`Linux-x86_64-py3.11.15`) |
+|---|---|---|
+| `guard_estop_latch_ms` (p50 / p95 / max) | `0.0057 / 0.0090 / 0.0090 ms` | `0.0099 / 0.0128 / 0.0128 ms` |
+| `urgent_estop_kill_ms` (p50 / p95 / max，含 120 ms 宽限) | `130.14 / 138.25 / 138.25 ms` | `130.27 / 130.85 / 130.85 ms` |
+| `stop_reconciliation_wall_ms` (p50 / p95 / max) | `10.06 / 11.11 / 11.11 ms` | `35.24 / 51.71 / 51.71 ms` |
+| `stop_reconciliation_sim_ms` (p50 / p95) | `100.0 / 100.0 ms` | `100.0 / 100.0 ms` |
+| 正常抓放动作（720 次提交）过期率 / 人工介入率 | `0.0 / 0.0`（720/720 接受，55 次 Guard 夹限） | `0.0 / 0.0`（720/720 接受，55 次 Guard 夹限） |
+| 注入过期与重放动作拦截率 | `1.0`（3/3 过期、1/1 重放全拦截，0 放行） | `1.0`（3/3 过期、1/1 重放全拦截，0 放行） |
+| 正常录制损失率（2 局） | `0.0`（2/2 完整通过 SHA-256 审计） | `0.0`（2/2 完整通过 SHA-256 审计） |
+| `os._exit(9)` 硬杀恢复（`checkpoint_every=10`） | 恢复 `50/57` 步（损失 `7 < 10`，`12.28%`）；截断尾行容忍 + 篡改检出 | 恢复 `50/57` 步（损失 `7 < 10`，`12.28%`）；截断尾行容忍 + 篡改检出 |
+
+- **云端常驻控制台**：本批仅增补内存指标基线与 `EpisodeWriter` 崩溃恢复，未改动线上 HTTP/WS 控制面或 schema v2，常驻控制台保持已激活的 `cb05aee`（HTTPS 8449 健康运行）。完整提交绑定证据见 [p1-metrics-baseline-20261122.json](../eval/p1-metrics-baseline-20261122.json)。

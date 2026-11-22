@@ -57,3 +57,7 @@ Linux 隔离容器的实际 SQLite FULL 验证了两项许可先撤销、全部�
 ## D034 增量
 
 `cb05aee` 新增 `physical_control_isolation` 组，矩阵扩展为 12 组 260 项全部通过（零跳过，`p1_complete: false`）。覆盖无头 MuJoCo 物理控制子进程与 D026 离屏渲染子进程分离（三进程 PID 互异、数值一致）、持 GIL 原生挂起/崩溃/`abort`/坏协议回收且零重放、`urgent_estop` 与 D033 mTLS Guardian Halt 跨线程强杀卡死物理子进程、`/healthz` 503 与 `RecoveryReview` 阻塞项、以及显式 `restart_physical_control()` 轮换 `controller_boot_id` 并保留 Guard 闩锁与资源隔离；真机 SG-0 独立硬件急停、跨机视觉时钟、延迟/数据损失基线与 schema v3 多 attempt 门禁仍保留未关闭。证据见[本地证据](../eval/physical-control-isolation-20261122.json)与[云端证据](../eval/cloud-physical-isolation-upgrade-20261122.json)。
+
+## D035 增量
+
+`b723417` 新增 `metrics_and_episode_integrity` 组，矩阵扩展为 13 组 267 项全部通过（零跳过，`p1_complete: false`），并新增专门的可重复基线脚本 `scripts/p1_metrics_baseline.py` 取代对“测试用例运行时间”的误读。实测涵盖隔离仿真下 Guard 闩锁、持 GIL 物理子进程强杀回收、仿真停止对账（`100.0 ms` 仿真窗）、100% 过期与重放动作拦截、人工介入计数、以及 `EpisodeWriter` 增量刷盘（`checkpoint_every=10`）在真实 `os._exit(9)` 硬杀下将损失压至 `< 10` 步（恢复 50/57 步、容忍截断尾行并检出 SHA-256 篡改），Windows 本机与 Linux Docker 隔离容器双平台均已采集；`hardware_stop_measured` 固定为 `false`，真机 SG-0 急停延迟、跨机视觉时钟与 schema v3 多 attempt 门禁仍保留未关闭。证据见[本批证据](../eval/p1-metrics-baseline-20261122.json)。

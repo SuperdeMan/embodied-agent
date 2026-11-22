@@ -367,7 +367,7 @@ D034 验收补记（2026-11-22）：`cb05aee` 已验收并部署激活（回执 
 
 ## D035 · P1 可观测延迟、过期动作率与 Episode 增量崩溃恢复基线
 
-**日期**：2026-11-22 · **状态**：实施中
+**日期**：2026-11-22 · **状态**：生效（本机 Windows 与 Linux Docker 容器均已验收，见 [p1-metrics-baseline.md](p1-metrics-baseline.md)）
 
 **问题**：既有 `p1_fault_matrix.py` 仅输出测试用例运行时间，缺少针对停止延迟（Guard 闩锁、挂起物理子进程强杀、仿真停止观测）、过期动作拦截率、人工介入率与 episode 数据损失率的专门计量；同时 `EpisodeWriter` 仅在 `finish()`/`abort()` 时一次性写出 `steps.npz`，若进程中途遭遇硬杀（`SIGKILL`/`os._exit`），已采步骤 100% 丢失。
 
@@ -376,3 +376,5 @@ D034 验收补记（2026-11-22）：`cb05aee` 已验收并部署激活（回执 
 **替代方案**：把指标直接写入 SQLite 新表（触发未授权的 schema 变更且增加控制路径存储耦合，拒绝）；用第三方 Prometheus/OpenTelemetry SDK（违背最小依赖原则，拒绝）；改用 MCAP 重写 v0 录制格式（破坏既有 `load_episode` 与 LeRobot 转换契约，留待后续需要多模态流容器时单独评审，拒绝）。
 
 **边界**：本批测量的是隔离仿真进程下的软件闩锁延迟、子进程强杀回收延迟、仿真停止观测耗时与本地文件增量持久化损失界限，`hardware_stop_measured` 固定为 `false`、`p1_complete` 固定为 `false`；真实硬件急停延迟、真实介质掉电与现场多模态录制仍保留为真机/现场门禁。
+
+D035 验收补记（2026-11-22）：`b723417` 已验收。ruff、904 项完整测试、46 项 RPC 测试及 13 组 267 项参考故障矩阵全通过（零跳过）；默认物理控制隔离下 3×30 回归保持真值/color 各 30/30、ONNX 29/30。Windows 本机（`guard_estop_latch` p95 `0.0090 ms`、`urgent_estop_kill` p95 `138.25 ms`、`stop_reconciliation_wall` p95 `11.11 ms`）与 Linux Docker 隔离容器镜像 `sha256:0ed21bd5...`（`0.0128 ms` / `130.85 ms` / `51.71 ms`，宿主机 40 容器不变）均录得仿真停止观测 `100.0 ms`、100% 过期与重放动作拦截、正常录制 0% 损失及 `os._exit(9)` 硬杀 50/57 步恢复（损失 `7 < 10`，容忍截断尾行并检出篡改）；`hardware_stop_measured=false`、`p1_complete=false`。线上 HTTP/WS 控制面与 schema v2 未变，云端常驻控制台维持已激活 `cb05aee`。证据见 `eval/p1-metrics-baseline-20261122.json`。
