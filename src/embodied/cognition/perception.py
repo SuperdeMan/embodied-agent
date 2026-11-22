@@ -321,6 +321,9 @@ class PerceivedSim:
             close_renderers = getattr(self._sim, "close_renderers", None)
             if close_renderers is not None:
                 close_renderers()
+            close_sim = getattr(self._sim, "close", None)
+            if callable(close_sim):
+                close_sim()
             return
 
         def _cleanup() -> None:
@@ -345,6 +348,9 @@ class PerceivedSim:
             self._render_thread.shutdown(wait=False)
             if future.done():
                 self._render_thread = None
+            close_sim = getattr(self._sim, "close", None)
+            if callable(close_sim):
+                close_sim()
 
     def _render_rgbd(self, camera: str, width: int, height: int):
         if self._render_thread is None:

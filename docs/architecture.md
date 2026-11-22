@@ -77,6 +77,14 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 八类契约字段与接线位置以[执行计划 §3](platform-upgrade.md#3-八类契约与冻结顺序)为迁移清单。纯契约不依赖适配器、ROS、GPU；跨进程 proto 先行，未知版本不静默接受。
 
+### 5.16 D034 物理控制进程隔离与受控停机回收
+
+D026 将图像检测、ONNX 与状态副本渲染迁入独立计算子进程，但 MuJoCo 物理仿真、逆解与停止控制器仍运行在父进程内。D034 将仿真物理控制本体（`TabletopSim` 物理步进、逆解、驱动侧 Guard 与 `SimStopController`）迁入父进程监管的独立物理控制子进程（`IsolatedTabletopSim` + `ControlProcess` + `control_worker`），与 D026 渲染子进程保持分离：父进程只持有任务/操作账本、资源仲裁、`ActionAuthority`、HTTP/gRPC 控制面与镜像 `Guard`，不再在父进程内执行 MuJoCo 原生步进或逆解；渲染继续通过独立 `RenderBackend` 子进程消费状态副本。
+
+本地控制管道契约先定义于 `proto/embodiedrpc/control_worker/v1/control_worker.proto`（无新增运行依赖，不修改现有 `control.proto`/`safety.proto`/`compute.proto` wire，不修改 SQLite schema v2）。管道采用网络序 4 字节长度前缀与严格 JSON 映射（拒绝重复字段、非有限数、超长帧与未知操作），单实例单在途请求、代次 `boot_id` 与递增 `request_id` 强绑定。子进程环境仅透传白名单运行变量，使用 `WindowsJob`（kill-on-close）或 Linux 独立进程组（`killpg(SIGKILL)` + `prctl(PR_SET_PDEATHSIG)`）限制自有进程树生命周期。
+
+当物理控制子进程发生原生挂起、持有 GIL 阻塞、异常退出、`abort()`、错代次或超长帧时，监督器在有界时间内终止并实际回收子进程树与 I/O 线程，将实例置为 `FAILED`，**同步闩锁父进程 `Guard`**（D028 不变式优先于子进程与数据库），不自动重启、不重放旧请求；在途技能立即解除阻塞并落账 `OUTCOME_UNKNOWN / STOP_UNCONFIRMED` 且保持资源隔离，父进程 HTTP/gRPC 查询、取消与 `Halt` 保持响应。当 `Halt` 或 `estop` 到达而子进程健康时，仅同步闩锁子进程 `Guard` 并保留活体供 `reconcile_stop`；若子进程在短暂宽限窗口内无响应（原生挂起），`urgent_estop` 立即强杀并回收子进程树。仅在无活跃调用/观察/在途停止且确认子进程已回收、资产摘要未变时，受信维护入口 `restart_physical_control()` 才可拉起新代次（轮换 `controller_boot_id` 与 `scene_epoch`），同时保留父 `Guard` 闩锁与账本资源隔离。本批关闭仿真物理控制原生挂起/崩溃对父进程的连带冻结与杀进程风险，不冒充真实硬件急停（SG-0）或 OS 权限沙箱。详见 [物理控制进程隔离](physical-control-isolation.md)。
+
 ### 5.15 D033 控制与监督 RPC 的 mTLS 传输认证与角色隔离
 
 `ControlService` 与 `SafetyService` 支持显式双向 TLS（mTLS）与只读 `RpcAccessPolicy` 角色策略。策略固定根 CA 证书指纹 `ca_cert_sha256` 及每个允许对端的叶证书 SHA-256 指纹、唯一名称、角色（`agent` / `guardian` / `operator`）、可选 `spiffe_id` 及操作者显式作用域（`read_only`、`cancel`、`reconcile_effect`、`reconcile_stop`、`halt`、`reset_guard`）。

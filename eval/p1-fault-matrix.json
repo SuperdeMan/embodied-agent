@@ -73,6 +73,15 @@
       "scope": "Worker timeout, crash, bad protocol, process reaping and no request replay"
     },
     {
+      "id": "physical_control_isolation",
+      "tests": [
+        "tests/runtime/test_control_process.py",
+        "tests/control/test_physical_control_isolation.py",
+        "tests/rpc/test_physical_control_mtls_halt.py"
+      ],
+      "scope": "Isolated MuJoCo physical control worker, native GIL hang/crash/abort reaping, urgent mTLS Guardian Halt kill, Guard latch & quarantine preservation across explicit restart; does not prove SG-0 real hardware stop"
+    },
+    {
       "id": "supervision_link",
       "tests": [
         "tests/rpc/test_process_split.py"
@@ -91,7 +100,7 @@
   ],
   "open_gates": [
     "Real storage-medium I/O failure and power loss",
-    "Physical control process native hang and independent hardware stop",
+    "Independent hardware stop (SG-0) and real-device physical controller faults",
     "Real camera disconnection and cross-host sensor clock validation",
     "Authenticated cross-host recovery authority and multi-attempt protocol",
     "Real network partition and field-device supervision",

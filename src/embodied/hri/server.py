@@ -392,6 +392,14 @@ async def health_handler(request: web.Request) -> web.Response:
     if ctx.registry.ledger.schema_version < 2:
         return web.json_response({"status": "maintenance", "reason": "task_journal_upgrade_required",
                                   "release": os.getenv("EMBODIED_RELEASE", "development")}, status=503)
+    control_state = getattr(ctx.sim, "control_process_state", None)
+    if control_state not in (None, "READY"):
+        return web.json_response({
+            "status": "unavailable", "reason": "physical_control_unavailable",
+            "control_process_state": control_state,
+            "release": os.getenv("EMBODIED_RELEASE", "development"),
+            "runtime": ctx.runtime_info,
+        }, status=503)
     return web.json_response({"status": "ok", "release": os.getenv("EMBODIED_RELEASE", "development"),
                               "runtime": ctx.runtime_info})
 

@@ -50,6 +50,8 @@ def main(argv: list[str] | None = None) -> int:
                      help="serve skill.manip.place from this learned policy")
     sim.add_argument("--perception", choices=["off", "color", "dino"], default="off",
                      help="agent sees objects through perception instead of sim ground truth (judge stays truth, D015)")
+    sim.add_argument("--in-process-sim", action="store_true",
+                     help="run MuJoCo physics in-process instead of an isolated physical control worker (reference mode)")
 
     collect = sub.add_parser("collect", help="scripted-expert data collection: record randomized pick&place episodes")
     collect.add_argument("--episodes", type=int, default=50)
@@ -89,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
     console.add_argument("--seed", type=int, default=0)
     console.add_argument("--ledger", default="outputs/runtime/operations.sqlite3")
     console.add_argument("--operator-policy", default="", help="explicit trusted proxy and operator allowlist JSON")
+    console.add_argument("--in-process-sim", action="store_true",
+                         help="run MuJoCo physics in-process instead of an isolated physical control worker (reference mode)")
 
     sc = sub.add_parser("serve-control", help="realtime-control process (gRPC ControlService)")
     sc.add_argument("--port", type=int, default=8391)
@@ -96,6 +100,8 @@ def main(argv: list[str] | None = None) -> int:
     sc.add_argument("--require-supervisor", action="store_true",
                     help="halt unless the safety guardian holds SupervisorLink (production topology)")
     sc.add_argument("--mock", action="store_true", help="serve mock skills instead of the sim (no mujoco)")
+    sc.add_argument("--in-process-sim", action="store_true",
+                    help="run MuJoCo physics in-process instead of an isolated physical control worker (reference mode)")
     sc.add_argument("--ledger", default="outputs/runtime/operations.sqlite3")
     _add_rpc_tls(sc, server=True)
 
@@ -287,6 +293,20 @@ def _make_sim_engine(sim: Any, registry: Any, provider: Any, confirm: Any) -> An
     return PlannerEngine(provider, registry, confirm=confirm, world_fn=world_fn, context_fn=context_fn)
 
 
+def _build_sim(seed: int, *, in_process: bool = False) -> Any:
+    """Build the tabletop embodiment: isolated physical control process by default (D034).
+
+    构建桌面仿真本体：默认启用隔离物理控制子进程（D034），显式指定时回退进程内参考模式。
+    """
+    if in_process:
+        from embodied.control.drivers.mujoco_sim import TabletopSim
+
+        return TabletopSim(seed=seed)
+    from embodied.control.isolated_sim import IsolatedTabletopSim
+
+    return IsolatedTabletopSim(seed=seed)
+
+
 async def _serve_control(args: argparse.Namespace) -> int:
     import logging
 
@@ -306,16 +326,16 @@ async def _serve_control(args: argparse.Namespace) -> int:
 
         register_builtin(registry)
     else:
-        from embodied.control.drivers.mujoco_sim import TabletopSim
         from embodied.skills.scripted.manip import register_sim_skills
 
-        sim = TabletopSim(seed=int(args.seed))
+        sim = _build_sim(int(args.seed), in_process=bool(args.in_process_sim))
         register_sim_skills(registry, sim)
     state = ControlState(registry, sim, require_supervisor=bool(args.require_supervisor),
                          world_reader=sim.read_reference_state if sim is not None else None)
     server, bound = await serve(state, port=int(args.port), host=str(args.host), tls=tls, policy=policy)
     print(f"realtime-control on {args.host}:{bound} (skills={len(registry.catalog())}, "
-          f"require_supervisor={state.require_supervisor}, mtls={tls is not None})")
+          f"require_supervisor={state.require_supervisor}, mtls={tls is not None}, "
+          f"control_isolation={'mock' if args.mock else ('in_process' if args.in_process_sim else 'process')})")
     wd = asyncio.create_task(watchdog_loop(state))
     try:
         await server.wait_for_termination()
@@ -325,6 +345,8 @@ async def _serve_control(args: argparse.Namespace) -> int:
         await server.stop(None)
         await registry.drain_compute()
         registry.close()
+        if sim is not None:
+            sim.close()
     return 0
 
 
@@ -491,7 +513,6 @@ def _register_skills(registry: Any, sim: Any, *, pick_policy: str = "", place_po
 
 async def _sim(args: argparse.Namespace) -> int:
     from embodied.cognition.offline import SIM_PLAN_RULES
-    from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.runtime.operations import OperationLedger
     from embodied.skills.registry import SkillRegistry
 
@@ -500,7 +521,7 @@ async def _sim(args: argparse.Namespace) -> int:
     if args.task and not args.snapshot:
         return await _sim_eval_task(args)
 
-    sim = _wrap_perception(TabletopSim(seed=int(args.seed)), str(args.perception))
+    sim = _wrap_perception(_build_sim(int(args.seed), in_process=bool(args.in_process_sim)), str(args.perception))
     ledger = OperationLedger() if args.task or args.eval > 0 else OperationLedger(args.ledger)
     registry = SkillRegistry(ledger=ledger, robot_id=sim.spec().embodiment_id)
     _register_skills(registry, sim, pick_policy=str(args.pick_policy), place_policy=str(args.place_policy))
@@ -674,7 +695,6 @@ def _console(args: argparse.Namespace) -> int:
 
     from embodied.cognition.offline import SIM_PLAN_RULES
     from embodied.contracts.operator import OperatorPolicy
-    from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.hri.server import AppContext, run_console
     from embodied.providers.audio import (
         MockASRProvider,
@@ -687,7 +707,7 @@ def _console(args: argparse.Namespace) -> int:
     from embodied.skills.scripted.manip import register_sim_skills
 
     policy = OperatorPolicy.model_validate_json(Path(args.operator_policy).read_text(encoding="utf-8")) if args.operator_policy else None
-    sim = TabletopSim(seed=int(args.seed))
+    sim = _build_sim(int(args.seed), in_process=bool(args.in_process_sim))
     registry = SkillRegistry(ledger=OperationLedger(args.ledger), robot_id=sim.spec().embodiment_id)
     register_sim_skills(registry, sim)
 
@@ -702,11 +722,13 @@ def _console(args: argparse.Namespace) -> int:
     tts = build_tts_stream_provider() or MockStreamingTTSProvider()
     ctx = AppContext(sim, registry, make_engine, asr, tts, operator_policy=policy,
                      runtime_info={"environment": "simulation", "planner": args.provider,
-                                   "audio": "mock" if isinstance(asr, MockASRProvider) else "configured"})
+                                   "audio": "mock" if isinstance(asr, MockASRProvider) else "configured",
+                                   "control_isolation": "in_process" if args.in_process_sim else "process"})
     try:
         run_console(ctx, host=str(args.host), port=int(args.port))
     finally:
         registry.close()
+        sim.close()
     return 0
 
 
@@ -718,14 +740,13 @@ async def _sim_eval_task(args: argparse.Namespace) -> int:
     版本化评测每个种子新建仿真、每局新建引擎并保存 JSON；学习与脚本共用任务及裁判，保证结果可比较。
     """
     from embodied.cognition.offline import SIM_PLAN_RULES, ScriptedPlanProvider
-    from embodied.control.drivers.mujoco_sim import TabletopSim
     from embodied.data_engine.evaluation import EvalTask, run_task
     from embodied.skills.registry import SkillRegistry
 
     task = EvalTask.load(str(args.task))
 
     def make_sim(seed: int):
-        sim = _wrap_perception(TabletopSim(seed=seed), str(args.perception))
+        sim = _wrap_perception(_build_sim(seed, in_process=bool(args.in_process_sim)), str(args.perception))
         registry = SkillRegistry()
         _register_skills(registry, sim, pick_policy=str(args.pick_policy), place_policy=str(args.place_policy))
         # 创建时配对保存，供引擎工厂取回。

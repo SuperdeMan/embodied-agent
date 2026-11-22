@@ -1,0 +1,13 @@
+syntax = "proto3";
+package embodied.control_worker.v1;
+
+// 本地物理控制管道使用 JSON 字段映射与 4 字节网络序 uint32 长度前缀；不传输执行句柄或任意 Python 对象。
+// Local physical-control pipes use JSON field mapping with a 4-byte network-order uint32 length prefix;
+// no execution handles or arbitrary Python objects cross the boundary.
+message ControlWorkerEnvelope {
+  string api_version = 1;
+  string boot_id = 2;
+  string request_id = 3;
+  string kind = 4;
+  string payload_json = 5;
+}

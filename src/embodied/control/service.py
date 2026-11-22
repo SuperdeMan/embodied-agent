@@ -31,6 +31,7 @@ from embodied.contracts.observation import ObservationEnvelope
 from embodied.contracts.operation import OperationIdentity
 from embodied.contracts.rpc_auth import RpcAccessPolicy, RpcTlsPaths
 from embodied.contracts.stopping import StopRejected
+from embodied.runtime.control_process import PhysicalControlUnavailable
 from embodied.runtime.observation import ObservationUnavailable
 from embodied.runtime.rpc_auth import (
     RpcAuthorizer,
@@ -80,6 +81,10 @@ class ControlState:
             self.halt_persistence_errors.update(self.registry.cancel_all())
 
     def reset(self, reason: str, *, principal: RpcPrincipal | None = None) -> None:
+        # 先复位驱动侧 Guard，失败时绝不清除父控制状态闩锁。
+        # Reset the driver-side Guard first; never clear parent halt state if the physical worker is unavailable.
+        if self.sim is not None and hasattr(self.sim, "guard"):
+            self.sim.guard.reset()
         if principal is not None:
             self.last_reset_audit = {
                 "api_version": "embodied.dev/v1alpha1", "issuer": principal.issuer,
@@ -93,8 +98,6 @@ class ControlState:
             logger.info("reset (%s)", reason)
         self.halted = False
         self.halt_reason = ""
-        if self.sim is not None and hasattr(self.sim, "guard"):
-            self.sim.guard.reset()
 
     def supervision_ok(self) -> bool:
         if not self.require_supervisor:
@@ -466,7 +469,10 @@ def build_servicer(state: ControlState):
 
         async def Reset(self, request, context):
             principal = await _auth(context, "Reset")
-            state.reset(request.reason or "reset_requested", principal=principal)
+            try:
+                state.reset(request.reason or "reset_requested", principal=principal)
+            except PhysicalControlUnavailable as exc:
+                await context.abort(grpc.StatusCode.UNAVAILABLE, str(exc))
             return pb2.ResetReply(reset=True)
 
         async def SupervisorLink(self, request_iterator, context):

@@ -348,3 +348,16 @@ D032 验收补记（2026-11-22）：`90135f0` 已部署激活（回执 `20261122
 **边界**：本批关闭本机/跨机参考 RPC 的未认证与角色混用缺口，但尚未引入在线证书吊销（CRL/OCSP）、自动证书轮换、跨机视觉传感器时钟同步、父进程物理控制隔离或真实硬件急停；回环无策略模式仅用于既有本地参考开发与回归，不宣称为已认证边界。
 
 D033 验收补记（2026-11-22）：`25343fa` 已验收。ruff、878 项完整测试、45 项 RPC 测试及 11 组 241 项参考故障矩阵全通过；真值/color 各 30/30，ONNX 29/30。Linux Docker 候选镜像（`sha256:3bc844ad...`）及三进程 BoringSSL mTLS 实测探针（`embodied-rpc-test:25343fa08480`）均通过，确认非回环明文拒止、CA/叶证书指纹固定、角色方法隔离、agent 断连触发 mTLS 急停、CLI mTLS 停止对账精确 4 事件审计序与 `Reset` 作用域边界。单进程 HTTP 控制台未变更，云端常驻维持已验收 `90135f0`。证据见 `eval/rpc-mtls-authorization-20261122.json`。
+
+
+## D034 · 物理控制进程隔离与原生挂起/崩溃回收
+
+**日期**：2026-11-22 · **状态**：实施中
+
+**问题**：D026 已将检测、ONNX 与渲染迁入纯计算子进程，但 MuJoCo 物理仿真（`mj_step`、逆解、`SimStopController` 与驱动写路径）仍运行在父进程（`embodied console` / `embodied serve-control` / `embodied sim`）内。一旦物理原生调用挂起、长期持 GIL 或发生原生崩溃，会直接锁死或杀死承载 `SkillRegistry`、SQLite 账本与 HTTP/gRPC 控制面的父进程，导致无法响应取消、`Halt`、状态查询或回收受阻工作线程。
+
+**决策**：新增协议 `proto/embodiedrpc/control_worker/v1/control_worker.proto` 与纯契约 `src/embodied/contracts/control_process.py`（无新增运行依赖、无 SQLite schema 变更、不改现有 `control.proto`/`safety.proto`/`compute.proto` wire）。实现独立物理控制子进程 `control_worker`、监督器 `ControlProcess` 与隔离本体适配器 `IsolatedTabletopSim`，将 MuJoCo 物理步进、逆解、驱动侧 `Guard` 与 `SimStopController` 全部迁入独立无头子进程，同时保留 D026 独立 `RenderBackend` 子进程承接离屏渲染与 JPEG 编码。父进程维护镜像 `Guard`、资源仲裁与 `ActionAuthority`：原生挂起、崩溃、坏协议或 `Halt` 遇卡死时，先同步闩锁父 `Guard`（D028），再在有界时间内终止并回收物理子进程树，置 `FAILED` 且不自动重启、不重放旧动作；仅允许在空闲且已回收后显式调用 `restart_physical_control()` 启动新代次并轮换 `controller_boot_id`，且维持 `Guard` 闩锁与未知操作隔离。应用入口（`console`、`serve-control`、`sim`）默认启用物理控制隔离，保留 `--in-process-sim` 与直接 `TabletopSim` 作为数值对照和单测夹具。
+
+**替代方案**：把物理仿真和离屏渲染合并到同一个子进程（Mesa/OpenGL 渲染故障会连带击垮物理状态并违背 D026 隔离成果，拒绝）；直接在父进程用线程超时放弃原生 MuJoCo 线程（Python 无法强杀原生/持 GIL 线程，锁与内存均无法回收，拒绝）；子进程崩溃后静默自动重启并继续执行（破坏未知结果隔离与 `controller_boot_id` 边界，拒绝）；引入 ZeroMQ/共享内存新依赖（违反最小依赖原则，拒绝）。
+
+**边界**：本批关闭仿真物理控制器原生挂起/崩溃对父进程控制面的连带失效，并支持经 D033 mTLS 监督链路触发对卡死仿真控制进程的强杀回收；不宣称 OS 文件/网络强沙箱，不代替真实机器人独立硬件急停（SG-0）、跨机视觉时钟同步或多 attempt 恢复（仍需 schema v3 审批）。

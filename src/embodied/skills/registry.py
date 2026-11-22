@@ -117,6 +117,19 @@ class SkillRegistry:
         if getattr(getattr(sim, "_render_process", None), "state", None) == "FAILED":
             sim.restart_renderer()
 
+    def restart_physical_control(self) -> dict[str, Any]:
+        """Explicitly restart a FAILED isolated physical control worker after reaping.
+
+        在物理控制子进程故障并确认回收后显式启动新代次，保留 Guard 闩锁与资源隔离。
+        """
+        self.check_thread()
+        if self._execution_controller is None:
+            raise SkillError("physical control controller unavailable")
+        restart = getattr(self._execution_controller.sim, "restart_physical_control", None)
+        if restart is None:
+            raise SkillError("physical control isolation not enabled")
+        return restart()
+
     async def drain_compute(self, timeout_s: float = 3.0) -> None:
         self.check_thread()
         self.cancel_all()
@@ -128,6 +141,9 @@ class SkillRegistry:
             cancel_render = getattr(self._execution_controller.sim, "cancel_render", None)
             if cancel_render is not None:
                 cancel_render()
+            cancel_control = getattr(self._execution_controller.sim, "cancel_control", None)
+            if cancel_control is not None:
+                cancel_control()
         deadline = time.monotonic() + timeout_s
         while (self.observation_pending or self._active or any(not p.drained for p in self._stop_contexts.values())
                or self._stop_inflight is not None and not self._stop_inflight.done()):
@@ -704,6 +720,9 @@ class SkillRegistry:
         controller = self._stop_controller
         if controller is None:
             raise StopRejected("stop_controller_unavailable")
+        control_state = getattr(controller.sim, "control_process_state", None)
+        if control_state is not None and control_state != "READY":
+            raise StopRejected("physical_control_unavailable")
         try:
             profile = StopProfile.model_validate_json(json.dumps(record.stop_context["stop_profile"]))
         except (ValueError, TypeError, KeyError):
@@ -787,10 +806,15 @@ class SkillRegistry:
             # Revoke BEFORE coroutine cancellation; to_thread work may continue running.
             permit.revoke()
             CURRENT_INVOCATION.reset(binding)
-            if task is not None and not task.done():
-                task.cancel()
-                self._retiring.add(task)
-                task.add_done_callback(self._retired)
+            if task is not None:
+                if not task.done():
+                    task.cancel()
+                    self._retiring.add(task)
+                    task.add_done_callback(self._retired)
+                elif not task.cancelled():
+                    # 消费已结束但因撤权提前返回的任务异常，避免未检索异常告警。
+                    # Consume exceptions on already-done tasks when revocation returned early.
+                    task.exception()
 
     def _retired(self, task: asyncio.Task) -> None:
         self._retiring.discard(task)

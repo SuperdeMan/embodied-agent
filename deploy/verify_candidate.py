@@ -22,6 +22,7 @@ async def main():
         async with session.get('http://127.0.0.1:8390/healthz') as response:
             health = await response.json()
             assert response.status == 200 and health['runtime']['planner'] == 'offline'
+            assert health['runtime'].get('control_isolation') == 'process'
         async with session.get('http://127.0.0.1:8390/api/operator/identity') as response:
             assert response.status == 503 and (await response.json())['error']=='operator_not_configured'
         frame_attempts=[]
@@ -197,6 +198,15 @@ def main() -> None:
             }))
             raise
         result["isolated_compute"] = json.loads(computation.stdout)
+        try:
+            control_probe = run(["docker", "exec", name, "/app/.venv/bin/python", "/app/scripts/control_smoke.py",
+                                 "--out", "/app/outputs/control-smoke.json"], timeout=120)
+        except subprocess.CalledProcessError as exc:
+            (artifacts / "control-failure.json").write_text(json.dumps({
+                "returncode": exc.returncode, "stdout": exc.stdout[-20000:], "stderr": exc.stderr[-20000:],
+            }))
+            raise
+        result["isolated_physical_control"] = json.loads(control_probe.stdout)
         result["commit"] = args.sha
         result["image_id"] = run(["docker", "image", "inspect", f"embodied-agent:{args.sha}", "--format", "{{.Id}}"]
                                  ).stdout.strip()

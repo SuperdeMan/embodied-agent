@@ -21,6 +21,7 @@ def review_state(registry, report, *, include_storage=True):
         "guard_halted": controller.sim.guard.halted,
         "guard_generation": controller.sim.guard.generation,
         "guard_matches": controller.sim.guard.limits is controller._limits,
+        "control_process_state": getattr(controller.sim, "control_process_state", None),
     }
     manifests = {}
     for step in report.get("steps", []):
@@ -114,6 +115,8 @@ async def assess_task(registry, task_id):
         blockers.add("controller_context_unavailable")
     if context.get("guard_halted") or context.get("guard_matches") is False:
         blockers.add("guard_unavailable")
+    if context.get("control_process_state") not in (None, "READY"):
+        blockers.add("physical_control_unavailable")
     bindings = []
     for step in report.get("steps", []):
         # 请求摘要取历史意图；不混入异步等待后新读到的操作版本。
