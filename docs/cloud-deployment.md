@@ -1,8 +1,16 @@
 # 云端仿真控制台
 
-> 2026-11-22，当前 **activated**：应用镜像固定 `90135f0`，运行配置包含 D032 的双作用域只读操作者策略挂载（配置摘要见下），私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D030/D031/D029/D028/D027/D026/D025/D024/2026-10-30 记录保留为历史。
+> 2026-11-22，当前 **activated**：应用镜像固定 `cb05aee`，启用 D034 物理控制进程隔离（`control_isolation: "process"`，父控制台 / 物理控制子进程 / 渲染子进程三进程分离）与 D032 双作用域只读操作者策略挂载，私网 HTTPS 8449。后续 main 推送不自动更新该镜像；下方 D032/D030/D031/D029/D028/D027/D026/D025/D024/2026-10-30 记录保留为历史。
 
-## D032 最近升级（2026-11-22）
+## D034 最近升级（2026-11-22）
+
+应用由 `90135f0` 升级至 `cb05aeeb3ada4c8a64930f3e00006b97773463a6`，激活回执 `20261122T042559Z`，镜像 ID `sha256:f4c5a4946d2cce1ed434a20f3c689e7cbb58bf34f9a5f03a202abaf0932229d0`。在控制台内默认启用 `IsolatedTabletopSim`，将 MuJoCo 物理步进、逆解、驱动 Guard 与 `SimStopController` 迁入独立无头物理控制子进程，继续保留 D026 独立离屏渲染子进程，未改 schema v2。
+
+继续沿用运行文件 `/home/ubuntu/embodied-agent/runtime/compose-55a9bea3a639e02d.json`（SHA-256 `55a9bea3a639e02dc99b38ba9a6d07e73c608645b4f9fd8587a119755be7b0b7`）与只读双作用域策略 `/home/ubuntu/embodied-agent/runtime/operator-policy-4ad094e27f820e05.json`（`scopes: ["reconcile_effect", "reconcile_stop"]`，`policy_digest` `33d665e9ba1dd084...`），保持原代理网关、原唯一主体、internal 网络、无宿主端口及 1 CPU / 1536 MiB / 128 PID 只读根限制。
+
+升级前备份并校验 19 tasks / 34 operations / 34 attempts / 132 operation_events / 13 task_plans / 71 task_events 逐行保留。升级后实测容器内三进程分离：PID 1（`embodied console`）、PID 8（`control_worker`，PPID 1）、PID 25（`compute_worker` 渲染，PPID 1）；抓放与重启后账本推进至 20 tasks / 36 operations / 36 attempts / 139 operation_events / 14 task_plans / 77 task_events，七表行摘要 `1299f223b87950dd...` 持久保留。外部真实 Tailscale Serve HTTPS 8449 验证 `/healthz` 报告 `control_isolation: "process"`、伪造身份头被 Serve 覆盖且保持双作用域与 `task_execution_authorized: false`、重启后只读任务评估生效；其他 39 个容器和 Serve 映射保持，Funnel 关闭。证据见 [cloud-physical-isolation-upgrade-20261122.json](../eval/cloud-physical-isolation-upgrade-20261122.json)。
+
+## D032 升级（2026-11-22 历史）
 
 应用由 `5b080dd` 升级至 `90135f05c95d5e974c4cb4e7b898346622fd9dd8`，激活回执 `20261122T012458Z`，镜像 ID `sha256:146a73f5933d2855c92db57a97fe962d915e61a9f5dcd721f99792cdf198c877`。在受控 HTTP 入口新增显式作用域隔离及一次性 `reconcile_stop` 审计授权，未改 schema v2。
 

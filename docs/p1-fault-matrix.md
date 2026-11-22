@@ -53,3 +53,7 @@ Linux 隔离容器的实际 SQLite FULL 验证了两项许可先撤销、全部�
 ## D033 增量
 
 `25343fa` 新增 `rpc_mtls_authorization` 组，矩阵扩展为 11 组 241 项全部通过（零跳过，`p1_complete: false`）。覆盖 CA/叶证书 SHA-256 指纹固定、非回环明文启动与连接拒止、硬编码 `agent`/`guardian`/`operator` 角色方法矩阵、未授权不污染连接标志、认证维护审计写失败阻断、D028 存储故障下 `Halt`/`CancelOperation` 优先撤权闩锁，以及 Linux Docker 三进程 BoringSSL mTLS 实测；CRL/OCSP 吊销、跨机视觉时钟、父进程物理控制隔离、多 attempt 与真机急停门禁仍保留未关闭。证据见[本批证据](../eval/rpc-mtls-authorization-20261122.json)。
+
+## D034 增量
+
+`cb05aee` 新增 `physical_control_isolation` 组，矩阵扩展为 12 组 260 项全部通过（零跳过，`p1_complete: false`）。覆盖无头 MuJoCo 物理控制子进程与 D026 离屏渲染子进程分离（三进程 PID 互异、数值一致）、持 GIL 原生挂起/崩溃/`abort`/坏协议回收且零重放、`urgent_estop` 与 D033 mTLS Guardian Halt 跨线程强杀卡死物理子进程、`/healthz` 503 与 `RecoveryReview` 阻塞项、以及显式 `restart_physical_control()` 轮换 `controller_boot_id` 并保留 Guard 闩锁与资源隔离；真机 SG-0 独立硬件急停、跨机视觉时钟、延迟/数据损失基线与 schema v3 多 attempt 门禁仍保留未关闭。证据见[本地证据](../eval/physical-control-isolation-20261122.json)与[云端证据](../eval/cloud-physical-isolation-upgrade-20261122.json)。

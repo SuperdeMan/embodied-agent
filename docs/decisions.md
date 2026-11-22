@@ -352,7 +352,7 @@ D033 验收补记（2026-11-22）：`25343fa` 已验收。ruff、878 项完整�
 
 ## D034 · 物理控制进程隔离与原生挂起/崩溃回收
 
-**日期**：2026-11-22 · **状态**：实施中
+**日期**：2026-11-22 · **状态**：生效（本机、Linux 容器 19 项实测与云端私网控制台均已验收，见 [physical-control-isolation.md](physical-control-isolation.md)）
 
 **问题**：D026 已将检测、ONNX 与渲染迁入纯计算子进程，但 MuJoCo 物理仿真（`mj_step`、逆解、`SimStopController` 与驱动写路径）仍运行在父进程（`embodied console` / `embodied serve-control` / `embodied sim`）内。一旦物理原生调用挂起、长期持 GIL 或发生原生崩溃，会直接锁死或杀死承载 `SkillRegistry`、SQLite 账本与 HTTP/gRPC 控制面的父进程，导致无法响应取消、`Halt`、状态查询或回收受阻工作线程。
 
@@ -361,3 +361,5 @@ D033 验收补记（2026-11-22）：`25343fa` 已验收。ruff、878 项完整�
 **替代方案**：把物理仿真和离屏渲染合并到同一个子进程（Mesa/OpenGL 渲染故障会连带击垮物理状态并违背 D026 隔离成果，拒绝）；直接在父进程用线程超时放弃原生 MuJoCo 线程（Python 无法强杀原生/持 GIL 线程，锁与内存均无法回收，拒绝）；子进程崩溃后静默自动重启并继续执行（破坏未知结果隔离与 `controller_boot_id` 边界，拒绝）；引入 ZeroMQ/共享内存新依赖（违反最小依赖原则，拒绝）。
 
 **边界**：本批关闭仿真物理控制器原生挂起/崩溃对父进程控制面的连带失效，并支持经 D033 mTLS 监督链路触发对卡死仿真控制进程的强杀回收；不宣称 OS 文件/网络强沙箱，不代替真实机器人独立硬件急停（SG-0）、跨机视觉时钟同步或多 attempt 恢复（仍需 schema v3 审批）。
+
+D034 验收补记（2026-11-22）：`cb05aee` 已验收并部署激活（回执 `20261122T042559Z`）。ruff、897 项完整测试、46 项 RPC 测试及 12 组 260 项参考故障矩阵全通过；默认启用物理控制隔离下的 3×30 回归保持真值/color 各 30/30、ONNX 29/30。Linux Docker 候选镜像（`sha256:f4c5a494...`）通过控制台验收、`compute_smoke.py` 与 `control_smoke.py`（`urgent_estop` 0.130s 强杀 Linux GIL 挂起子进程），独立测试镜像（`sha256:cf445026...`）在 Linux 容器内通过全部 19 项 D034 + BoringSSL mTLS 集成测试。云端常驻控制台升级保留 schema v2 原七表历史行（19→20 tasks / 34→36 ops），实测容器内 PID 1 / 8 / 25 三进程分离、抓放、重启持久性与真实 HTTPS 8449 Serve 身份及双作用域全部通过，未宣称 SG-0 真机急停。证据见 `eval/physical-control-isolation-20261122.json` 与 `eval/cloud-physical-isolation-upgrade-20261122.json`。

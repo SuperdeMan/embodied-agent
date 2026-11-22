@@ -30,3 +30,11 @@
 - 终止仿真物理子进程证明的是**仿真控制进程已终止并回收**，不等于真实硬件独立急停（SG-0）已验收。
 - 环境变量白名单与自有进程树回收提供故障和生命周期隔离，不构成操作系统级文件/网络权限沙箱。
 - 真机硬件急停、跨机传感器时钟同步、在线证书吊销（CRL/OCSP）与 schema v3 多 attempt 恢复仍为独立未关闭门禁。
+
+## 本批验收
+
+固定提交 `cb05aee`（干净工作树、无新增运行依赖、无 SQLite schema 变更、无外部 gRPC wire 变更；新增本地协议 `proto/embodiedrpc/control_worker/v1/control_worker.proto`）：
+
+- **本机验证**：`ruff check .` 通过；完整 5 组测试 **897 passed / 0 skipped**（含 19 项新增物理控制进程与 mTLS 集成测试）；RPC 套件 **46 passed / 0 skipped**；[P1 参考故障矩阵](p1-fault-matrix.md) 扩展至 **12 组 260 项全部通过**（`p1_complete: false`）；在默认启用物理控制隔离的 `embodied sim` 下，`tabletop_pick_place@v1` 3×30 回归保持 `scripted_truth` 30/30、`isolated_pick_v1_truth` 29/30（既有第 14 局 `horizon reached`）、`isolated_color` 30/30。
+- **Linux Docker 候选与 19 项真栈实测**：候选镜像 `embodied-agent:cb05aee...`（`sha256:f4c5a494...`）通过无网络隔离控制台验收（`control_isolation: "process"`、抓放、并行预览、6 项计算故障回收）及 `scripts/control_smoke.py`（三进程 PID 互异、数值一致、`urgent_estop` 0.130s 强杀 Linux 持 GIL 挂起子进程、6 项物理控制故障全部回收且零重放）；独立测试镜像 `embodied-phys-rpc-test:cb05aeeb3ada`（`sha256:cf445026...`）在 Linux 容器内全量通过全部 19 项 D034 + BoringSSL mTLS 集成测试。
+- **云端私网控制台升级**：已授权由 `90135f0` 升级至 `cb05aee`（回执 `20261122T042559Z`，HTTPS 8449），原七表历史行（19 tasks / 34 operations）逐行保留，实测容器内 PID 1（`console`）/ PID 8（`control_worker`）/ PID 25（`render_worker`）三进程分离、抓放、重启持久性与真实 Serve HTTPS 身份/双作用域校验全部通过。完整证据见 [physical-control-isolation-20261122.json](../eval/physical-control-isolation-20261122.json) 与 [cloud-physical-isolation-upgrade-20261122.json](../eval/cloud-physical-isolation-upgrade-20261122.json)。

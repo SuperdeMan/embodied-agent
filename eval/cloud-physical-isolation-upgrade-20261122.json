@@ -1,0 +1,409 @@
+{
+  "date_local": "2026-11-22",
+  "qualified_commit": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+  "source_tree": "fb8c00372f8240d14db85d23b5f7e86a53acc5a5",
+  "tarball_sha256": "d037e8728414a84c695acaa5cebd6bc1ddc3ea42d2875b7cee29df4e53fa7b31",
+  "candidate": {
+    "file": "outputs/cloud/candidate-cb05aee.json",
+    "sha256": "6f92af0abb7f67c5438724e9c24eced224ace25fc8f75bbf3d925b2ebf8a6577",
+    "result": {
+      "passed": true,
+      "health": {
+        "status": "ok",
+        "release": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+        "runtime": {
+          "environment": "simulation",
+          "planner": "offline",
+          "audio": "mock",
+          "control_isolation": "process"
+        }
+      },
+      "jpeg_bytes": 31088,
+      "steps": [
+        {
+          "type": "step",
+          "step_id": "s1",
+          "task_id": "cef395080cdf40e18814fa3820ad9735",
+          "skill": "skill.manip.pick",
+          "status": "ok",
+          "detail": "obj_cube grasped and lifted",
+          "operation_id": "2bfce0e532285583a9840ce242820f38",
+          "attempt_id": "cbd086c9ef834f488b5043d49e584966",
+          "invocation_state": "RETURNED",
+          "stop_state": "NOT_REQUESTED"
+        },
+        {
+          "type": "step",
+          "step_id": "s2",
+          "task_id": "cef395080cdf40e18814fa3820ad9735",
+          "skill": "skill.manip.place",
+          "status": "ok",
+          "detail": "obj_cube placed in bin_region",
+          "operation_id": "7d703889c5a757d78117504112bb5009",
+          "attempt_id": "c803357920e24173b78d11f78f6e22b5",
+          "invocation_state": "RETURNED",
+          "stop_state": "NOT_REQUESTED"
+        }
+      ],
+      "operation_states": [
+        "RETURNED",
+        "RETURNED"
+      ],
+      "effect_verdicts": [
+        "sat",
+        "sat"
+      ],
+      "task_journal": {
+        "schema_version": 2,
+        "task_id": "cef395080cdf40e18814fa3820ad9735",
+        "events": 6,
+        "read_only": true
+      },
+      "frame_attempts": [
+        {
+          "status": 503,
+          "bytes": 34
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 503,
+          "bytes": 38
+        },
+        {
+          "status": 200,
+          "bytes": 31088
+        }
+      ],
+      "concurrent_preview_statuses": [
+        200,
+        200,
+        200
+      ],
+      "bounded_observation": {
+        "passed": true,
+        "timeout_probe_s": 0.10085267759859562,
+        "queued_replacements": 0
+      },
+      "isolated_compute": {
+        "passed": true,
+        "faults": [
+          {
+            "fault": "hang",
+            "old_pid": 89,
+            "seconds": 0.10358068905770779,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "gil_hang",
+            "old_pid": 93,
+            "seconds": 0.10349549911916256,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "crash",
+            "old_pid": 97,
+            "seconds": 0.0023053307086229324,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "abort",
+            "old_pid": 101,
+            "seconds": 0.1075445432215929,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "wrong_boot",
+            "old_pid": 105,
+            "seconds": 0.0038599371910095215,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "oversize",
+            "old_pid": 109,
+            "seconds": 0.0037072915583848953,
+            "reaped": true,
+            "request_replayed": false
+          }
+        ],
+        "color_pid": 113,
+        "color_reference_equal": true,
+        "color_reaped": true,
+        "graceful_ack": true,
+        "exitcode": 0
+      },
+      "isolated_physical_control": {
+        "passed": true,
+        "parent_pid": 120,
+        "control_pid": 155,
+        "render_pid": 161,
+        "three_distinct_pids": true,
+        "numerical_parity": true,
+        "pick_place_ok": true,
+        "urgent_estop_kill_s": 0.13023543916642666,
+        "graceful_ack": true,
+        "exitcode": 0,
+        "faults": [
+          {
+            "fault": "hang",
+            "old_pid": 128,
+            "seconds": 0.1535927914083004,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "gil_hang",
+            "old_pid": 132,
+            "seconds": 0.15355311520397663,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "crash",
+            "old_pid": 136,
+            "seconds": 0.0026185698807239532,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "abort",
+            "old_pid": 140,
+            "seconds": 0.1536259911954403,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "wrong_boot",
+            "old_pid": 144,
+            "seconds": 0.003883806988596916,
+            "reaped": true,
+            "request_replayed": false
+          },
+          {
+            "fault": "oversize",
+            "old_pid": 148,
+            "seconds": 0.0037839412689208984,
+            "reaped": true,
+            "request_replayed": false
+          }
+        ]
+      },
+      "commit": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+      "image_id": "sha256:f4c5a4946d2cce1ed434a20f3c689e7cbb58bf34f9a5f03a202abaf0932229d0",
+      "published": false,
+      "runtime_limits": {
+        "cpus": 1,
+        "memory_mib": 1536,
+        "ports": [],
+        "network": "none"
+      }
+    },
+    "existing_containers_count": 40,
+    "existing_containers_unchanged": true
+  },
+  "linux_d034_mtls_suite": {
+    "file": "outputs/cloud/linux-phys-iso-mtls-cb05aee.json",
+    "sha256": "f40849e7f16dbab2ae13d6438f8685aaee8ad7024580b4d5b817b52e0b9fd38b",
+    "result": {
+      "passed": true,
+      "commit": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+      "probe_image": "embodied-phys-rpc-test:cb05aeeb3ada",
+      "probe_image_id": "sha256:cf44502653133a3033b3c8b624e86be1d8aecd8709904b3f56139c3b356af5f1",
+      "tests_passed_count": 19,
+      "summary": "======================== 19 passed, 1 warning in 59.20s ========================",
+      "suites": [
+        "tests/runtime/test_control_process.py",
+        "tests/control/test_physical_control_isolation.py",
+        "tests/rpc/test_physical_control_mtls_halt.py"
+      ],
+      "network": "none",
+      "user": "10001:10001"
+    }
+  },
+  "live_activation": {
+    "file": "outputs/cloud/cloud-phys-iso-upgrade-cb05aee.json",
+    "sha256": "face22b9c3f8ec27937cf35a18b4545eb862336c4ca7bd76844368e46b4e8405",
+    "result": {
+      "activation_id": "20261122T042559Z",
+      "status": "activated",
+      "commit": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+      "previous_commit": "90135f05c95d5e974c4cb4e7b898346622fd9dd8",
+      "image_id": "sha256:f4c5a4946d2cce1ed434a20f3c689e7cbb58bf34f9a5f03a202abaf0932229d0",
+      "url_template": "https://<tailnet-host>:8449/",
+      "compose_path": "/home/ubuntu/embodied-agent/runtime/compose-55a9bea3a639e02d.json",
+      "compose_sha256": "55a9bea3a639e02dc99b38ba9a6d07e73c608645b4f9fd8587a119755be7b0b7",
+      "operator_policy": {
+        "policy_path": "/home/ubuntu/embodied-agent/runtime/operator-policy-4ad094e27f820e05.json",
+        "policy_sha256": "4ad094e27f820e05549aeab583c26755fa12a7be2f78c117649fc34a5755d46d",
+        "policy_digest": "33d665e9ba1dd084f07c038f13a5d7fb96ae7d632e0ad887e6062550780d9d00",
+        "subject_hash": "a66ce6bd445e1b6a9c75c8d80edd8078ab5dbdb7b590ee0e904bd7640e2ed18c",
+        "trusted_proxy": "172.30.0.1",
+        "subjects": 1,
+        "scopes": [
+          "reconcile_effect",
+          "reconcile_stop"
+        ]
+      },
+      "health": {
+        "status": "ok",
+        "release": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+        "runtime": {
+          "environment": "simulation",
+          "planner": "offline",
+          "audio": "mock",
+          "control_isolation": "process"
+        }
+      },
+      "schema_version": 2,
+      "schema_changed": false,
+      "backup_sha256": "caa994e8634d033e525dfa4ff133ca714a68f3e51ba1c2b1e2e56727572f3c96",
+      "prior_operations_count": 34,
+      "old_rows_preserved": {
+        "tasks": 19,
+        "operations": 34,
+        "attempts": 34,
+        "operation_events": 132,
+        "task_plans": 13,
+        "task_events": 71
+      },
+      "current_counts": {
+        "tasks": 20,
+        "operations": 36,
+        "attempts": 36,
+        "operation_events": 139,
+        "task_plans": 14,
+        "task_events": 77
+      },
+      "live_pids": {
+        "parent": 1,
+        "control_worker": 8,
+        "render_worker": 25
+      },
+      "jpeg_bytes": 31088,
+      "frame_attempts": [
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        200
+      ],
+      "live_steps": [
+        {
+          "type": "step",
+          "step_id": "s1",
+          "task_id": "1c47e58c321b4a049d6274bdcfc5b293",
+          "skill": "skill.manip.pick",
+          "status": "ok",
+          "detail": "obj_cube grasped and lifted",
+          "operation_id": "cb8f90f4b843544394c6febd2d8018cf",
+          "attempt_id": "3ff4012665d5420592df6b3bb55a4e5a",
+          "invocation_state": "RETURNED",
+          "stop_state": "NOT_REQUESTED"
+        },
+        {
+          "type": "step",
+          "step_id": "s2",
+          "task_id": "1c47e58c321b4a049d6274bdcfc5b293",
+          "skill": "skill.manip.place",
+          "status": "ok",
+          "detail": "obj_cube placed in bin_region",
+          "operation_id": "758819432b1d512d87080bd302d82640",
+          "attempt_id": "b9ad3a90f56743adaec004e2477e5fa2",
+          "invocation_state": "RETURNED",
+          "stop_state": "NOT_REQUESTED"
+        }
+      ],
+      "live_effect_verdicts": [
+        "sat",
+        "sat"
+      ],
+      "persistence": {
+        "marker_survived": true,
+        "operations_count": 36,
+        "effect_events": 36,
+        "seven_table_digest": "1299f223b87950dd7f32dc626a4bcc132c9f831b5963b1873396f1106eb639a2"
+      },
+      "external_verification": {
+        "https_health": {
+          "status": "ok",
+          "release": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+          "runtime": {
+            "environment": "simulation",
+            "planner": "offline",
+            "audio": "mock",
+            "control_isolation": "process"
+          }
+        },
+        "serve_overwrote_spoofed_header": true,
+        "subject_hash": "a66ce6bd445e1b6a9c75c8d80edd8078ab5dbdb7b590ee0e904bd7640e2ed18c",
+        "policy_digest": "33d665e9ba1dd084f07c038f13a5d7fb96ae7d632e0ad887e6062550780d9d00",
+        "scopes": [
+          "reconcile_effect",
+          "reconcile_stop"
+        ],
+        "task_execution_authorized": false,
+        "post_restart_task_workflow": "FINISHED",
+        "post_restart_same_runtime": false,
+        "post_restart_all_effects_ineligible": true
+      },
+      "other_container_count": 39,
+      "other_containers_unchanged": true,
+      "existing_serve_mappings_unchanged": true,
+      "funnel": false
+    }
+  }
+}

@@ -1,0 +1,401 @@
+{
+  "date_local": "2026-11-22",
+  "qualified_commit": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+  "source_tree": "fb8c00372f8240d14db85d23b5f7e86a53acc5a5",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_version": 2,
+  "schema_changed": false,
+  "external_rpc_wire_changed": false,
+  "local_control_worker_proto_added": "proto/embodiedrpc/control_worker/v1/control_worker.proto",
+  "new_runtime_dependencies": false,
+  "ruff": "passed",
+  "full_suite": {
+    "file": "outputs/phys-iso-cb05aee.xml",
+    "sha256": "e561052a85d3230ef08c9fca4af64381c2adffe932d81adecd8d60a91bbe4ab5",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "897",
+      "time": "120.947",
+      "timestamp": "2026-11-22T12:18:40.287651+08:00"
+    },
+    "warnings": 4,
+    "new_tests": 19
+  },
+  "rpc_suite": {
+    "file": "outputs/phys-iso-rpc-cb05aee.xml",
+    "sha256": "82051d9b95e9dccc438318f0e83ee321a41734ae1a402a9779c68af0fe75ec48",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "46",
+      "time": "8.622",
+      "timestamp": "2026-11-22T12:20:43.916121+08:00"
+    },
+    "included_in_full_suite": true
+  },
+  "fault_matrix": {
+    "file": "outputs/p1-faults/20261122T042053Z-cb05aee/report.json",
+    "sha256": "ef0cf70f6ba0e1613826fb74c43db73ef0da8fdabdd9ec7c762c29c0d019ba00",
+    "result": {
+      "schema": "embodied.p1-fault-matrix/v1",
+      "commit": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+      "working_tree_clean": true,
+      "matrix_sha256": "e4b0e0863d42f0835dea82bfe72c572cf6f0895c6eab19508747f493ddd76052",
+      "reference_checks_passed": true,
+      "p1_complete": false,
+      "groups": [
+        {
+          "id": "storage_cancel",
+          "tests": [
+            "tests/runtime/test_cancel_storage_faults.py",
+            "tests/rpc/test_halt_storage_faults.py"
+          ],
+          "scope": "SQLite page-cap FULL, read/write failure, cancellation, Guard latch and watchdog",
+          "total": 8,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.103,
+            "max": 0.103
+          }
+        },
+        {
+          "id": "operation_crash_and_replay",
+          "tests": [
+            "tests/runtime/test_operations.py",
+            "tests/rpc/test_operation_protocol.py"
+          ],
+          "scope": "Abrupt owner exit, duplicate identity, restart and loopback RPC",
+          "total": 15,
+          "passed": 15,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.54,
+            "max": 0.54
+          }
+        },
+        {
+          "id": "task_recovery",
+          "tests": [
+            "tests/runtime/test_task_journal.py",
+            "tests/control/test_task_recovery.py",
+            "tests/rpc/test_task_protocol.py"
+          ],
+          "scope": "Task corruption, interrupted intent, scene change, read-only assessment",
+          "total": 29,
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.511,
+            "max": 0.733
+          }
+        },
+        {
+          "id": "recovery_review",
+          "tests": [
+            "tests/runtime/test_recovery_review.py",
+            "tests/control/test_recovery_review.py",
+            "tests/rpc/test_recovery_review.py"
+          ],
+          "scope": "Consistent read-only snapshot, Guard lifecycle, evidence age and denial of authority claims; no execution authorization",
+          "total": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.051,
+            "max": 0.053
+          }
+        },
+        {
+          "id": "operator_authorization",
+          "tests": [
+            "tests/runtime/test_operator_policy.py",
+            "tests/hri/test_operator_authorization.py"
+          ],
+          "scope": "Exact proxy, subject and default scope policy, one-use effect-only authority, audit failure/expiry/replay refusal; no task execution authority",
+          "total": 41,
+          "passed": 41,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.053,
+            "max": 0.056
+          }
+        },
+        {
+          "id": "stop_authorization",
+          "tests": [
+            "tests/hri/test_stop_authorization.py"
+          ],
+          "scope": "Explicit stop scope isolation, one-use audited simulation stop reconciliation, cross-restart and latched-Guard boundaries; no Guard reset or task execution authority",
+          "total": 29,
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.294,
+            "max": 0.451
+          }
+        },
+        {
+          "id": "rpc_mtls_authorization",
+          "tests": [
+            "tests/runtime/test_rpc_auth_policy.py",
+            "tests/rpc/test_rpc_mtls_authorization.py"
+          ],
+          "scope": "Pinned-CA BoringSSL mTLS transport auth, hardcoded agent/guardian/operator role matrix, non-loopback fail-closed, audited RPC maintenance and D028 halt resilience; no CRL/OCSP or hardware stop",
+          "total": 19,
+          "passed": 19,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.687,
+            "max": 0.687
+          }
+        },
+        {
+          "id": "incompatible_ledger",
+          "tests": [
+            "tests/runtime/test_task_schema.py"
+          ],
+          "scope": "Unknown schema, live-owner refusal, atomic migration rollback",
+          "total": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.031,
+            "max": 0.031
+          }
+        },
+        {
+          "id": "compute_process",
+          "tests": [
+            "tests/runtime/test_compute_process.py"
+          ],
+          "scope": "Worker timeout, crash, bad protocol, process reaping and no request replay",
+          "total": 20,
+          "passed": 20,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 1.544,
+            "max": 2.091
+          }
+        },
+        {
+          "id": "physical_control_isolation",
+          "tests": [
+            "tests/runtime/test_control_process.py",
+            "tests/control/test_physical_control_isolation.py",
+            "tests/rpc/test_physical_control_mtls_halt.py"
+          ],
+          "scope": "Isolated MuJoCo physical control worker, native GIL hang/crash/abort reaping, urgent mTLS Guardian Halt kill, Guard latch & quarantine preservation across explicit restart; does not prove SG-0 real hardware stop",
+          "total": 19,
+          "passed": 19,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 6.356,
+            "max": 6.356
+          }
+        },
+        {
+          "id": "supervision_link",
+          "tests": [
+            "tests/rpc/test_process_split.py"
+          ],
+          "scope": "Loopback control/Guardian link loss, stale heartbeat, confirmation and latch",
+          "total": 9,
+          "passed": 9,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.608,
+            "max": 0.608
+          }
+        },
+        {
+          "id": "observation_availability",
+          "tests": [
+            "tests/runtime/test_observation_lane.py",
+            "tests/cognition/test_object_freshness.py",
+            "tests/control/test_body_feedback.py"
+          ],
+          "scope": "Blocked read-only workers, stale or missing local perception; no real camera disconnect",
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.077,
+            "max": 0.115
+          }
+        }
+      ],
+      "open_gates": [
+        "Real storage-medium I/O failure and power loss",
+        "Independent hardware stop (SG-0) and real-device physical controller faults",
+        "Real camera disconnection and cross-host sensor clock validation",
+        "Authenticated cross-host recovery authority and multi-attempt protocol",
+        "Real network partition and field-device supervision",
+        "Physical stop latency, stale-action rate and real episode data loss metrics",
+        "Release compatibility and downgrade/recovery rehearsal after new v2 writes"
+      ],
+      "wall_duration_s": 69.95994420000352,
+      "returncode": 0,
+      "command": [
+        "D:\\Personal\\AI\\Claude Code\\产品\\embodied-agent\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/runtime/test_cancel_storage_faults.py",
+        "tests/rpc/test_halt_storage_faults.py",
+        "tests/runtime/test_operations.py",
+        "tests/rpc/test_operation_protocol.py",
+        "tests/runtime/test_task_journal.py",
+        "tests/control/test_task_recovery.py",
+        "tests/rpc/test_task_protocol.py",
+        "tests/runtime/test_recovery_review.py",
+        "tests/control/test_recovery_review.py",
+        "tests/rpc/test_recovery_review.py",
+        "tests/runtime/test_operator_policy.py",
+        "tests/hri/test_operator_authorization.py",
+        "tests/hri/test_stop_authorization.py",
+        "tests/runtime/test_rpc_auth_policy.py",
+        "tests/rpc/test_rpc_mtls_authorization.py",
+        "tests/runtime/test_task_schema.py",
+        "tests/runtime/test_compute_process.py",
+        "tests/runtime/test_control_process.py",
+        "tests/control/test_physical_control_isolation.py",
+        "tests/rpc/test_physical_control_mtls_halt.py",
+        "tests/rpc/test_process_split.py",
+        "tests/runtime/test_observation_lane.py",
+        "tests/cognition/test_object_freshness.py",
+        "tests/control/test_body_feedback.py",
+        "-q",
+        "-o",
+        "addopts=",
+        "--import-mode=importlib",
+        "--junitxml=D:\\Personal\\AI\\Claude Code\\产品\\embodied-agent\\outputs\\p1-faults\\20261122T042053Z-cb05aee\\results.xml"
+      ],
+      "junit_sha256": "74b8ec24731a3d28b9d6c66122540b9fba2627d84dc8620c7050690ebecbd290"
+    }
+  },
+  "regressions": [
+    {
+      "mode": "isolated_control_scripted_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261122-042225.json",
+      "sha256": "5ad8652fbc947a2459469b16f10e2c6a95e1895b3345c8ae99f15c18bae69e24",
+      "result": {
+        "commit": "cb05aee",
+        "finished_at": "2026-11-22T04:22:25.993016+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "isolated_control_pick_v1_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261122-042259.json",
+      "sha256": "3427b257f13b12dc2d94b4f6d1d4eb965168ca375751a76f6fbba1fc48503b5f",
+      "result": {
+        "commit": "cb05aee",
+        "finished_at": "2026-11-22T04:22:59.812251+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "isolated_control_color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261122-042409.json",
+      "sha256": "ffe2dcd2b10138aeaffbf6fe33fbd88f32f54fdfecba56ffd92cfb6a098e7717",
+      "result": {
+        "commit": "cb05aee",
+        "finished_at": "2026-11-22T04:24:09.867940+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "linux_docker_d034_mtls_suite": {
+    "file": "outputs/cloud/linux-phys-iso-mtls-cb05aee.json",
+    "sha256": "f40849e7f16dbab2ae13d6438f8685aaee8ad7024580b4d5b817b52e0b9fd38b",
+    "result": {
+      "passed": true,
+      "commit": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+      "probe_image": "embodied-phys-rpc-test:cb05aeeb3ada",
+      "probe_image_id": "sha256:cf44502653133a3033b3c8b624e86be1d8aecd8709904b3f56139c3b356af5f1",
+      "tests_passed_count": 19,
+      "summary": "======================== 19 passed, 1 warning in 59.20s ========================",
+      "suites": [
+        "tests/runtime/test_control_process.py",
+        "tests/control/test_physical_control_isolation.py",
+        "tests/rpc/test_physical_control_mtls_halt.py"
+      ],
+      "network": "none",
+      "user": "10001:10001"
+    }
+  },
+  "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+  "pick_v1_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+  "boundaries": [
+    "Isolates MuJoCo physics, IK, driver-side Guard, and SimStopController in a supervised child process separate from parent control plane and D026 render worker",
+    "Native hang, GIL hang, crash, abort, and protocol faults reap the child process tree, latch parent Guard, quarantine resources, and refuse automatic restart or replay",
+    "Reaping a simulation child process proves simulation process termination only; independent hardware stop (SG-0) remains an open real-device gate",
+    "Process-tree containment and allowlisted env vars provide fault/lifecycle isolation, not an OS filesystem/network sandbox"
+  ]
+}
