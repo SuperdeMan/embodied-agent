@@ -65,3 +65,7 @@ Linux 隔离容器的实际 SQLite FULL 验证了两项许可先撤销、全部�
 ## D036 增量
 
 `c549839` 新增 `cross_host_observation_clock` 组，矩阵扩展为 14 组 287 项全部通过（零跳过，`p1_complete: false`）。覆盖跨主机 `local_monotonic` 拒止、`wall_ntp`/`wall_ptp` 同步状态/偏斜/漂移/未来时间戳/本地墙钟跳变与 Cristian 中点往返偏斜反查、无 epoch 变更切换时钟 ID/时钟域/标定拒止、`PerceivedSim.read_reference_state()` 阻断真值泄漏、逐对象 `RemoteObjectEvidence` 叠加 RTT 与偏斜后重基准至接收端单调时钟并在遮挡/超时下使远端验证器返回 `UNKNOWN` 阻断依赖，以及 Linux Docker 隔离容器 35 项 BoringSSL mTLS + OSMesa ColorBlob 实测；真实物理相机掉线、硬件 PTP/NTP 同步质量、真机 SG-0 急停与 schema v3 多 attempt 门禁仍保留未关闭。证据见[本批证据](../eval/cross-host-observation-clock-20261122.json)。
+
+## D037 增量
+
+`75853f5` 新增 `release_compatibility_and_rollback` 组，矩阵扩展为 15 组 299 项全部通过（零跳过，`p1_complete: false`）。覆盖 `ModelBundle` 超越张量维度的物理语义与权重哈希校验、`ReleaseBundle` 维护态独占锁/活跃操作/未确认停止/配置与资产摘要预检、新 v2 写入后拒止 v1-only 降级与未验证回滚目标、全七表在线备份与受损账本（含脏 `-wal`）认证原子恢复，以及 Linux Docker 真实双镜像（`75853f5` ↔ `cb05aee`）降级读写与恢复演练；真机固件 OTA、真机 SG-0 急停、物理相机断连与未来 schema v3→v2 降级门禁仍保留未关闭。证据见[本批证据](../eval/release-compatibility-20261122.json)。

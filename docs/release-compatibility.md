@@ -39,3 +39,16 @@
 
 - 本批覆盖仿真/容器交付的 `ReleaseBundle`/`ModelBundle` 语义兼容预检、v2 账本新写入后的真实双镜像受控降级（新版 ↔ `cb05aee`）、不兼容 v1 降级拒止，以及受损账本的认证备份原子恢复。
 - **不宣称**：真机固件刷写（OTA）、多机集群灰度发布，或跨大版本 schema（如未来 v3 → v2）降级兼容；这些仍保留在后续实机与 schema v3 门禁中。
+
+## 5. 本批验收
+
+固定干净提交 `75853f5`（source tree `869beb17...`，无新增运行依赖、无 SQLite schema 变更、无 proto 变更）：
+
+- **本机回归**：`ruff` 全绿；完整 5 组 `pytest` **936 项全通过**（+12 项新测，零跳过，4 条既有 ONNX 导出告警）；RPC 套件 **49 项全通过**；[P1 故障矩阵](p1-fault-matrix.md) 扩展至 **15 组 299 项全通过**（零跳过，`p1_complete: false`）。默认物理控制隔离下 3×30 `tabletop_pick_place@v1` 回归保持真值 30/30、color 30/30、ONNX 29/30（既有第 14 局 `horizon reached`）。
+- **Linux Docker 候选与双镜像真实降级/恢复演练**：
+  - 候选镜像 `sha256:a2a364d9...`（`--network none`、1 CPU / 1536 MiB、UID 10001）通过控制台冒烟、`compute_smoke.py`、`control_smoke.py` 与 `p1_metrics_baseline.py`，宿主机既有 40 个容器未变。
+  - **双镜像演练（`embodied-agent:75853f5` `sha256:a2a364d9...` ↔ `embodied-agent:cb05aee` `sha256:f4c5a494...`）**：
+    1. `75853f5` 在隔离容器内跑完真实抓放任务写入全七表（`1 task / 2 ops / 2 attempts / 7 op_events / 1 plan / 6 task_events`，全七表摘要 `d5ddfe05...`）；`embodied release-check` 拒绝 v1-only 降级（`ledger_schema_incompatible:v2_not_in_[1,1]`）与未验证目标，放行已验证的 `cb05aee` 回滚（`rollback_safe=true`）并生成认证备份（`d093da85...`）。
+    2. 将该 v2 账本直接挂载入真实前序镜像 `cb05aee`：写前全七表摘要逐字节一致（`d5ddfe05...`），正确读取 D037 历史任务并完成第二局抓放写入（`tasks 1→2 / ops 2→4 / plans 1→2 / task_events 6→12`）。
+    3. 故意截断破坏主库并注入 17 字节垃圾 `-wal`：`release-check` 拒止损坏账本、拒绝错误哈希恢复；经认证 `--restore-from` 清除残留脏 WAL 并原子还原至精确备份摘要 `d5ddfe05...`，重开 `OperationLedger` 无错，宿主机 40 个容器全程未变。
+- **云端常驻控制台**：本批未改动线上 HTTP/WS 控制面或 schema v2，常驻控制台保持已激活的 `cb05aee`（HTTPS 8449 健康运行）。完整提交绑定证据见 [release-compatibility-20261122.json](../eval/release-compatibility-20261122.json)。
