@@ -112,6 +112,13 @@
         "tests/rpc/test_cross_host_vision_rpc.py"
       ],
       "scope": "Cross-host ObservationEnvelope clock-domain admission, local_monotonic cross-host ban, wall NTP/PTP skew/drift/Cristian midpoint and local wall-step checks, PerceivedSim.read_reference_state non-leakage, and mTLS RPC per-object TTL rebase; real physical camera disconnect and hardware PTP sync stay open"
+    },
+    {
+      "id": "release_compatibility_and_rollback",
+      "tests": [
+        "tests/runtime/test_release_compatibility.py"
+      ],
+      "scope": "ModelBundle semantic compatibility beyond shape, ReleaseBundle maintenance-mode lock/running/unconfirmed-stop preflight, v1-only downgrade and unverified rollback refusal after new v2 writes, and authenticated online backup + atomic restore of corrupted v2 ledgers; hardware firmware OTA and future v3->v2 downgrade stay open"
     }
   ],
   "open_gates": [
@@ -121,6 +128,6 @@
     "Authenticated cross-host recovery authority and multi-attempt protocol",
     "Real network partition and field-device supervision",
     "Real-hardware physical stop latency and field-deployment episode data loss metrics (simulation isolated-process baseline measured in D035)",
-    "Release compatibility and downgrade/recovery rehearsal after new v2 writes"
+    "Field hardware/firmware OTA activation and cross-major-schema (v3->v2) downgrade rehearsal (v2 ReleaseBundle/ModelBundle compatibility preflight, two-image v2 downgrade, and corrupt-ledger backup restore verified in D037)"
   ]
 }

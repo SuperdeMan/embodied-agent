@@ -393,3 +393,16 @@ D035 验收补记（2026-11-22）：`b723417` 已验收。ruff、904 项完整�
 **边界**：本批关闭软件层跨机视觉时钟契约、时钟偏斜/跳变拒止与 RPC 对象级时效传播；不替代真实物理相机断连、真实硬件 PTP/NTP 同步测量或真机手眼标定验证。
 
 D036 验收补记（2026-11-22）：`c549839` 已验收。ruff、924 项完整测试（+20）、49 项 RPC 测试（+3）及 14 组 287 项参考故障矩阵全通过（零跳过、`p1_complete=false`）；默认物理控制隔离下 3×30 回归保持真值/color 各 30/30、ONNX 29/30。Linux Docker 候选镜像（`sha256:cb2775cf...`）通过控制台冒烟、`compute_smoke.py`、`control_smoke.py` 与 `p1_metrics_baseline.py`，独立测试镜像 `embodied-vision-rpc-test:c549839dec3c`（`sha256:b6c6820d...`）在真实 Linux OSMesa 与高运行单调时钟下通过全部 35/35 项跨机时钟与 BoringSSL mTLS 视觉 RPC 测试（含隔离物理 + ColorBlob 感知与 reset 轮换），宿主机 40 个既有容器不变。线上 HTTP/WS 控制面与 schema v2 未变，云端常驻维持已激活 `cb05aee`。证据见 `eval/cross-host-observation-clock-20261122.json`。
+
+
+## D037 · ReleaseBundle/ModelBundle 兼容预检与 v2 账本降级恢复演练
+
+**日期**：2026-11-22 · **状态**：实施中
+
+**问题**：P1 故障矩阵仍留有“v2 账本产生新写入后的发行兼容与降级/恢复演练”门禁；此前虽有 `task_schema.py` 处理 v1→v2 迁移，但缺少 `ReleaseBundle` 与 `ModelBundle` 冻结契约、维护态激活/回滚预检（阻止错误模型语义、资产篡改、活跃操作或未验证回滚组合），以及受损 v2 账本的认证备份原子恢复工具与双镜像演练证据。
+
+**决策**：在不新增第三方依赖、不修改 SQLite schema v2、不修改 gRPC proto 的前提下，新增纯契约 `src/embodied/contracts/release.py`（`ModelBundle`、`TargetEnvironment`、`ReleaseBundle`、`LedgerBackupManifest`、`ReleasePreflightReport`）与运行时模块 `src/embodied/runtime/release.py`（CLI `embodied release-check`）：对模型执行本体/关节序/动作语义/后端/权重哈希全维度校验（相同 shape 不等于物理兼容）；对激活与回滚强制校验独占账本锁、零 `RUNNING` 操作、零 `STOP_UNCONFIRMED` 尝试、schema 区间匹配、资产与停止 profile 摘要及显式 `verified_rollback_targets`（未经验证组合不得标 `rollback_safe=true`）；提供全七表确定性摘要、`backup_ledger()` 在线备份与 `restore_ledger_backup()` 认证原子恢复。将兼容与降级恢复契约纳入 P1 故障矩阵第 15 组，并在 Linux Docker 隔离容器中用真实新版镜像与前序 `cb05aee` 镜像演练新 v2 写入后的受控降级与受损账本恢复。
+
+**替代方案**：允许仅凭张量维度匹配就加载模型或允许任意版本间默认自动回滚（易导致错误关节映射和静默数据损坏，拒绝）；用文件拷贝 `cp` 直接备份或覆盖正在运行的 SQLite 数据库（易造成半页损坏与锁竞争，拒绝）；顺带升级为 schema v3（触发未授权的数据库 schema 变更红线，拒绝）。
+
+**边界**：本批关闭仿真/容器层面的 v2 发行兼容预检、双镜像受控降级与认证备份原子恢复门禁，`hardware_verified` 固定为 `false`；真实硬件固件 OTA 与未来跨大版本 schema（v3→v2）降级仍保留为独立门禁。

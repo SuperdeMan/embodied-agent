@@ -77,6 +77,15 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 八类契约字段与接线位置以[执行计划 §3](platform-upgrade.md#3-八类契约与冻结顺序)为迁移清单。纯契约不依赖适配器、ROS、GPU；跨进程 proto 先行，未知版本不静默接受。
 
+### 5.19 D037 发行兼容契约与 v2 账本降级恢复
+
+为收口 P1 故障矩阵中 v2 账本新写入后的发行兼容与降级/恢复演练门禁，在零新增依赖、零 SQLite schema 变更、零 proto 变更前提下，新增纯契约 `src/embodied/contracts/release.py`（`ModelBundle`、`TargetEnvironment`、`ReleaseBundle`、`LedgerBackupManifest`、`ReleasePreflightReport`，版本 `embodied.dev/v1alpha1`）与运行时模块 `src/embodied/runtime/release.py`（CLI `embodied release-check`）：
+
+- **模型物理语义兼容（不止校验张量形状）**：`verify_model_compatibility` 同时核对 `robot_id`、关节顺序 `joint_order`、单位、`action_semantics`、`normalization_mode`、推理后端支持集与模型文件 SHA-256（拒绝路径穿越与篡改），防止同维度模型在错误本体或错误关节序上激活。
+- **维护态激活与回滚门禁**：`preflight_release` 在激活或回滚前强制校验独占账本 `.lock`、零 `RUNNING` 操作、零 `STOP_UNCONFIRMED` 尝试、资产/停止 profile 与配置摘要、驱动固件兼容列表、账本 schema 版本区间 `[min_ledger_schema, max_ledger_schema]` 以及显式 `verified_rollback_targets`。凡未经验证的组合或版本跨界降级（如 v1-only 运行时读取 v2 账本）一律 fail-closed 并固定 `rollback_safe=false`。
+- **全七表认证备份与受损恢复**：`backup_ledger` 与 `restore_ledger_backup` 在独占锁下通过 SQLite 在线备份与全七表确定性 SHA-256 校验，确保受损账本仅在备份哈希、完整性与外键检查全通过后原子恢复，且支持在真实双镜像 Linux 容器间完成“新版本写入 v2 → 备份 → 受控回滚至前序兼容镜像 → 历史行逐行一致”演练。
+- **诚实边界**：`hardware_verified` 固定为 `false`，不宣称真机固件 OTA 刷写或跨大版本 schema（v3→v2）降级兼容。详见 [发行兼容与降级恢复](release-compatibility.md)。
+
 ### 5.18 D036 跨机视觉与观察时钟契约
 
 D019 远端世界状态仅发布即时 `sim_truth` 且未传递对象级感知年龄，D023 对象级时效仅覆盖本机同进程 `monotonic`。D036 在不破坏既有 gRPC proto wire、不改 SQLite schema v2、不增运行依赖的前提下，补齐跨机视觉/观察时钟契约与 RPC 对象级时效传播：

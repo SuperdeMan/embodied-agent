@@ -123,6 +123,19 @@ def main(argv: list[str] | None = None) -> int:
     upgrade.add_argument("--apply", action="store_true")
     upgrade.add_argument("--backup-dir", default=None)
 
+    rel = sub.add_parser("release-check", help="preflight release/rollback compatibility or backup/restore v2 ledger (D037)")
+    rel.add_argument("--bundle", default="", help="target ReleaseBundle JSON file")
+    rel.add_argument("--target", default="", help="TargetEnvironment JSON file")
+    rel.add_argument("--current-bundle", default="", help="optional currently active ReleaseBundle JSON file")
+    rel.add_argument("--bundle-root", default="", help="optional bundle root directory for config/model digest verification")
+    rel.add_argument("--action", choices=["activate", "rollback"], default="activate")
+    rel.add_argument("--ledger", default="", help="SQLite operation ledger path")
+    rel.add_argument("--backup-dir", default="", help="create an authenticated online ledger backup into this directory")
+    rel.add_argument("--source-release", default="", help="source release label recorded in backup manifest")
+    rel.add_argument("--restore-from", default="", help="atomically restore --ledger from this authenticated backup file")
+    rel.add_argument("--expected-sha256", default="", help="required backup file SHA-256 for --restore-from")
+    rel.add_argument("--expected-all-tables-sha256", default="", help="optional expected full-table SHA-256 for --restore-from")
+
     task_query = sub.add_parser("task", help="query task history or assess recovery without executing actions")
     task_query.add_argument("--remote", required=True)
     task_query.add_argument("--id", default="")
@@ -169,10 +182,62 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(upgrade_ledger(args.ledger, apply=args.apply, backup_dir=args.backup_dir),
                          ensure_ascii=False, indent=2))
         return 0
+    if args.cmd == "release-check":
+        return _release_check(args, parser)
     if args.cmd == "task":
         return asyncio.run(_task_query(args))
     parser.error(f"unknown command {args.cmd!r}")
     return 2
+
+
+def _release_check(args: argparse.Namespace, parser: argparse.ArgumentParser) -> int:
+    """Execute maintenance-mode release preflight, ledger backup, or authenticated restore (D037).
+
+    执行维护态发行/回滚兼容预检、v2 账本在线备份或经认证原子恢复（D037）。
+    """
+    import json
+    from pathlib import Path
+
+    from embodied.contracts.release import ReleaseBundle, TargetEnvironment
+    from embodied.runtime.release import backup_ledger, preflight_release, restore_ledger_backup
+
+    if args.backup_dir:
+        if not args.ledger or not args.source_release:
+            parser.error("--backup-dir requires --ledger and --source-release")
+        backup_path, manifest = backup_ledger(args.ledger, args.backup_dir, source_release=str(args.source_release))
+        print(json.dumps({"backup_path": str(backup_path), "manifest": manifest.model_dump(mode="json")},
+                         ensure_ascii=False, indent=2))
+        return 0
+    if args.restore_from:
+        if not args.ledger or not args.expected_sha256:
+            parser.error("--restore-from requires --ledger and --expected-sha256")
+        report = restore_ledger_backup(
+            args.ledger,
+            args.restore_from,
+            expected_sha256=str(args.expected_sha256),
+            expected_all_tables_sha256=str(args.expected_all_tables_sha256) or None,
+        )
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
+    if not args.bundle or not args.target:
+        parser.error("release-check preflight requires --bundle and --target")
+    bundle = ReleaseBundle.model_validate_json(Path(args.bundle).read_text(encoding="utf-8"))
+    target = TargetEnvironment.model_validate_json(Path(args.target).read_text(encoding="utf-8"))
+    current = (
+        ReleaseBundle.model_validate_json(Path(args.current_bundle).read_text(encoding="utf-8"))
+        if args.current_bundle
+        else None
+    )
+    result = preflight_release(
+        bundle,
+        target,
+        ledger_path=args.ledger or None,
+        action=str(args.action),
+        current_bundle=current,
+        bundle_root=args.bundle_root or None,
+    )
+    print(result.model_dump_json(indent=2))
+    return 0 if result.allowed else 2
 
 
 def _add_common(p: argparse.ArgumentParser) -> None:
