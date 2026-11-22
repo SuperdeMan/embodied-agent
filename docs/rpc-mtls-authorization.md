@@ -54,3 +54,11 @@
 
 - 不提供在线吊销（CRL/OCSP）或自动证书轮换；吊销需更新只读策略文件并重启服务。
 - 物理停止证明仍限定于仿真参考控制器；跨机传感器时钟同步、父进程原生控制隔离、多 attempt 恢复与真机急停继续保留为独立门禁。
+
+## 本批验收
+
+固定提交 `25343fa`（干净工作树、无新增依赖、无 proto wire 变更、无 schema 迁移）：
+
+- **本机验证**：`ruff check .` 通过；完整 5 组测试 **878 passed / 0 skipped**（含 19 项新增 RPC 策略与 mTLS 集成测试）；RPC 套件 **45 passed / 0 skipped**；[P1 参考故障矩阵](p1-fault-matrix.md) 扩展至 **11 组 241 项全部通过**（`p1_complete: false`）；`tabletop_pick_place@v1` 3×30 回归保持 `scripted_truth` 30/30、`isolated_pick_v1_truth` 29/30（既有第 14 局 `horizon reached`）、`isolated_color` 30/30。
+- **Linux Docker 真栈验证**：在独立 Linux Docker 宿主上，源码归档候选镜像 `embodied-agent:25343fa...`（`sha256:3bc844ad...`）通过无网络隔离控制台验收（抓放、并行预览、有界观察与 6 项计算子进程故障回收全绿，40 个既有容器保持不变）；基于该候选构建的独立测试镜像 `embodied-rpc-test:25343fa08480`（`sha256:491f2e10...`）实测 Linux BoringSSL 三进程 mTLS（`serve-control` + `serve-guardian` + CLI `operation`/`task`），确认非回环明文启动拒止、未列明/伪造 CA 客户端拒绝、角色隔离与越权拦截、agent 心跳断连触发经 mTLS 传达的 Guard 闩锁、`ReconcileStop` 精确 4 事件审计序（`rpc_operator_action_started` → `stop_reconciliation_requested` → `stop_reconciliation_observed` → `rpc_operator_action_finished`）、`Reset` 仅允许 `reset_guard` 作用域且不解除未知操作隔离、`RecoveryReview` 保持 `execution_authorized=false`。
+- **云端常驻边界**：D033 仅变更 gRPC 认证与授权路径，未改动单进程 HTTP 控制台或 schema v2，常驻私网控制台保持已验收的 `90135f0`（HTTPS 8449 健康检查通过），不做无必要的线上重启。完整证据见 [rpc-mtls-authorization-20261122.json](../eval/rpc-mtls-authorization-20261122.json)。

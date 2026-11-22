@@ -1,0 +1,571 @@
+{
+  "date_local": "2026-11-22",
+  "qualified_commit": "25343fa08480ed793ffe4d65e87991d8a5509821",
+  "source_tree": "d082c4310788ae2693869b97ea50c24a5c32dd20",
+  "working_tree_clean_for_qualified_runs": true,
+  "schema_version": 2,
+  "schema_changed": false,
+  "rpc_wire_changed": false,
+  "new_runtime_dependencies": false,
+  "ruff": "passed",
+  "full_suite": {
+    "file": "outputs/rpc-mtls-25343fa.xml",
+    "sha256": "3fe04ea1475ba7d011bfd21d123d0efe92f874e11a6c3cacf67d16cafe9edf52",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "878",
+      "time": "89.130",
+      "timestamp": "2026-11-22T09:44:52.903516+08:00"
+    },
+    "warnings": 4,
+    "new_tests": 19
+  },
+  "rpc_suite": {
+    "file": "outputs/rpc-mtls-rpc-25343fa.xml",
+    "sha256": "9f55d5834e0389d0c32c67fdfd57b6f7eb126d194b3a10e0f09a7ebdff4b7f66",
+    "result": {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "45",
+      "time": "5.112",
+      "timestamp": "2026-11-22T09:46:25.066985+08:00"
+    },
+    "included_in_full_suite": true
+  },
+  "fault_matrix": {
+    "file": "outputs/p1-faults/20261122T014630Z-25343fa/report.json",
+    "sha256": "c3bb46c9e38f36950e2c171dbfbd9c482b03c634de6732a5b861494016c12dc2",
+    "result": {
+      "schema": "embodied.p1-fault-matrix/v1",
+      "commit": "25343fa08480ed793ffe4d65e87991d8a5509821",
+      "working_tree_clean": true,
+      "matrix_sha256": "45d447b2dd1563658cd1dfb4ecedc2e82f87f3add955449f1fdd2fc616f5450e",
+      "reference_checks_passed": true,
+      "p1_complete": false,
+      "groups": [
+        {
+          "id": "storage_cancel",
+          "tests": [
+            "tests/runtime/test_cancel_storage_faults.py",
+            "tests/rpc/test_halt_storage_faults.py"
+          ],
+          "scope": "SQLite page-cap FULL, read/write failure, cancellation, Guard latch and watchdog",
+          "total": 8,
+          "passed": 8,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.102,
+            "max": 0.102
+          }
+        },
+        {
+          "id": "operation_crash_and_replay",
+          "tests": [
+            "tests/runtime/test_operations.py",
+            "tests/rpc/test_operation_protocol.py"
+          ],
+          "scope": "Abrupt owner exit, duplicate identity, restart and loopback RPC",
+          "total": 15,
+          "passed": 15,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.554,
+            "max": 0.554
+          }
+        },
+        {
+          "id": "task_recovery",
+          "tests": [
+            "tests/runtime/test_task_journal.py",
+            "tests/control/test_task_recovery.py",
+            "tests/rpc/test_task_protocol.py"
+          ],
+          "scope": "Task corruption, interrupted intent, scene change, read-only assessment",
+          "total": 29,
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.586,
+            "max": 0.74
+          }
+        },
+        {
+          "id": "recovery_review",
+          "tests": [
+            "tests/runtime/test_recovery_review.py",
+            "tests/control/test_recovery_review.py",
+            "tests/rpc/test_recovery_review.py"
+          ],
+          "scope": "Consistent read-only snapshot, Guard lifecycle, evidence age and denial of authority claims; no execution authorization",
+          "total": 30,
+          "passed": 30,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.049,
+            "max": 0.061
+          }
+        },
+        {
+          "id": "operator_authorization",
+          "tests": [
+            "tests/runtime/test_operator_policy.py",
+            "tests/hri/test_operator_authorization.py"
+          ],
+          "scope": "Exact proxy, subject and default scope policy, one-use effect-only authority, audit failure/expiry/replay refusal; no task execution authority",
+          "total": 41,
+          "passed": 41,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.077,
+            "max": 0.081
+          }
+        },
+        {
+          "id": "stop_authorization",
+          "tests": [
+            "tests/hri/test_stop_authorization.py"
+          ],
+          "scope": "Explicit stop scope isolation, one-use audited simulation stop reconciliation, cross-restart and latched-Guard boundaries; no Guard reset or task execution authority",
+          "total": 29,
+          "passed": 29,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.295,
+            "max": 0.532
+          }
+        },
+        {
+          "id": "rpc_mtls_authorization",
+          "tests": [
+            "tests/runtime/test_rpc_auth_policy.py",
+            "tests/rpc/test_rpc_mtls_authorization.py"
+          ],
+          "scope": "Pinned-CA BoringSSL mTLS transport auth, hardcoded agent/guardian/operator role matrix, non-loopback fail-closed, audited RPC maintenance and D028 halt resilience; no CRL/OCSP or hardware stop",
+          "total": 19,
+          "passed": 19,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.688,
+            "max": 0.688
+          }
+        },
+        {
+          "id": "incompatible_ledger",
+          "tests": [
+            "tests/runtime/test_task_schema.py"
+          ],
+          "scope": "Unknown schema, live-owner refusal, atomic migration rollback",
+          "total": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.04,
+            "max": 0.04
+          }
+        },
+        {
+          "id": "compute_process",
+          "tests": [
+            "tests/runtime/test_compute_process.py"
+          ],
+          "scope": "Worker timeout, crash, bad protocol, process reaping and no request replay",
+          "total": 20,
+          "passed": 20,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 1.484,
+            "max": 2.08
+          }
+        },
+        {
+          "id": "supervision_link",
+          "tests": [
+            "tests/rpc/test_process_split.py"
+          ],
+          "scope": "Loopback control/Guardian link loss, stale heartbeat, confirmation and latch",
+          "total": 9,
+          "passed": 9,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.618,
+            "max": 0.618
+          }
+        },
+        {
+          "id": "observation_availability",
+          "tests": [
+            "tests/runtime/test_observation_lane.py",
+            "tests/cognition/test_object_freshness.py",
+            "tests/control/test_body_feedback.py"
+          ],
+          "scope": "Blocked read-only workers, stale or missing local perception; no real camera disconnect",
+          "total": 37,
+          "passed": 37,
+          "failed": 0,
+          "skipped": 0,
+          "missing_modules": [],
+          "test_duration_s": {
+            "p95": 0.076,
+            "max": 0.114
+          }
+        }
+      ],
+      "open_gates": [
+        "Real storage-medium I/O failure and power loss",
+        "Physical control process native hang and independent hardware stop",
+        "Real camera disconnection and cross-host sensor clock validation",
+        "Authenticated cross-host recovery authority and multi-attempt protocol",
+        "Real network partition and field-device supervision",
+        "Physical stop latency, stale-action rate and real episode data loss metrics",
+        "Release compatibility and downgrade/recovery rehearsal after new v2 writes"
+      ],
+      "wall_duration_s": 35.49185599999328,
+      "returncode": 0,
+      "command": [
+        "D:\\Personal\\AI\\Claude Code\\产品\\embodied-agent\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "tests/runtime/test_cancel_storage_faults.py",
+        "tests/rpc/test_halt_storage_faults.py",
+        "tests/runtime/test_operations.py",
+        "tests/rpc/test_operation_protocol.py",
+        "tests/runtime/test_task_journal.py",
+        "tests/control/test_task_recovery.py",
+        "tests/rpc/test_task_protocol.py",
+        "tests/runtime/test_recovery_review.py",
+        "tests/control/test_recovery_review.py",
+        "tests/rpc/test_recovery_review.py",
+        "tests/runtime/test_operator_policy.py",
+        "tests/hri/test_operator_authorization.py",
+        "tests/hri/test_stop_authorization.py",
+        "tests/runtime/test_rpc_auth_policy.py",
+        "tests/rpc/test_rpc_mtls_authorization.py",
+        "tests/runtime/test_task_schema.py",
+        "tests/runtime/test_compute_process.py",
+        "tests/rpc/test_process_split.py",
+        "tests/runtime/test_observation_lane.py",
+        "tests/cognition/test_object_freshness.py",
+        "tests/control/test_body_feedback.py",
+        "-q",
+        "-o",
+        "addopts=",
+        "--import-mode=importlib",
+        "--junitxml=D:\\Personal\\AI\\Claude Code\\产品\\embodied-agent\\outputs\\p1-faults\\20261122T014630Z-25343fa\\results.xml"
+      ],
+      "junit_sha256": "73e53f794f56d18bbe9ba6964ef77b0adf527749c33af268d31e87ec75091143"
+    }
+  },
+  "regressions": [
+    {
+      "mode": "scripted_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261122-014716.json",
+      "sha256": "ae92f46ed3363f8f181f66c209de727a6994d8e577344a84446de8ba9f8b11be",
+      "result": {
+        "commit": "25343fa",
+        "finished_at": "2026-11-22T01:47:16.702380+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "mode": "isolated_pick_v1_truth",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261122-014734.json",
+      "sha256": "7822f145c07e437ee894757461a672e3d4244bffe12e974e2aafa1aad462197a",
+      "result": {
+        "commit": "25343fa",
+        "finished_at": "2026-11-22T01:47:34.807767+00:00",
+        "total": 30,
+        "wins": 29,
+        "rate": 0.9667,
+        "passed": true,
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "start_pos": [
+              0.0132,
+              -0.2475,
+              0.015
+            ],
+            "success": false,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ],
+            "report": "部分步骤未完成。\n- s1: 失败：policy pick failed (horizon reached)\n- s2: 跳过：dependency s1 failed",
+            "episode_dir": ""
+          }
+        ]
+      }
+    },
+    {
+      "mode": "isolated_color",
+      "file": "outputs/eval/tabletop_pick_place@v1-20261122-014923.json",
+      "sha256": "149fb25894126badff12683441d253af7ce1402f59fb44ec883d41838185aece",
+      "result": {
+        "commit": "25343fa",
+        "finished_at": "2026-11-22T01:49:23.645788+00:00",
+        "total": 30,
+        "wins": 30,
+        "rate": 1.0,
+        "passed": true,
+        "failures": []
+      }
+    }
+  ],
+  "linux_docker_verification": {
+    "tarball_sha256": "2a6ff25c59c74e7e2e3d8277bf9656cf6b1bc467550674804ef2c57b2539bd4a",
+    "console_candidate": {
+      "file": "outputs/cloud/candidate-25343fa.json",
+      "sha256": "b9fcf33d5348c47a6717e81189ef4271bfb3b169b01bba97a0fc4e89a42e4efb",
+      "result": {
+        "passed": true,
+        "health": {
+          "status": "ok",
+          "release": "25343fa08480ed793ffe4d65e87991d8a5509821",
+          "runtime": {
+            "environment": "simulation",
+            "planner": "offline",
+            "audio": "mock"
+          }
+        },
+        "jpeg_bytes": 31088,
+        "steps": [
+          {
+            "type": "step",
+            "step_id": "s1",
+            "task_id": "f3d980d524894c208972b477be23ae75",
+            "skill": "skill.manip.pick",
+            "status": "ok",
+            "detail": "obj_cube grasped and lifted",
+            "operation_id": "cf12fa53a45f57bfa03061e8d8516385",
+            "attempt_id": "4f777fd4381b4074ae0fcf957a6fe388",
+            "invocation_state": "RETURNED",
+            "stop_state": "NOT_REQUESTED"
+          },
+          {
+            "type": "step",
+            "step_id": "s2",
+            "task_id": "f3d980d524894c208972b477be23ae75",
+            "skill": "skill.manip.place",
+            "status": "ok",
+            "detail": "obj_cube placed in bin_region",
+            "operation_id": "3e60261d59d258dcbff5496e1fcbf785",
+            "attempt_id": "5b634f65fcca4b0db42700f8c285d286",
+            "invocation_state": "RETURNED",
+            "stop_state": "NOT_REQUESTED"
+          }
+        ],
+        "operation_states": [
+          "RETURNED",
+          "RETURNED"
+        ],
+        "effect_verdicts": [
+          "sat",
+          "sat"
+        ],
+        "task_journal": {
+          "schema_version": 2,
+          "task_id": "f3d980d524894c208972b477be23ae75",
+          "events": 6,
+          "read_only": true
+        },
+        "frame_attempts": [
+          {
+            "status": 503,
+            "bytes": 34
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 503,
+            "bytes": 38
+          },
+          {
+            "status": 200,
+            "bytes": 31088
+          }
+        ],
+        "concurrent_preview_statuses": [
+          200,
+          200,
+          200
+        ],
+        "bounded_observation": {
+          "passed": true,
+          "timeout_probe_s": 0.1008000299334526,
+          "queued_replacements": 0
+        },
+        "isolated_compute": {
+          "passed": true,
+          "faults": [
+            {
+              "fault": "hang",
+              "old_pid": 68,
+              "seconds": 0.10359416902065277,
+              "reaped": true,
+              "request_replayed": false
+            },
+            {
+              "fault": "gil_hang",
+              "old_pid": 72,
+              "seconds": 0.11027098260819912,
+              "reaped": true,
+              "request_replayed": false
+            },
+            {
+              "fault": "crash",
+              "old_pid": 76,
+              "seconds": 0.00246434286236763,
+              "reaped": true,
+              "request_replayed": false
+            },
+            {
+              "fault": "abort",
+              "old_pid": 80,
+              "seconds": 0.1036511268466711,
+              "reaped": true,
+              "request_replayed": false
+            },
+            {
+              "fault": "wrong_boot",
+              "old_pid": 84,
+              "seconds": 0.0037870071828365326,
+              "reaped": true,
+              "request_replayed": false
+            },
+            {
+              "fault": "oversize",
+              "old_pid": 94,
+              "seconds": 0.0036483239382505417,
+              "reaped": true,
+              "request_replayed": false
+            }
+          ],
+          "color_pid": 98,
+          "color_reference_equal": true,
+          "color_reaped": true,
+          "graceful_ack": true,
+          "exitcode": 0
+        },
+        "commit": "25343fa08480ed793ffe4d65e87991d8a5509821",
+        "image_id": "sha256:3bc844adfcc3af41ff8c0dba838d4154eaf844381c6210dd797707342a281f30",
+        "published": false,
+        "runtime_limits": {
+          "cpus": 1,
+          "memory_mib": 1536,
+          "ports": [],
+          "network": "none"
+        }
+      },
+      "existing_containers_count": 40,
+      "existing_containers_unchanged": true
+    },
+    "rpc_mtls_real_stack": {
+      "file": "outputs/cloud/linux-rpc-mtls-25343fa.json",
+      "sha256": "05a239cce424f74537b0613b1f1ad8105231e407821f756270c297384654c011",
+      "probe_image": "embodied-rpc-test:25343fa08480",
+      "probe_image_id": "sha256:491f2e10930bff9ba8729af5b8baf2fbe25997e28bcbfc0b3a2719e7aa0d7170",
+      "result": {
+        "passed": true,
+        "non_loopback_plaintext_refused": true,
+        "plaintext_and_rogue_unlisted_rejected": true,
+        "role_isolation_enforced": true,
+        "three_process_mtls_liveness_halt_verified": true,
+        "cli_mtls_stop_reconciliation_verified": true,
+        "exact_four_event_rpc_audit_order": true,
+        "reset_guard_scope_verified": true,
+        "task_execution_authorized": false,
+        "commit": "25343fa08480ed793ffe4d65e87991d8a5509821"
+      }
+    },
+    "live_cloud_console_status": {
+      "redeployed": false,
+      "reason": "D033 modifies gRPC mTLS/authorization only; single-process HTTP console and schema v2 unchanged",
+      "active_release": "90135f05c95d5e974c4cb4e7b898346622fd9dd8",
+      "health": "ok"
+    }
+  },
+  "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+  "pick_v1_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+  "boundaries": [
+    "Non-loopback ControlService/SafetyService servers and CLI clients fail closed without pinned-CA mTLS and explicit peer policy",
+    "Loopback unauthenticated reference mode remains opt-in for local dev/regression only and never claims authenticated identity",
+    "No online revocation (CRL/OCSP) or automated certificate rotation; revocation requires read-only policy update and restart",
+    "Simulation stop verification remains mujoco-hold-current-v1; no hardware stop, cross-host vision clock, parent physical isolation, or task execution resume granted"
+  ]
+}

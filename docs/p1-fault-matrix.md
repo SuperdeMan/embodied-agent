@@ -49,3 +49,7 @@ Linux 隔离容器的实际 SQLite FULL 验证了两项许可先撤销、全部�
 ## D032 增量
 
 `90135f0` 新增 `stop_authorization` 组与显式策略作用域检查，矩阵扩展为 10 组 222 项全部通过（零跳过）。覆盖缺省策略拒止、双作用域停止确认与 5 事件审计序、跨重启停止、Guard 闩锁保持、快照变更失效、各落账点失败与 WebSocket 中断隔离恢复；实际设备/跨机/父进程原生控制与多 attempt 门禁仍保留未关闭。证据见[本地证据](../eval/stop-authorization-20261122.json)与[云端证据](../eval/cloud-stop-upgrade-20261122.json)。
+
+## D033 增量
+
+`25343fa` 新增 `rpc_mtls_authorization` 组，矩阵扩展为 11 组 241 项全部通过（零跳过，`p1_complete: false`）。覆盖 CA/叶证书 SHA-256 指纹固定、非回环明文启动与连接拒止、硬编码 `agent`/`guardian`/`operator` 角色方法矩阵、未授权不污染连接标志、认证维护审计写失败阻断、D028 存储故障下 `Halt`/`CancelOperation` 优先撤权闩锁，以及 Linux Docker 三进程 BoringSSL mTLS 实测；CRL/OCSP 吊销、跨机视觉时钟、父进程物理控制隔离、多 attempt 与真机急停门禁仍保留未关闭。证据见[本批证据](../eval/rpc-mtls-authorization-20261122.json)。
