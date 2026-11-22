@@ -344,11 +344,12 @@ async def test_mtls_rpc_isolated_sim_and_color_perception_world_state(tmp_path):
     tls, policy = _make_pki(tmp_path)
     iso = IsolatedTabletopSim(seed=0)
     iso.prepare_renderer()
-    # 使用 320x240 适配 1 CPU 软件 OSMesa 渲染预算，不放宽 1.0s 观察窗或 1.0s 跨机鲜度预算。
-    # Use 320x240 to fit 1-CPU software OSMesa within the strict 1.0s observation lane and 1.0s freshness budget.
+    # 使用 side 优先与 320x240 适配 1 CPU 软件 OSMesa 单帧渲染预算，不放宽 1.0s 观察窗或 1.0s 跨机鲜度预算。
+    # Prefer side camera at 320x240 so 1-CPU software OSMesa fits within strict 1.0s observation and freshness budgets.
     perceived = PerceivedSim(
         iso,
         PerceptionPipeline(ColorBlobProvider(), dict(TABLETOP_OBJECTS)),
+        cameras=("side", "top"),
         width=320,
         height=240,
         min_interval_s=0.25,
