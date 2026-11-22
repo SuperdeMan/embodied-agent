@@ -382,7 +382,7 @@ D035 验收补记（2026-11-22）：`b723417` 已验收。ruff、904 项完整�
 
 ## D036 · 跨机视觉/观察时钟契约与 RPC 对象级时效传播
 
-**日期**：2026-11-22 · **状态**：实施中
+**日期**：2026-11-22 · **状态**：生效（本机 Windows 与 Linux Docker 容器 35 项 mTLS 视觉时钟实测均已验收，见 [cross-host-observation-clock.md](cross-host-observation-clock.md)）
 
 **问题**：D019 远端 `ObservationEnvelope` 仅支持即时 `sim_truth`，既无法表达跨主机视觉观察的时钟域与偏斜/漂移界限，也无法传递 D023 逐对象感知年龄；同时 `PerceivedSim` 未覆写 `read_reference_state()`，通过 `__getattr__` 穿透到底层仿真直接泄漏真值，导致远端规划与效果验证器无法在感知遮挡、相机故障或网络延迟时收口为 `UNKNOWN`。
 
@@ -391,3 +391,5 @@ D035 验收补记（2026-11-22）：`b723417` 已验收。ruff、904 项完整�
 **替代方案**：直接把生产端 `time.monotonic()` 放进 RPC 供接收端相减（跨主机单调时钟无共同零点，必然出错，拒绝）；仅依赖远端自报 UTC 墙钟而不做偏斜上界与 Cristian 往返交叉检验（远端时钟失步或恶意/异常超前会绕过过期门禁，拒绝）；把对象鲜度校验移到 SQLite 新表或修改 gRPC proto 字段破坏旧客户端（触发未授权 schema 变更且无必要，拒绝）。
 
 **边界**：本批关闭软件层跨机视觉时钟契约、时钟偏斜/跳变拒止与 RPC 对象级时效传播；不替代真实物理相机断连、真实硬件 PTP/NTP 同步测量或真机手眼标定验证。
+
+D036 验收补记（2026-11-22）：`c549839` 已验收。ruff、924 项完整测试（+20）、49 项 RPC 测试（+3）及 14 组 287 项参考故障矩阵全通过（零跳过、`p1_complete=false`）；默认物理控制隔离下 3×30 回归保持真值/color 各 30/30、ONNX 29/30。Linux Docker 候选镜像（`sha256:cb2775cf...`）通过控制台冒烟、`compute_smoke.py`、`control_smoke.py` 与 `p1_metrics_baseline.py`，独立测试镜像 `embodied-vision-rpc-test:c549839dec3c`（`sha256:b6c6820d...`）在真实 Linux OSMesa 与高运行单调时钟下通过全部 35/35 项跨机时钟与 BoringSSL mTLS 视觉 RPC 测试（含隔离物理 + ColorBlob 感知与 reset 轮换），宿主机 40 个既有容器不变。线上 HTTP/WS 控制面与 schema v2 未变，云端常驻维持已激活 `cb05aee`。证据见 `eval/cross-host-observation-clock-20261122.json`。

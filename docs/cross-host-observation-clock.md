@@ -31,3 +31,13 @@
 
 - 本批完成跨机视觉/观察时钟软件契约、偏斜/漂移/RTT 鲜度门禁、接收端重基准与 mTLS gRPC 端到端感知对象时效传播；已支持 `embodied serve-control --perception color`。
 - **不宣称**：真实物理相机硬件失联、真实多网卡硬件 PTP/NTP 时钟同步质量证明，或真机手眼标定验证；这些仍保留在 P1/P2 实机门禁中。
+
+## 4. 本批验收
+
+固定干净提交 `c549839`（source tree `d870ea25...`，含功能提交 `b5e4214` 与测试适配提交 `0dab61a`/`c549839`；无新增运行依赖、无 SQLite schema 变更、无 proto wire 变更）：
+
+- **本机回归**：`ruff` 全绿；完整 5 组 `pytest` **924 项全通过**（+20 项新测，零跳过，4 条既有 ONNX 导出告警）；RPC 套件 **49 项全通过**（+3 项 mTLS 跨机视觉 RPC 测试）；[P1 故障矩阵](p1-fault-matrix.md) 扩展至 **14 组 287 项全通过**（零跳过，`p1_complete: false`）。默认物理控制隔离下 3×30 `tabletop_pick_place@v1` 回归保持真值 30/30、color 30/30、ONNX 29/30（既有第 14 局 `horizon reached`）。
+- **Linux Docker 候选与 35 项 mTLS 视觉真栈实测**：
+  - 候选镜像 `sha256:cb2775cf...`（`--network none`、1 CPU / 1536 MiB、UID 10001）同步通过控制台冒烟、`compute_smoke.py`、`control_smoke.py` 与 `p1_metrics_baseline.py`，宿主机 40 个既有容器全程未变。
+  - 独立测试镜像 `embodied-vision-rpc-test:c549839dec3c`（`sha256:b6c6820d...`，`--network none`、UID 10001）在真实 Linux 98 天高运行单调时钟及 1 CPU 软件 OSMesa 下通过全部 **35/35** 项快照、跨机时钟与 BoringSSL mTLS 视觉 RPC 测试（`10.99s`、0 告警，含真实隔离 MuJoCo + `PerceivedSim(ColorBlobProvider)` 经 mTLS RPC 传递逐对象 `RemoteObjectEvidence` 与场景 reset 代次轮换，全程不放宽 `1.0s` 观察窗或 `1.0s` 跨机鲜度预算）。
+- **云端常驻控制台**：本批未改动线上 HTTP/WS 控制面或 schema v2，常驻控制台保持已激活的 `cb05aee`（HTTPS 8449 健康运行）。完整提交绑定证据见 [cross-host-observation-clock-20261122.json](../eval/cross-host-observation-clock-20261122.json)。
