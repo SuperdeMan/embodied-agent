@@ -5,6 +5,8 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, IPvAnyAddress, field_validator
 
+OperatorScope = Literal["reconcile_effect", "reconcile_stop"]
+
 
 class OperatorPolicy(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -12,6 +14,9 @@ class OperatorPolicy(BaseModel):
     trusted_proxy: IPvAnyAddress
     origin: str
     subjects: frozenset[str] = Field(min_length=1, max_length=32)
+    # 未显式声明时仅授权效果重查，避免旧策略升级后静默扩大权限。
+    # Default to effect review only when omitted so existing policies never silently widen scope.
+    scopes: frozenset[OperatorScope] = Field(default=frozenset({"reconcile_effect"}), min_length=1, max_length=2)
 
     @field_validator("trusted_proxy")
     @classmethod
@@ -40,13 +45,17 @@ class OperatorPolicy(BaseModel):
         return values
 
 
-class EffectAuthorizationRequest(BaseModel):
+class OperatorAuthorizationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    scope: Literal["reconcile_effect"]
+    scope: OperatorScope
     task_id: str = Field(min_length=1, max_length=160, pattern=r"^[A-Za-z0-9_.:-]+$")
     operation_id: str = Field(min_length=1, max_length=160, pattern=r"^[A-Za-z0-9_.:-]+$")
     attempt_id: str = Field(min_length=1, max_length=160)
     state_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class EffectAuthorizationRequest(OperatorAuthorizationRequest):
+    scope: Literal["reconcile_effect"]
 
 
 class OperatorConfirmation(BaseModel):

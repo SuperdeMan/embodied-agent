@@ -318,3 +318,16 @@ D029 验收补记（2026-11-04）：`a29ad0e` 已部署，787 项测试、38 项
 **决策**：原语改用已有 read_control_feedback；物体感知仍在技能阶段显式采样，闭合后的附着更新由技能在抬升前显式执行。保持全部语义有效期、求解误差、轨迹与 Guard 参数，不重试旧动作、不延长旧观察寿命。新增测试证明只取本体字段不调用视觉，并保留真实过期目标拒绝。
 
 D030/D031 验收补记（2026-11-04）：`5b080dd` 已部署。822 项完整测试、38 项 RPC、185 项参考矩阵通过；真值/color 各 30/30，ONNX 29/30。Serve 身份覆盖、只读策略挂载、一次消费审计及重启失效均经真实入口验证，原七表历史保留；只授权效果重查。be8cc7d 两次无详情失败及 e1b2706 color 29/30 保留，未宣称完全同因。证据见 `eval/operator-authorization-20261104.json` 与 `eval/cloud-operator-upgrade-20261104.json`。
+
+
+## D032 · 显式作用域隔离下的一次性受控停止授权
+
+**日期**：2026-11-22 · **状态**：实施中
+
+**问题**：D030 仅在受控 HTTP 入口开放 `reconcile_effect`，而 `OUTCOME_UNKNOWN / STOP_UNCONFIRMED` 操作在确认停止前会隔离物理资源并阻断效果重查与后续任务；现有 `reconcile_stop` 仅有未认证的 Python/本机 RPC `confirmed=True` 路径，缺少代理身份、显式作用域边界、审查快照绑定和主体审计。
+
+**决策**：在 `OperatorPolicy` 中增加可选 `scopes`（仅允许 `reconcile_effect` 与 `reconcile_stop`，默认仅 `reconcile_effect`），避免旧策略升级后静默扩权。复用 D030 的 Serve 代理身份、Origin/Host 校验、一次性内存 challenge 与 schema v2 `operation_events` 审计（无 DDL 迁移），并把 `stop_profile_digest`、`_stop_fence` 与在途停止状态纳入 `review_state` 指纹。`reconcile_stop` 在签发和消费前共享 `SkillRegistry` 停止准入检查，拒绝已停止、非未知、未跟踪或工作线程未退出的操作；允许跨重启中断任务与 Guard 已闩锁状态下的停止观测，但绝不清除 Guard 闩锁、绝不把 `OUTCOME_UNKNOWN` 改为成功、绝不授权重放或续跑。停止观测进行期间，控制台场景渲染主动返回不可用以避免争用仿真状态锁。
+
+**替代方案**：把 `reconcile_stop` 合并进泛化“恢复”作用域或默认随旧策略开放（违反最小权限与显式分权，拒绝）；在 HTTP 直接透传客户端自证的停止证据或允许顺带复位 Guard（破坏安全隔离，拒绝）；放宽 `reconcile_effect` 使其绕过停止确认或跨重启生效（拒绝）。
+
+**边界**：本批仅打通单机受控 HTTP 到现有 MuJoCo `SimStopController` 的受信停止对账；不改变本机参考 RPC 的未认证边界，不增加数据库表，不开放 Guard 复位、多 attempt、自动续跑或真机停止证明。跨主机控制身份、父进程物理控制隔离和真机停止控制器仍须独立验收。

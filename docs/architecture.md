@@ -77,6 +77,14 @@ SG-0 硬件、SG-1 固件/驱动、SG-2 确定性守护、SG-3 任务确认分�
 
 八类契约字段与接线位置以[执行计划 §3](platform-upgrade.md#3-八类契约与冻结顺序)为迁移清单。纯契约不依赖适配器、ROS、GPU；跨进程 proto 先行，未知版本不静默接受。
 
+### 5.14 D032 受控停止授权与作用域隔离
+
+`OperatorPolicy` 显式声明允许的操作作用域集合 `scopes`；未填写时默认仅为 `["reconcile_effect"]`，保证已有策略文件在应用升级后不会隐式获得物理停止对账权限。只有策略显式包含 `reconcile_stop` 时，受控 HTTP 入口才受理该作用域；未授权作用域直接返回拒绝且不写审计。
+
+`reconcile_stop` 与 `reconcile_effect` 共享同一代理身份、精确 Origin/Host 校验、30 秒一次性内存 challenge 与 `operation_events` 审计链路，不改 schema，不进入模型技能目录，不授权任务续跑、技能重试或 Guard 复位。准备与确认阶段复用 `SkillRegistry` 的停止准入校验：仅允许带有效任务计划和受跟踪工作线程的 `OUTCOME_UNKNOWN / STOP_UNCONFIRMED` 操作，且须满足无活跃调用、工作线程已退出、`StopProfile` 摘要匹配、无在途观测或冲突围栏且隔离归属一致；已完成停止或普通操作拒绝签发。
+
+与效果重查不同，停止对账允许跨重启（`context_matches=false` 且任务为 `INTERRUPTED`）以及在 Guard 已急停闩锁（`guard.halted=true`）下执行，但要求 Guard 限位绑定未篡改，且从签发到消费期间 `review_state`（含停止配置摘要、围栏、在途状态、场景代次、Guard 代次和账本写入计数）无任何变化。确认后先烧毁凭据并持久化 `operator_authorization_consumed`，再调用现有 `SimStopController` 推进仿真、连续采样并先写 `stop_observed` 再解除隔离，最后追加 `operator_authorization_finished`。原调用保持 `OUTCOME_UNKNOWN`，Guard 闩锁永不被清除。详见 [受控停止授权](stop-authorization.md)。
+
 ### 5.13 D031 本体反馈不触发语义采样
 
 关节插值、夹爪插值及夹取框架方向仅消费现有 `read_control_feedback` 的关节/夹爪/末端反馈；旧参考夹具没有该接口时保留 read 回退。不得为读取这些字段重复触发视觉渲染/检测，消耗已求解物体目标的 TTL。物体目标的初始、分段与最终观测继续显式读取感知；夹爪闭合后、抬升前显式更新附着信念，保留原生命周期行为。

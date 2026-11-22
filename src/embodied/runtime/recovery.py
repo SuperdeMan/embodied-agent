@@ -30,9 +30,15 @@ def review_state(registry, report, *, include_storage=True):
     for key, permit in registry._stop_contexts.items():
         with permit.access() as allowed:
             permits[key] = (allowed, permit.drained)
+    stop = registry._stop_controller
     state = {"ledger_boot_id": registry.ledger.boot_id, "changes": registry.ledger._db.total_changes,
              "data_version": registry.ledger._db.execute("PRAGMA data_version").fetchone()[0],
-             "context": context, "manifests": manifests, "active": sorted(registry._active), "permits": permits}
+             "context": context, "manifests": manifests, "active": sorted(registry._active), "permits": permits,
+             # 纳入停止配置、维护围栏与在途状态，防止签发后停止环境变更。
+             # Fingerprint stop profile, fence and inflight state so stop context shifts invalidate review.
+             "stop_profile_digest": None if stop is None else stop.profile.digest,
+             "stop_fence": None if controller is None else getattr(controller.sim, "_stop_fence", None),
+             "stop_inflight": bool(registry._stop_inflight is not None and not registry._stop_inflight.done())}
     if not include_storage:
         state.pop("changes")
         state.pop("data_version")

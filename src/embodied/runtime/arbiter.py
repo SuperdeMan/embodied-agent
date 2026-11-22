@@ -62,6 +62,15 @@ class ResourceArbiter:
         with self._lock:
             self._quarantined.add(lease.owner)
 
+    def is_quarantined(self, owner: str, resources: tuple[str, ...]) -> bool:
+        """Read-only check matching resolve() ownership invariants.
+
+        与 resolve() 归属不变式一致的只读隔离检查。
+        """
+        with self._lock:
+            actual = {name for name, lease in self._owners.items() if lease.owner == owner}
+            return owner in self._quarantined and actual == set(resources)
+
     def resolve(self, owner: str, resources: tuple[str, ...], persist):
         """Commit proof before clearing exactly this owner's quarantine.
 

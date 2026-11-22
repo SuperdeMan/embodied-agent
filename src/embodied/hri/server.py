@@ -46,10 +46,12 @@ from urllib.parse import urlsplit
 from aiohttp import WSMsgType, web
 
 from embodied.contracts.effect import EffectRejected
-from embodied.contracts.operator import EffectAuthorizationRequest, OperatorConfirmation, OperatorPolicy
+from embodied.contracts.operator import OperatorAuthorizationRequest, OperatorConfirmation, OperatorPolicy
+from embodied.contracts.stopping import StopRejected
+from embodied.runtime.arbiter import ResourceBusy
 from embodied.runtime.invocation import OBSERVATION_ONLY
 from embodied.runtime.observation import OBSERVATION_TIMEOUT_S, ObservationUnavailable
-from embodied.runtime.operator import OperatorAuthority, OperatorDenied
+from embodied.runtime.operator import OperatorAuthority, OperatorDenied, OperatorForbidden
 
 logger = logging.getLogger("hri.server")
 
@@ -277,6 +279,8 @@ class AppContext:
             raise ObservationUnavailable("render_worker_busy")
         if getattr(self.registry, "observation_pending", False):
             raise ObservationUnavailable("observation_worker_busy")
+        if getattr(self.registry, "stop_pending", False):
+            raise ObservationUnavailable("stop_reconciliation_in_progress")
         future = asyncio.get_running_loop().run_in_executor(self._render_thread, Context().run, self._render_jpeg)
         self._frame_future = future
         future.add_done_callback(lambda f: None if f.cancelled() else f.exception())
@@ -417,17 +421,19 @@ async def operator_handler(request: web.Request) -> web.Response:
     if request.method == "GET":
         return web.json_response({"authenticated": True, "subject_hash": principal.subject_hash,
             "issuer": principal.issuer, "policy_digest": principal.policy_digest,
-            "scopes": ["reconcile_effect"], "task_execution_authorized": False}, headers=headers)
+            "scopes": list(principal.scopes), "task_execution_authorized": False}, headers=headers)
     try:
         raw = await request.read()
         if len(raw) > 4096 or request.content_type != "application/json":
             raise ValueError("operator_request_too_large")
         if request.path.endswith("/authorizations"):
-            result = await ctx.operator.issue(principal, EffectAuthorizationRequest.model_validate_json(raw))
+            result = await ctx.operator.issue(principal, OperatorAuthorizationRequest.model_validate_json(raw))
         else:
             result = await ctx.operator.consume(principal, OperatorConfirmation.model_validate_json(raw))
         return web.json_response(result, headers=headers)
-    except (OperatorDenied, EffectRejected) as exc:
+    except OperatorForbidden as exc:
+        return web.json_response({"error": str(exc), "task_execution_authorized": False}, status=403, headers=headers)
+    except (OperatorDenied, EffectRejected, StopRejected, ResourceBusy) as exc:
         return web.json_response({"error": str(exc), "task_execution_authorized": False}, status=409, headers=headers)
     except (ValueError, TypeError):
         return web.json_response({"error": "invalid_operator_request"}, status=400, headers=headers)

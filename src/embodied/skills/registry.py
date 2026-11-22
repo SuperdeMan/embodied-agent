@@ -139,6 +139,14 @@ class SkillRegistry:
     def observation_pending(self) -> bool:
         return bool(self._preview_admissions) or self._observations.busy or any(barrier() for barrier in self._read_barriers)
 
+    @property
+    def stop_pending(self) -> bool:
+        """True while stop reconciliation holds the lock or observes motion.
+
+        停止对账持锁或正在观测运动期间返回 True。
+        """
+        return bool(self._stop_inflight is not None and not self._stop_inflight.done()) or self._stop_lock.locked()
+
     def add_read_barrier(self, barrier: Callable[[], bool]) -> None:
         self.check_thread()
         self._read_barriers.append(barrier)
@@ -661,42 +669,69 @@ class SkillRegistry:
         self.ledger.close()
         self._closed = True
 
-    async def reconcile_stop(self, operation_id: str, attempt_id: str, *, confirmed: bool = False) -> OperationRecord:
+    def _validate_stop_reconciliation(
+        self, operation_id: str, attempt_id: str, *, allow_already_observed: bool = True, check_lock: bool = False,
+    ):
+        """Read-only admission check shared by stop reconciliation and operator authorization.
+
+        停止对账与操作者授权共用的只读准入检查。
+        """
+        self.check_thread()
+        if self.observation_pending:
+            raise StopRejected("observation_worker_still_running")
+        if check_lock and self._stop_lock.locked():
+            raise StopRejected("stop_observer_still_running")
+        record = self.ledger.get(operation_id)
+        if record is None or record.attempt_id != attempt_id:
+            raise StopRejected("stop_attempt_mismatch")
+        if record.state != "OUTCOME_UNKNOWN":
+            raise StopRejected("operation_not_unknown")
+        if record.stop_state == "MOTION_STOPPED_OBSERVED":
+            if allow_already_observed:
+                return record, None, None
+            raise StopRejected("stop_already_observed")
+        if record.robot_id != self.robot_id:
+            raise StopRejected("stop_robot_mismatch")
+        if operation_id in self._active:
+            raise StopRejected("invocation_still_active")
+        permit = self._stop_contexts.get(operation_id)
+        if record.boot_id == self.ledger.boot_id and permit is None:
+            raise StopRejected("stop_worker_identity_unavailable")
+        if permit is not None and not permit.drained:
+            raise StopRejected("worker_still_running")
+        if record.stop_context.get("tracked_workers") is not True:
+            raise StopRejected("stop_tracking_unavailable")
+        controller = self._stop_controller
+        if controller is None:
+            raise StopRejected("stop_controller_unavailable")
+        try:
+            profile = StopProfile.model_validate_json(json.dumps(record.stop_context["stop_profile"]))
+        except (ValueError, TypeError, KeyError):
+            raise StopRejected("stop_profile_unavailable") from None
+        if profile.digest != controller.profile.digest:
+            raise StopRejected("stop_profile_changed")
+        if self._stop_inflight is not None and not self._stop_inflight.done():
+            raise StopRejected("stop_observer_still_running")
+        if getattr(controller.sim, "_stop_fence", None) and getattr(controller, "_owner", None) != operation_id:
+            raise StopRejected("other_stop_reconciliation_pending")
+        if not self.arbiter.is_quarantined(operation_id, record.resources):
+            raise StopRejected("quarantine_owner_mismatch")
+        return record, controller, profile
+
+    async def reconcile_stop(
+        self, operation_id: str, attempt_id: str, *, confirmed: bool = False, allow_already_observed: bool = True,
+    ) -> OperationRecord:
         self.check_thread()
         if confirmed is not True:
             raise ConfirmationRequired("maintenance.reconcile_stop")
         if self.observation_pending:
             raise StopRejected("observation_worker_still_running")
         async with self._stop_lock:
-            record = self.ledger.get(operation_id)
-            if record is None or record.attempt_id != attempt_id:
-                raise StopRejected("stop_attempt_mismatch")
-            if record.state != "OUTCOME_UNKNOWN":
-                raise StopRejected("operation_not_unknown")
-            if record.stop_state == "MOTION_STOPPED_OBSERVED":
-                return record
-            if record.robot_id != self.robot_id:
-                raise StopRejected("stop_robot_mismatch")
-            if operation_id in self._active:
-                raise StopRejected("invocation_still_active")
-            permit = self._stop_contexts.get(operation_id)
-            if record.boot_id == self.ledger.boot_id and permit is None:
-                raise StopRejected("stop_worker_identity_unavailable")
-            if permit is not None and not permit.drained:
-                raise StopRejected("worker_still_running")
-            if record.stop_context.get("tracked_workers") is not True:
-                raise StopRejected("stop_tracking_unavailable")
-            controller = self._stop_controller
+            record, controller, profile = self._validate_stop_reconciliation(
+                operation_id, attempt_id, allow_already_observed=allow_already_observed,
+            )
             if controller is None:
-                raise StopRejected("stop_controller_unavailable")
-            try:
-                profile = StopProfile.model_validate_json(json.dumps(record.stop_context["stop_profile"]))
-            except (ValueError, TypeError, KeyError):
-                raise StopRejected("stop_profile_unavailable") from None
-            if profile.digest != controller.profile.digest:
-                raise StopRejected("stop_profile_changed")
-            if self._stop_inflight is not None and not self._stop_inflight.done():
-                raise StopRejected("stop_observer_still_running")
+                return record
             request = StopRequest(
                 operation_id=operation_id, attempt_id=attempt_id, attempt_boot_id=record.boot_id,
                 observer_boot_id=self.ledger.boot_id, robot_id=self.robot_id, lease_epoch=record.lease_epoch,

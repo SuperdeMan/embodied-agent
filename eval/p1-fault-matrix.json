@@ -41,7 +41,14 @@
         "tests/runtime/test_operator_policy.py",
         "tests/hri/test_operator_authorization.py"
       ],
-      "scope": "Exact proxy and subject policy, one-use effect-only authority, audit failure/expiry/replay refusal; no task execution authority"
+      "scope": "Exact proxy, subject and default scope policy, one-use effect-only authority, audit failure/expiry/replay refusal; no task execution authority"
+    },
+    {
+      "id": "stop_authorization",
+      "tests": [
+        "tests/hri/test_stop_authorization.py"
+      ],
+      "scope": "Explicit stop scope isolation, one-use audited simulation stop reconciliation, cross-restart and latched-Guard boundaries; no Guard reset or task execution authority"
     },
     {
       "id": "incompatible_ledger",
