@@ -1,0 +1,256 @@
+{
+  "schema": "embodied.object-deadline-qualification/v1",
+  "date": "2026-11-29",
+  "issue": {
+    "source_commit": "1eb0dfc7ab257f8c8e53b95a7bd1fa36a13ea929",
+    "failed_ci": "https://github.com/SuperdeMan/embodied-agent/actions/runs/46176805533",
+    "job_id": 141077243499,
+    "case": "tests/cognition/test_object_freshness.py::test_missed_detection_expires_without_read_refresh[wall]",
+    "captured": 31.789207533,
+    "ttl_s": 2.0,
+    "representable_deadline": 33.789207532999995,
+    "subtracted_age_s": 1.9999999999999964,
+    "local_reproduction": "Three deterministic regression cases added to the old runtime before implementation, all three failed."
+  },
+  "change": "Require capture <= now < capture+ttl for local object evidence and the RPC publisher. The receiver also rejects an object at its known simulation or synchronized Unix deadline before applying the existing RTT, skew and drift checks.",
+  "windows": {
+    "source_commit": "11e4009ecf4145333839d97ba19e30f3804d80ee",
+    "ruff": "passed",
+    "local_pre_fix_repro": {
+      "tests": 3,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 3,
+      "junit_sha256": "6ed3470cfad8fbc0e0cb69644292e58a5678204f908ec8014e1a4823767f1bb3"
+    },
+    "focused_after_fix": {
+      "tests": 50,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0,
+      "junit_sha256": "378a21f3aadfa5acc30d4287fbd54922af8e7393487f6ea00797664039604171"
+    },
+    "runs": {
+      "scripted-truth": {
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "perception": "off",
+        "pick_sha256": null,
+        "place_sha256": null,
+        "wins": 30,
+        "total": 30,
+        "failures": [],
+        "report_path": "outputs/observation-deadline-20261129/scripted-truth/tabletop_pick_place@v1-20261128-184632-84c4e675a80443e7984641d587f3b37c.json",
+        "report_sha256": "eb9312c64ea65a28f66df32654982aeaa89f51e6407bd53d6c4da3ac0f900175"
+      },
+      "scripted-color": {
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "perception": "color",
+        "pick_sha256": null,
+        "place_sha256": null,
+        "wins": 30,
+        "total": 30,
+        "failures": [],
+        "report_path": "outputs/observation-deadline-20261129/scripted-color/tabletop_pick_place@v1-20261128-184754-b0401bbe563241389ce5ad772f55b44a.json",
+        "report_sha256": "b88407ac3c0b1a8acd289e3026b51e1c31c184ebd63073f380d2d8ce57b03cc8"
+      },
+      "learned-truth": {
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "perception": "off",
+        "pick_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "wins": 30,
+        "total": 30,
+        "failures": [],
+        "report_path": "outputs/observation-deadline-20261129/learned-truth/tabletop_pick_place@v1-20261128-184833-09f904ec22d340e2ba4ca42ae30a5f23.json",
+        "report_sha256": "661b879e799fecf23f641575763a65716f7887c449a6837d050d00075b914908"
+      },
+      "learned-color": {
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "perception": "color",
+        "pick_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "wins": 30,
+        "total": 30,
+        "failures": [],
+        "report_path": "outputs/observation-deadline-20261129/learned-color/tabletop_pick_place@v1-20261128-185208-786d48c4b657451e9c999495533ca743.json",
+        "report_sha256": "786013de1dfb149f8b701691b24987107150054c942e1af812f8aeea68dd5700"
+      }
+    },
+    "full": {
+      "tests": 976,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0,
+      "junit_sha256": "9f477adbe3d791fa216133d5f26dbafcea784518b3b0595bf1db8aa0d1717894"
+    },
+    "rpc": {
+      "tests": 50,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 0,
+      "junit_sha256": "f6b389891ab8565d2aefc8a25b50a04f17962cc9856403d6ceb556bcec471206"
+    },
+    "reference_fault_matrix": {
+      "groups": 16,
+      "total": 319,
+      "passed": 319,
+      "skipped": 0,
+      "p1_complete": false,
+      "open_field_gates": 7,
+      "junit_sha256": "f9b2d655a60822b40c82341c81ed32613656aad96ff17db9af97a2e0af8313fe",
+      "details_sha256": "55fcc7be3cab02e81de95faed40a36eaedd96d4dc3ea8b9f00ddaf5aa4726d6c"
+    },
+    "clean_start_and_finish": true
+  },
+  "linux_isolated_candidate": {
+    "commit": "11e4009ecf4145333839d97ba19e30f3804d80ee",
+    "image_id": "sha256:bb788b1297e6ec77b91904ea6e4f1c98c079d9bf1fa647c81683ca14485fd702",
+    "parent_dependency_image": "sha256:8b6f22f1d3ca20b255e6a5a449b02c144bfc9befde70efd0279a018e8fbe1bf9",
+    "bundle_sha256": "299187a07ae7c12e2a8100f1928385cc1bdf19f82f46b8ea22a2aafb6d62edd8",
+    "verified_files": 353,
+    "lock_sha256": "abccd2e176793fe9b6d72c699824dd075bbdf77675f90a08a6ee05ef5158530b",
+    "profile": {
+      "cpu": 1,
+      "memory_mib": 1536,
+      "pid_limit": 128,
+      "network": "none"
+    },
+    "tested": [
+      "tests/cognition/test_object_freshness.py",
+      "tests/runtime/test_cross_host_observation_clock.py",
+      "tests/rpc/test_cross_host_vision_rpc.py"
+    ],
+    "test_returncode": 1,
+    "suite": {
+      "tests": 50,
+      "skipped": 0,
+      "errors": 0,
+      "failures": 1
+    },
+    "junit_sha256": "b4dbaa7e5530fc25d3d19456048324dfbb024c01ed8d1c7e893a559ca18b86cb",
+    "scripted_reference": {
+      "returncode": 0,
+      "commit": "11e4009",
+      "schema": "eval.result/v1",
+      "complete": true,
+      "planned_total": 30,
+      "wins": 30,
+      "total": 30,
+      "sha256": "2591f24641f47d066352623a557702791c06095995041d89dae6c20efaaf1ba0"
+    },
+    "failed_cases": [
+      "tests.rpc.test_cross_host_vision_rpc.test_mtls_rpc_isolated_sim_and_color_perception_world_state"
+    ],
+    "vision_followup": {
+      "same_image_id": "sha256:bb788b1297e6ec77b91904ea6e4f1c98c079d9bf1fa647c81683ca14485fd702",
+      "same_resources_and_budgets": true,
+      "initial_failure": "first perceived.read() at 320x240 returned no obj_cube before RPC server setup",
+      "fresh_read_probe": {
+        "error": "       ^^^^^^^^^^^^^^\n  File \"/app/src/embodied/runtime/compute.py\", line 218, in start\n    return self._start()\n           ^^^^^^^^^^^^^\n  File \"/app/src/embodied/runtime/compute.py\", line 201, in _start\n    raise ComputeUnavailable(\"compute_requires_explicit_restart\")\nembodied.runtime.compute.ComputeUnavailable: compute_requires_explicit_restart\n"
+      },
+      "fresh_process_same_single_test": {
+        "returncode": 1,
+        "tests": 1,
+        "failures": 1,
+        "skips": 0,
+        "junit_sha256": "26725842723a475922b1a7884235a93aa5c45f0a491b8979185c94e8a878504a"
+      },
+      "first_read_detail": {
+        "reads": [
+          {
+            "s": 2.0604,
+            "visible": [],
+            "evidence": [],
+            "error": "ComputeUnavailable",
+            "stages": [
+              {
+                "op": "_render_rgbd",
+                "s": 2.0529,
+                "error": "ComputeUnavailable",
+                "detail": "compute_timeout"
+              },
+              {
+                "op": "_render_rgbd",
+                "s": 0.0002,
+                "error": "ComputeUnavailable",
+                "detail": "compute_requires_explicit_restart"
+              }
+            ]
+          }
+        ],
+        "all_stages": [
+          {
+            "op": "_render_rgbd",
+            "s": 2.0529,
+            "error": "ComputeUnavailable",
+            "detail": "compute_timeout"
+          },
+          {
+            "op": "_render_rgbd",
+            "s": 0.0002,
+            "error": "ComputeUnavailable",
+            "detail": "compute_requires_explicit_restart"
+          }
+        ],
+        "terminal": {
+          "type": "ComputeUnavailable",
+          "detail": "compute_requires_explicit_restart"
+        }
+      }
+    },
+    "render_options": {
+      "shared_context_experiment": {
+        "experimental_overlay_sha256": "d597ada1f14e9b580f694337806948ca1cf68f27cc580ea8ada60e3966e1eeba",
+        "returncode": 1,
+        "cases": [
+          {
+            "name": "test_mtls_rpc_isolated_sim_and_color_perception_world_state",
+            "ok": false,
+            "detail": "AssertionError: assert 'obj_cube@' in 'World state unavailable or stale; do not assume physical effects.'"
+          },
+          {
+            "name": "test_render_copy_matches_reference_and_preserves_live_state",
+            "ok": false,
+            "detail": "AssertionError: Failed to create //.cache for shader cache (Read-only file system)---disabling.\n  Failed to create //.cache for shader cache (Read-only file system)---disabling.\n  "
+          }
+        ],
+        "depth_parity_observation": "Isolated renderer depth array differed from same-scene native reference in exact-equality test.",
+        "not_promoted": true
+      },
+      "writable_shader_cache_experiment": {
+        "image": "sha256:bb788b1297e6ec77b91904ea6e4f1c98c079d9bf1fa647c81683ca14485fd702",
+        "environment_change": {
+          "XDG_CACHE_HOME": "/tmp/embodied-cache"
+        },
+        "returncode": 1,
+        "raw_sha256": "f0b07a1303507acfff2284a39354b360d67eeb328b2dae669a32db554ddbe952",
+        "cases": [
+          {
+            "name": "test_mtls_rpc_isolated_sim_and_color_perception_world_state",
+            "ok": false,
+            "detail": "assert None is not None"
+          },
+          {
+            "name": "test_render_copy_matches_reference_and_preserves_live_state",
+            "ok": true,
+            "detail": ""
+          }
+        ]
+      }
+    }
+  },
+  "push_ci": {
+    "name": "ci",
+    "id": 46177312184,
+    "status": "completed",
+    "conclusion": "success",
+    "head_sha": "11e4009ecf4145333839d97ba19e30f3804d80ee",
+    "html_url": "https://github.com/SuperdeMan/embodied-agent/actions/runs/46177312184"
+  },
+  "permanent_simulator_commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+  "hardware_verified": false
+}

@@ -96,3 +96,8 @@
 | 2026-11-29 | a8eee34 | tabletop_pick_place@v1 | 30/30 | PASS | D048 单命令，Windows 隔离仿真，仿真真值，双学习。[配对与来源](learned-pick-recipe-20261129.json)。 |
 | 2026-11-29 | a8eee34 | tabletop_pick_place@v1 | 30/30 | PASS | D048 单命令，Windows 隔离仿真，ColorBlob 相机，脚本。[配对与来源](learned-pick-recipe-20261129.json)。 |
 | 2026-11-29 | a8eee34 | tabletop_pick_place@v1 | 30/30 | PASS | D048 单命令，Windows 隔离仿真，ColorBlob 相机，双学习。[配对与来源](learned-pick-recipe-20261129.json)。 |
+| 2026-11-29 | 11e4009 | tabletop_pick_place@v1 | 30/30 | PASS | D049，Windows 脚本真值。[对象截止点回归](object-deadline-20261129.json)。 |
+| 2026-11-29 | 11e4009 | tabletop_pick_place@v1 | 30/30 | PASS | D049，Windows 脚本 ColorBlob。[对象截止点回归](object-deadline-20261129.json)。 |
+| 2026-11-29 | 11e4009 | tabletop_pick_place@v1 | 30/30 | PASS | D049，Windows 双学习真值。[对象截止点回归](object-deadline-20261129.json)。 |
+| 2026-11-29 | 11e4009 | tabletop_pick_place@v1 | 30/30 | PASS | D049，Windows 双学习 ColorBlob。[对象截止点回归](object-deadline-20261129.json)。 |
+| 2026-11-29 | 11e4009 | tabletop_pick_place@v1 | 30/30 | PASS | D049，Linux 单核隔离候选，脚本真值。[容器回执](object-deadline-20261129.json)。 |
