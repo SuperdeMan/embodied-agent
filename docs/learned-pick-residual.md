@@ -18,9 +18,20 @@ Windows 脚本在原任务真值和相机配置均为 30/30。旧 `pick-v1` 配�
 
 Linux 使用同一镜像、ONNX Runtime CPU、OSMesa、1536 MiB、128 PID。单核和双核的脚本相机对照也未完成。单核的 5 次静态场景观察均找到方块，RGB-D 渲染及进程间往返耗时 0.424–0.755 秒，ColorBlob 检测往返 0.102–0.203 秒。完整任务仍会遇到观察超时或重置时控制器未空闲。中断报告保留已评分局次，整组成功率为空。
 
+## 从示教数据一条命令完成仿真验收
+
+以下入口从本地 LeRobot 抓取数据重新拟合、导出权重，并在隔离仿真中分别部署脚本和学习抓放。仓库根目录运行，基础权重放在 `outputs/policies/`。每个命令取一种观察配置。
+
+```sh
+uv run --group sim --group learn --group policy python scripts/qualify_pick.py --dataset outputs/act-study-20261128/learn-uniform-pick-n200 --perception truth
+uv run --group sim --group learn --group policy python scripts/qualify_pick.py --dataset outputs/act-study-20261128/learn-uniform-pick-n200 --perception color
+```
+
+`a8eee34` 的两个命令均重建了下表的原权重摘要。每次各自运行脚本 30 局和学习抓放 30 局，四组都为 30/30。`outputs/pick-qualification/<运行 ID>/qualification.json` 保存产物、任务、观察配置、得分和原始报告摘要。退出码 0 表示两组均达到固定原基线。[单命令验收回执](../eval/learned-pick-recipe-20261129.json)。
+
 ## 数据、模型与复现
 
-新增 200 条均匀专家示教，采集种子 94173，200/200 成功。抓取分段含 55,800 帧，50 Hz。真值版每 10 帧取样，从相近的 8 个示教状态估计冻结 ACT 的动作误差。感知版额外用独立种子 81471 的 64 组观测标定桌面附近的输入，位置误差中位数 0.895 mm。两份 ONNX 均可重复生成相同字节。
+新增 200 条均匀专家示教，采集种子 94173，200/200 成功。抓取分段含 55,800 帧，50 Hz。真值版每 10 帧取样，从相近的 8 个示教状态估计冻结 ACT 的动作误差。感知版额外用独立种子 81471 的 64 组观测标定桌面附近的输入，位置误差中位数 0.895 mm。在归档的同一份抓取数据上，两份 ONNX 均可重复生成相同字节。该 Parquet 文件的 SHA-256 为 `5b0f75e7bce4dfd3f20f18eab02d981a4efb7b5e1863f17bacc187e74647c0dd`。
 
 | 用途 | 文件名或 SHA-256 |
 |---|---|

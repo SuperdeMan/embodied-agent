@@ -1,0 +1,167 @@
+{
+  "schema": "embodied.pick-recipe-acceptance/v1",
+  "date": "2026-11-29",
+  "scope": "Windows, local demonstration fitting and paired MuJoCo real-stack simulation using the normal CLI",
+  "qualification": {
+    "source_commit": "a8eee3428c6b9fbcf81e42ec9a55fbc0b94816b5",
+    "ruff": "passed",
+    "full_suite": {
+      "tests": 972,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "full_junit_sha256": "5527bac650ca95a94d562935801e838ee5d119d09f174e4583ba68f6397e59a3",
+    "cases": {
+      "truth": {
+        "command": [
+          "uv",
+          "run",
+          "--group",
+          "sim",
+          "--group",
+          "learn",
+          "--group",
+          "policy",
+          "python",
+          "scripts/qualify_pick.py",
+          "--dataset",
+          "outputs/act-study-20261128/learn-uniform-pick-n200",
+          "--perception",
+          "truth"
+        ],
+        "receipt": "outputs/pick-qualification/9494e09eb8f6448baa1add7852b7b873/qualification.json",
+        "receipt_sha256": "1240317f28c5d342345373e5d1d8155cffb76abe7defe6e8cc28d3c90d424f11",
+        "qualified": true,
+        "scripted": {
+          "report": "outputs/pick-qualification/9494e09eb8f6448baa1add7852b7b873/scripted/tabletop_pick_place@v1-20261128-182909-230523803a28454ba427c23da0f09cd6.json",
+          "report_sha256": "2b2e0fdfcee5da4cd8c095d1ea86da55e93d69154c115dc869c03e0a2d874398",
+          "commit": "a8eee34",
+          "task": "tabletop_pick_place@v1",
+          "schema": "eval.result/v1",
+          "complete": true,
+          "planned_total": 30,
+          "total": 30,
+          "wins": 30,
+          "exit_code": 0
+        },
+        "learned": {
+          "report": "outputs/pick-qualification/9494e09eb8f6448baa1add7852b7b873/learned/tabletop_pick_place@v1-20261128-182949-41900752cf1b41de8ed4215566b87f63.json",
+          "report_sha256": "f15501253ca9b2bd1cbc46b3c026cce60249253fb1291056220da9e48a2f2892",
+          "commit": "a8eee34",
+          "task": "tabletop_pick_place@v1",
+          "schema": "eval.result/v1",
+          "complete": true,
+          "planned_total": 30,
+          "total": 30,
+          "wins": 30,
+          "exit_code": 0
+        },
+        "pick_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "task_lf_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "calibration_sha256": null,
+        "data_files_sha256": {
+          "data/chunk-000/file-000.parquet": "5b0f75e7bce4dfd3f20f18eab02d981a4efb7b5e1863f17bacc187e74647c0dd"
+        }
+      },
+      "color": {
+        "command": [
+          "uv",
+          "run",
+          "--group",
+          "sim",
+          "--group",
+          "learn",
+          "--group",
+          "policy",
+          "python",
+          "scripts/qualify_pick.py",
+          "--dataset",
+          "outputs/act-study-20261128/learn-uniform-pick-n200",
+          "--perception",
+          "color"
+        ],
+        "receipt": "outputs/pick-qualification/a20ba95f7e174f04969b028be41a7441/qualification.json",
+        "receipt_sha256": "eecc7f837d9120da2fe11bff44a6393f6b4781011c1bb2b8599366ab7aa461bc",
+        "qualified": true,
+        "scripted": {
+          "report": "outputs/pick-qualification/a20ba95f7e174f04969b028be41a7441/scripted/tabletop_pick_place@v1-20261128-183220-6dfdd9f410d3436ba3488c52246223be.json",
+          "report_sha256": "3172ae95f54cc4f469686bac3a12f3714cfb2cfcb62acdbaab2534cb92e85e27",
+          "commit": "a8eee34",
+          "task": "tabletop_pick_place@v1",
+          "schema": "eval.result/v1",
+          "complete": true,
+          "planned_total": 30,
+          "total": 30,
+          "wins": 30,
+          "exit_code": 0
+        },
+        "learned": {
+          "report": "outputs/pick-qualification/a20ba95f7e174f04969b028be41a7441/learned/tabletop_pick_place@v1-20261128-183552-f15a8b6d307e4f55938499c2a1f21acb.json",
+          "report_sha256": "4056933de232b383d684232e3a13b16ef33de53bab68950a51a53d11a807e1ba",
+          "commit": "a8eee34",
+          "task": "tabletop_pick_place@v1",
+          "schema": "eval.result/v1",
+          "complete": true,
+          "planned_total": 30,
+          "total": 30,
+          "wins": 30,
+          "exit_code": 0
+        },
+        "pick_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "task_lf_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "calibration_sha256": "e6e00768df2999dbfe01b718084b47e02bc746ee3140778058340e7a9fa65a0b",
+        "data_files_sha256": {
+          "data/chunk-000/file-000.parquet": "5b0f75e7bce4dfd3f20f18eab02d981a4efb7b5e1863f17bacc187e74647c0dd"
+        }
+      }
+    },
+    "clean_start_and_finish": true
+  },
+  "ci": {
+    "name": "ci",
+    "id": 46176135971,
+    "head_sha": "a8eee3428c6b9fbcf81e42ec9a55fbc0b94816b5",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/SuperdeMan/embodied-agent/actions/runs/46176135971"
+  },
+  "last_checked_permanent_service": {
+    "release": {
+      "commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+      "activation_id": "d043-20261128T170754Z",
+      "image_id": "sha256:1fef0bd36f183cdf5c7d9bdd11ef707b0cc7817f5203d449e2e0090d018f41a8"
+    },
+    "console": [
+      {
+        "name": "embodied-agent-cloud-console-1",
+        "health": "healthy",
+        "image_id": "sha256:1fef0bd36f183cdf5c7d9bdd11ef707b0cc7817f5203d449e2e0090d018f41a8",
+        "repo_sha": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a"
+      }
+    ],
+    "eval_jobs": []
+  },
+  "hardware_verified": false,
+  "scheduled_reference": {
+    "id": 46096311039,
+    "url": "https://github.com/SuperdeMan/embodied-agent/actions/runs/46096311039",
+    "event": "schedule",
+    "run_started_at": "2026-11-28T02:05:11Z",
+    "source_commit": "4e5b17d1b53ed4971762c8a580afef3fc99e5069",
+    "job_id": 140828328043,
+    "versioned_scripted_truth": {
+      "wins": 30,
+      "total": 30,
+      "log_result": "30/30 (100%) -> PASS"
+    },
+    "upload_step": "success",
+    "artifact_id": 15242643573,
+    "artifact_bytes": 1184,
+    "artifact_sha256": "b32fa8b3a89ab8e811ad2aa70737bbf94b16f846d4fd06ee837ed78962591552"
+  }
+}

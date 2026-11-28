@@ -6,7 +6,7 @@
 
 **当前进度（2026-11-29）**。P1 仿真与跨主机单步恢复已验收。Windows 上 M2 双学习抓放在原任务的真值与 ColorBlob 两种配置各 30/30，Linux 单核的真值原任务和保留集各 30/30。Linux 相机闭环和 P2 现场设备仍待验收。证据见 `docs/learned-pick-residual.md`。优先级见 `docs/roadmap.md`，各批次退出条件见 `docs/platform-upgrade.md`。脚本、感知、策略与部署证据按提交和运行配置分别记录。
 
-本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。本轮 commit/push、D018 新 SQLite 五表、D027 两表追加及 v2 云端迁移部署、nightly 注释补齐已获用户明确授权；后续不同范围的敏感变更仍按红线确认。
+本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。D018、D027 和 D041 的账本变更及常驻迁移已有各批次授权和回执。后续敏感改动按当前范围确认。
 
 云端私网仿真控制台已激活 `723cc80`（2026-11-29），HTTPS 8449、隔离物理控制、离线规划、模拟音频。`463199e` 完成 v3 迁移，`77b754d` 验收了空闲连接单次发送文本，`723cc80` 为缺帧保留最近收到的画面并标记时间。最新只读验收前后八表 SHA-256 完全一致，23 个任务、42 个操作和 42 次尝试。常驻操作者仅有 `reconcile_effect` 与 `reconcile_stop` 权限，`retry_step` 在独立授权的跨主机 mTLS 仿真链路验收。入口与证据见 `docs/cloud-deployment.md` 及 `docs/roadmap.md`。
 

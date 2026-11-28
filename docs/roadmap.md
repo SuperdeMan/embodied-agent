@@ -30,7 +30,7 @@ D026 已验收[纯计算进程隔离](isolated-compute.md)，应用 `505b60e` �
 
 ## 2026-11-29 待办顺序
 
-已完成发行预检、失败索引、交互录制回放、v3 常驻库迁移、受控单步恢复、浏览器空闲文本抓放与预览恢复。[预检](../eval/release-preflight-20261128.json) · [恢复](controlled-recovery-v3.md) · [控制台](cloud-deployment.md)。`8618b8a` 本机完整 967 项、RPC 50 项、16 组参考故障 315 项通过。新学习抓放在 Windows 原任务真值与 ColorBlob 各 30/30，Linux 单核真值原任务与保留集各 30/30。[模型与失败局次](learned-pick-residual.md)。
+已完成发行预检、失败索引、交互录制回放、v3 常驻库迁移、受控单步恢复、浏览器空闲文本抓放与预览恢复。[预检](../eval/release-preflight-20261128.json) · [恢复](controlled-recovery-v3.md) · [控制台](cloud-deployment.md)。`8618b8a` 本机完整 967 项、RPC 50 项、16 组参考故障 315 项通过。新学习抓放在 Windows 原任务真值与 ColorBlob 各 30/30，Linux 单核真值原任务与保留集各 30/30。[模型与失败局次](learned-pick-residual.md)。`a8eee34` 将拟合、评测与模型仿真部署串为单命令，两种输入的脚本与学习对照均跑完 30/30。最近核查的定时任务在旧提交 `4e5b17d` 跑完脚本真值 30/30 并上传了报告。[单命令与 nightly 回执](../eval/learned-pick-recipe-20261129.json)。
 
 | 优先级 | 接下来处理 | 验收依据 |
 |---|---|---|

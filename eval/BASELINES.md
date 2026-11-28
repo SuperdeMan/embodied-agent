@@ -92,3 +92,7 @@
 | 2026-11-29 | 8618b8a | tabletop_pick_place_reserve_31_37_41@v1 | 中断，已评 2/30，成功 0 | INCOMPLETE | Linux 1 CPU，双学习，输入 color，计划 30 局。[原始配置](learned-pick-residual-20261129.json)。 |
 | 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 中断，已评 1/30，成功 1 | INCOMPLETE | Linux 2 CPU，双学习，输入 color，计划 30 局。[原始配置](learned-pick-residual-20261129.json)。 |
 | 2026-11-29 | 8618b8a | tabletop_pick_place_reserve_31_37_41@v1 | 0/30 | FAIL | Linux 2 CPU，双学习，输入 color，计划 30 局。[原始配置](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | a8eee34 | tabletop_pick_place@v1 | 30/30 | PASS | D048 单命令，Windows 隔离仿真，仿真真值，脚本。[配对与来源](learned-pick-recipe-20261129.json)。 |
+| 2026-11-29 | a8eee34 | tabletop_pick_place@v1 | 30/30 | PASS | D048 单命令，Windows 隔离仿真，仿真真值，双学习。[配对与来源](learned-pick-recipe-20261129.json)。 |
+| 2026-11-29 | a8eee34 | tabletop_pick_place@v1 | 30/30 | PASS | D048 单命令，Windows 隔离仿真，ColorBlob 相机，脚本。[配对与来源](learned-pick-recipe-20261129.json)。 |
+| 2026-11-29 | a8eee34 | tabletop_pick_place@v1 | 30/30 | PASS | D048 单命令，Windows 隔离仿真，ColorBlob 相机，双学习。[配对与来源](learned-pick-recipe-20261129.json)。 |
