@@ -174,19 +174,10 @@ def build_servicer(state: ControlState):
                     remote_evidence = {}
                     for name, pose in obs.objects.items():
                         ev = obs.object_evidence.get(name)
-                        if ev is None or ev.scene_epoch != ctx.scene_epoch or ev.calibration_id != ctx.calibration_id:
+                        if ev is None or not ev.current(ctx, obs.t, now_mono):
                             continue
                         age_sim_s = obs.t - ev.captured_sim_t
                         age_wall_s = now_mono - ev.captured_monotonic
-                        if (
-                            not math.isfinite(age_sim_s)
-                            or not math.isfinite(age_wall_s)
-                            or age_sim_s < 0.0
-                            or age_wall_s < 0.0
-                            or age_sim_s >= ev.ttl_sim_s
-                            or age_wall_s >= ev.ttl_wall_s
-                        ):
-                            continue
                         captured_unix_s = (
                             ref_unix - age_wall_s
                             if clock.clock_domain in ("wall_ntp", "wall_ptp") and ref_unix is not None and ref_unix - age_wall_s > 0.0

@@ -1,5 +1,6 @@
 """Object lifetime faults without a renderer. 不依赖渲染器的对象时效故障测试。"""
 
+import math
 import time
 from dataclasses import replace
 from types import SimpleNamespace
@@ -112,6 +113,22 @@ def test_kinematic_estimate_keeps_original_detection_deadline(scene):
     body.t = 2.0
     assert "cube" not in wrapped.read().objects
     assert wrapped._attached is None
+
+
+@pytest.mark.parametrize("clock_kind", ["simulation", "wall"])
+def test_last_float_before_object_deadline_is_current_but_deadline_is_expired(scene, clock_kind):
+    body, pipeline, wrapped, clock = scene
+    captured = 31.789207533
+    clock[0] = body.t = captured
+    assert "cube" in wrapped.read().objects
+    pipeline.visible = False
+    deadline = captured + 2.0
+    for at, expected in ((math.nextafter(deadline, captured), True), (deadline, False)):
+        if clock_kind == "wall":
+            clock[0] = at
+        else:
+            body.t = at
+        assert ("cube" in wrapped.read().objects) is expected
 
 
 @pytest.mark.parametrize("change", ["epoch", "calibration", "sim_rollback", "wall_rollback"])

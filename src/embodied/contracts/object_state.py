@@ -29,9 +29,10 @@ class ObjectEvidence(ObjectContext):
     def current(self, context: ObjectContext | None, sim_t: float, now: float) -> bool:
         if context is None or not math.isfinite(sim_t) or not math.isfinite(now):
             return False
+        # 相减可能将截止点的年龄向下舍入。 / Subtraction can round the age down at the deadline.
         return (all(getattr(self, key) == getattr(context, key) for key in ObjectContext.model_fields)
-                and 0 <= sim_t - self.captured_sim_t < self.ttl_sim_s
-                and 0 <= now - self.captured_monotonic < self.ttl_wall_s)
+                and self.captured_sim_t <= sim_t < self.captured_sim_t + self.ttl_sim_s
+                and self.captured_monotonic <= now < self.captured_monotonic + self.ttl_wall_s)
 
 
 def object_available(snapshot, name: str, *, now: float | None = None, sim_t: float | None = None,

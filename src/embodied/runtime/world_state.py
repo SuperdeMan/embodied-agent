@@ -186,7 +186,8 @@ class SnapshotAdmission:
         rebased_evidence: dict[str, ObjectEvidence] = {}
         for name, pose in envelope.objects.items():
             ev = envelope.object_evidence[name]
-            if ev.max_clock_skew_s > self.policy.max_allowed_skew_s:
+            if (ev.max_clock_skew_s > self.policy.max_allowed_skew_s
+                    or envelope.capture_timestamp >= ev.captured_sim_t + ev.ttl_sim_s):
                 continue
             sim_age = max(ev.age_sim_s, envelope.capture_timestamp - ev.captured_sim_t)
             wall_age = (
@@ -197,7 +198,7 @@ class SnapshotAdmission:
             )
             if clock is not None and clock.clock_domain in ("wall_ntp", "wall_ptp") and ev.captured_unix_s is not None:
                 combined_skew = clock.max_clock_skew_s + ev.max_clock_skew_s
-                if ev.captured_unix_s - rx_unix > combined_skew:
+                if ev.captured_unix_s - rx_unix > combined_skew or rx_unix >= ev.captured_unix_s + ev.ttl_wall_s:
                     continue
                 unix_obj_age = max(0.0, (rx_unix - ev.captured_unix_s) + combined_skew) * (1.0 + clock_drift_factor)
                 wall_age = max(wall_age, unix_obj_age)

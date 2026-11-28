@@ -348,6 +348,27 @@ def test_clock_id_domain_or_calibration_change_requires_explicit_epoch():
     assert admission.last_rejection_reason == "retired_epoch"
 
 
+def test_remote_object_at_simulation_deadline_is_omitted_when_subtraction_rounds_down():
+    captured = 31.789207533
+    deadline = captured + 2.0
+    evidence = _remote_ev(captured_sim_t=captured, age_sim_s=deadline - captured)
+    envelope = _envelope(capture_timestamp=deadline, object_evidence={"obj_cube": evidence})
+    snap = SnapshotAdmission().accept(envelope, 0.01)
+    assert snap is not None and "obj_cube" not in snap.objects
+
+
+def test_synchronized_object_at_unix_deadline_is_omitted_without_transit_delay():
+    captured = 31.789207533
+    deadline = captured + 2.0
+    clock = ClockMetadata(clock_domain="wall_ntp", clock_id="ntp-1", host_id="host-control",
+                          sync_status="synchronized", max_clock_skew_s=0.0, clock_drift_ppm=0.0,
+                          source_unix_s=deadline, publish_unix_s=deadline, measurement_source="ntp_declared")
+    evidence = _remote_ev(captured_unix_s=captured, age_wall_s=deadline - captured, ttl_wall_s=2.0)
+    envelope = _envelope(clock_domain="wall_ntp", clock=clock, object_evidence={"obj_cube": evidence})
+    snap = SnapshotAdmission().accept(envelope, 0.0, received_unix_s=deadline)
+    assert snap is not None and "obj_cube" not in snap.objects
+
+
 def test_per_object_rtt_skew_compounding_and_local_monotonic_rebase():
     """Per-object ages compound producer age + RTT + skew and rebase exact remaining TTL onto receiver monotonic time.
 
