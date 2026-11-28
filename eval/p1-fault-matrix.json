@@ -118,16 +118,21 @@
       "tests": [
         "tests/runtime/test_release_compatibility.py"
       ],
-      "scope": "ModelBundle semantic compatibility beyond shape, ReleaseBundle maintenance-mode lock/running/unconfirmed-stop preflight, v1-only downgrade and unverified rollback refusal after new v2 writes, and authenticated online backup + atomic restore of corrupted v2 ledgers; hardware firmware OTA and future v3->v2 downgrade stay open"
+      "scope": "ModelBundle semantic compatibility, required ledger and file evidence, v1-only downgrade refusal, and authenticated v2 backup and restore. The controlled_step_retry_and_v3 group covers the v3 downgrade fence."
+    },
+    {
+      "id": "controlled_step_retry_and_v3",
+      "tests": ["tests/runtime/test_attempt_schema.py", "tests/control/test_controlled_step_retry.py"],
+      "scope": "v2 history projection and v3 dirty rollback fence, single authenticated retry, current effect, atomic grant consumption and immutable previous attempts. Transport tests run in rpc_mtls_authorization."
     }
   ],
   "open_gates": [
     "Real storage-medium I/O failure and power loss",
     "Independent hardware stop (SG-0) and real-device physical controller faults",
     "Real physical camera disconnection and hardware PTP/NTP clock synchronization (software cross-host clock-domain, skew/RTT freshness, and RPC per-object evidence contract verified in D036)",
-    "Authenticated cross-host recovery authority and multi-attempt protocol",
+    "Field-device evidence for controlled single-step recovery after a physical stop and current effect check",
     "Real network partition and field-device supervision",
     "Real-hardware physical stop latency and field-deployment episode data loss metrics (simulation isolated-process baseline measured in D035)",
-    "Field hardware/firmware OTA activation and cross-major-schema (v3->v2) downgrade rehearsal (v2 ReleaseBundle/ModelBundle compatibility preflight, two-image v2 downgrade, and corrupt-ledger backup restore verified in D037)"
+    "Field hardware/firmware OTA activation and model/driver compatibility on actual devices"
   ]
 }

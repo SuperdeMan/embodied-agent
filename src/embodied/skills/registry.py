@@ -30,6 +30,7 @@ from embodied.runtime.arbiter import Lease, ResourceArbiter, ResourceBusy
 from embodied.runtime.invocation import CURRENT_INVOCATION, InvocationPermit
 from embodied.runtime.observation import OBSERVATION_TIMEOUT_S, ObservationLane, ObservationUnavailable
 from embodied.runtime.operations import OperationLedger, OperationRecord, request_digest
+from embodied.runtime.step_retry import StepRetryAuthority
 from embodied.skills.manifest import SkillManifest
 
 logger = logging.getLogger("skills.registry")
@@ -85,6 +86,7 @@ class SkillRegistry:
         self._retiring: set[asyncio.Task] = set()
         self.ledger = ledger if ledger is not None else OperationLedger()
         self.robot_id = robot_id
+        self.step_retries = StepRetryAuthority(self)
         self.arbiter = ResourceArbiter(self.ledger.quarantined())
         self._active: dict[str, tuple[asyncio.Task, InvocationPermit, Lease]] = {}
         self._tracked_skills: set[str] = set()
@@ -318,14 +320,26 @@ class SkillRegistry:
             manifest, handler = self._skills[name]
         except KeyError:
             raise SkillNotFound(name) from None
+        return await self._invoke_registered(manifest, handler, params, confirmed, operation)
+
+    async def _invoke_registered(self, manifest, handler, params, confirmed, operation, *, retry_grant=None):
         merged = self._parameters(manifest, params, confirmed)
         identity = operation or OperationIdentity.fresh()
         await self._await_preview(identity)
-        with self._dispatch(manifest, merged, identity, "skill", name in self._tracked_skills) as dispatch:
+        with self._dispatch(manifest, merged, identity, "skill", manifest.name in self._tracked_skills,
+                            retry_grant=retry_grant) as dispatch:
             if isinstance(dispatch, SkillResult):
                 return dispatch
             try:
                 await self._bind_effect_async(dispatch)
+                if retry_grant is not None:
+                    if retry_grant.proof.source == "perception" and not await self.observe(
+                            self._effect_observer.evidence_current, retry_grant.proof.model_dump(mode="json")):
+                        raise EffectRejected("retry_observation_stale")
+                    retry_grant.require_current_controller(self)
+                    bound = dispatch.record.stop_context["effect_context"]["bindings"]
+                    if effect_digest(bound) != retry_grant.proof.binding_digest:
+                        raise EffectRejected("retry_bound_object_changed")
             except Exception as exc:
                 reason = str(exc) if isinstance(exc, ObservationUnavailable) else "effect_binding_failed"
                 return await self._finish_async(dispatch, SkillResult(ok=False, detail=reason), unavailable=reason)
@@ -385,21 +399,22 @@ class SkillRegistry:
         return self._validate_params(manifest, {} if params is None else params)
 
     @contextmanager
-    def _dispatch(self, manifest, params, operation, source, tracked):
+    def _dispatch(self, manifest, params, operation, source, tracked, *, retry_grant=None):
         identity = operation or OperationIdentity.fresh()
         declaration = manifest.model_dump(mode="json")
         if source != "skill":
             declaration["execution_source"] = source
         digest = request_digest(manifest.name, params, declaration, self.robot_id)
         previous = self.ledger.lookup(identity, digest)
-        if previous:
+        if previous and retry_grant is None:
             outcome = self._from_record(previous)
             if manifest.verification.get("mode") == "state_predicate":
                 outcome.data["_operation_replay"] = True
             yield outcome
             return
         from embodied.runtime.task_journal import validate_dispatch
-        validate_dispatch(self, identity, digest)
+        if retry_grant is None:
+            validate_dispatch(self, identity, digest)
         if self.observation_pending:
             yield SkillResult(ok=False, detail="observation_worker_busy", operation_id=identity.operation_id,
                               invocation_state="REJECTED")
@@ -424,8 +439,10 @@ class SkillRegistry:
                 with controller.admission() if controller is not None else nullcontext():
                     if "effect_context" in context and not self._effect_observer.matches(context["effect_context"]):
                         raise EffectRejected("effect_context_changed")
+                    if retry_grant is not None:
+                        retry_grant.require_current_controller(self)
                     record = self.ledger.begin(identity, self.robot_id, manifest.name, digest,
-                                               lease.resources, lease.epoch, stop_context=context)
+                                               lease.resources, lease.epoch, stop_context=context, retry_grant=retry_grant)
                     self._op_metrics["operations_started"] += 1
                     permit = InvocationPermit(manifest.termination.timeout_s, lambda: self.arbiter.valid(lease))
                     permit.issuer = self
@@ -453,7 +470,8 @@ class SkillRegistry:
             outcome.permit.revoke()
             if outcome.record.state not in {"RETURNED", "FAILED"}:
                 self.arbiter.quarantine(outcome.lease)
-                self.ledger.finish(identity.operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED")
+                self.ledger.finish(identity.operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED",
+                                   attempt_id=outcome.record.attempt_id)
                 self._op_metrics["operations_unknown"] += 1
             raise
         finally:
@@ -491,7 +509,7 @@ class SkillRegistry:
             result.data["_execution"] = {"outcome": "OUTCOME_UNKNOWN", "stop_state": "STOP_UNCONFIRMED"}
         state = "OUTCOME_UNKNOWN" if unknown else "RETURNED" if result.ok else "FAILED"
         dispatch.record = self.ledger.finish(dispatch.record.operation_id, state, asdict(result),
-                                             "STOP_UNCONFIRMED" if unknown else "NOT_REQUESTED")
+                                             "STOP_UNCONFIRMED" if unknown else "NOT_REQUESTED", attempt_id=permit.attempt_id)
         if state == "RETURNED":
             self._op_metrics["operations_returned"] += 1
         elif state == "FAILED":
@@ -712,7 +730,7 @@ class SkillRegistry:
                 if record.state == "RUNNING":
                     self.arbiter.quarantine(lease)
                     record = self.ledger.finish(operation_id, "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED",
-                                                event="cancel_requested")
+                                                event="cancel_requested", attempt_id=permit.attempt_id)
                 return record
             except Exception:
                 self.arbiter.quarantine(lease)

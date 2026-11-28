@@ -126,11 +126,18 @@ class OperationLedger:
                 if "schema_version" not in tables:
                     raise LedgerUnavailable("unrecognized operation ledger schema")
                 versions = [row[0] for row in self._db.execute("SELECT version FROM schema_version")]
-                if versions not in ([1], [SCHEMA_VERSION]):
+                if versions not in ([1], [SCHEMA_VERSION], [3]):
                     raise LedgerUnavailable("unsupported operation ledger schema version")
                 self.schema_version = versions[0]
-                if self.schema_version == 2 and not {"task_plans", "task_events"}.issubset(tables):
+                if self.schema_version >= 2 and not {"task_plans", "task_events"}.issubset(tables):
                     raise LedgerUnavailable("incomplete task journal schema")
+                if self.schema_version == 3:
+                    from embodied.runtime.attempt_schema import mark_v3_path
+                    from embodied.runtime.task_schema import inspect_schema
+
+                    inspect_schema(self._db)
+                    if self.path != ":memory:":
+                        mark_v3_path(Path(self.path))
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.execute("PRAGMA synchronous=FULL")
             self._recover()
@@ -151,18 +158,27 @@ class OperationLedger:
 
     def _recover(self) -> None:
         # 文件锁确保旧 owner 已退出，才允许恢复判断。 / The file lock proves the previous owner is gone before recovery.
-        running = list(self._db.execute("SELECT operation_id FROM operations WHERE state='RUNNING'"))
+        running = list(self._db.execute("""SELECT o.operation_id,a.attempt_id FROM operations o
+            JOIN attempts a USING(operation_id) WHERE o.state='RUNNING' AND a.state='RUNNING'"""))
         for row in running:
-            self.finish(row[0], "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED", event="recovered_unknown")
+            self.finish(row[0], "OUTCOME_UNKNOWN", None, "STOP_UNCONFIRMED", event="recovered_unknown", attempt_id=row[1])
         from embodied.runtime.task_journal import recover
         recover(self)
+        if self.schema_version == 3:
+            with self._db:
+                self._db.execute("""UPDATE recovery_grants SET state='REFUSED',closed_at=?
+                    WHERE state='ISSUED' AND ledger_boot_id<>?""", (time.time(), self.boot_id))
 
-    def get(self, operation_id: str) -> OperationRecord | None:
-        row = self._db.execute("""
-            SELECT o.*, a.attempt_id, a.boot_id, a.lease_epoch, a.stop_state, a.resources_json, t.robot_id
+    def get(self, operation_id: str, attempt_id: str | None = None) -> OperationRecord | None:
+        result_column = "a.result_json" if self.schema_version == 3 else "o.evidence_json"
+        state_column = "a.state" if self.schema_version == 3 else "o.state"
+        order = "ORDER BY a.attempt_no DESC" if self.schema_version == 3 else ""
+        row = self._db.execute(f"""
+            SELECT o.operation_id,o.task_id,o.request_digest,o.skill_id,{state_column} AS state,{result_column} AS evidence_json,
+                   a.attempt_id, a.boot_id, a.lease_epoch, a.stop_state, a.resources_json, t.robot_id
             FROM operations o JOIN attempts a USING(operation_id) JOIN tasks t ON t.task_id=o.task_id
-            WHERE o.operation_id=?
-        """, (operation_id,)).fetchone()
+            WHERE o.operation_id=? AND (? IS NULL OR a.attempt_id=?) {order} LIMIT 1
+        """, (operation_id, attempt_id, attempt_id)).fetchone()
         if row is None:
             return None
         admitted = self._event_payload(operation_id, row["attempt_id"], "admitted") or {}
@@ -194,6 +210,20 @@ class OperationLedger:
         if record.stop_state == "MOTION_STOPPED_OBSERVED" and not self._valid_stored_stop(record):
             return replace(record, stop_state="STOP_UNCONFIRMED", stop_evidence=None)
         return record
+
+    def attempt_history(self, operation_id: str) -> list[dict]:
+        """Describe each v3 attempt using its validated evidence. 按独立校验的停止和效果证据展示每次 v3 尝试。"""
+        number_column = "attempt_no" if self.schema_version == 3 else "1"
+        rows = self._db.execute(f"SELECT {number_column},attempt_id FROM attempts WHERE operation_id=? ORDER BY 1",
+                                (operation_id,)).fetchall()
+        history = []
+        for number, attempt_id in rows:
+            record = self.get(operation_id, attempt_id)
+            evidence = record.effect_evidence or {}
+            history.append({"attempt_no": number, "attempt_id": attempt_id, "state": record.state,
+                            "stop_state": record.stop_state, "lease_epoch": record.lease_epoch,
+                            "effect_evidence_id": evidence.get("evidence_id"), "effect_verdict": evidence.get("verdict", "unknown")})
+        return history
 
     def _event_payload(self, operation_id: str, attempt_id: str, kind: str) -> dict | None:
         row = self._db.execute("""
@@ -285,32 +315,50 @@ class OperationLedger:
         return self._db.execute("SELECT EXISTS(SELECT 1 FROM operations)").fetchone()[0] == 1
 
     def begin(self, identity: OperationIdentity, robot_id: str, skill: str, digest: str,
-              resources: tuple[str, ...], epoch: int, *, stop_context: dict | None = None) -> OperationRecord:
+              resources: tuple[str, ...], epoch: int, *, stop_context: dict | None = None,
+              retry_grant=None) -> OperationRecord:
         now = time.time()
         attempt = uuid4().hex
         with self._db:
             self._db.execute("BEGIN IMMEDIATE")
             prior = self.lookup(identity, digest)
-            if prior:
+            if prior and retry_grant is None:
                 return prior
-            task = self._db.execute("SELECT robot_id FROM tasks WHERE task_id=?", (identity.task_id,)).fetchone()
-            if task and task[0] != robot_id:
-                raise OperationConflict("task_id belongs to a different robot")
-            self._db.execute("""
-                INSERT INTO tasks VALUES(?,?,?,'OPEN',?,?) ON CONFLICT(task_id) DO UPDATE SET
-                plan_revision=MAX(plan_revision,excluded.plan_revision), updated_at=excluded.updated_at
-            """, (identity.task_id, robot_id, identity.plan_revision, now, now))
-            self._db.execute("INSERT INTO operations VALUES(?,?,?,?,'RUNNING',NULL)",
-                             (identity.operation_id, identity.task_id, digest, skill))
-            self._db.execute("INSERT INTO attempts VALUES(?,?,?,?, 'RUNNING','NOT_REQUESTED',?,?,NULL)",
-                             (attempt, identity.operation_id, self.boot_id, epoch,
-                              json.dumps(resources), now))
+            if retry_grant is None:
+                task = self._db.execute("SELECT robot_id FROM tasks WHERE task_id=?", (identity.task_id,)).fetchone()
+                if task and task[0] != robot_id:
+                    raise OperationConflict("task_id belongs to a different robot")
+                self._db.execute("""
+                    INSERT INTO tasks VALUES(?,?,?,'OPEN',?,?) ON CONFLICT(task_id) DO UPDATE SET
+                    plan_revision=MAX(plan_revision,excluded.plan_revision), updated_at=excluded.updated_at
+                """, (identity.task_id, robot_id, identity.plan_revision, now, now))
+                self._db.execute("INSERT INTO operations VALUES(?,?,?,?,'RUNNING',NULL)",
+                                 (identity.operation_id, identity.task_id, digest, skill))
+            else:
+                if self.schema_version != 3 or prior is None:
+                    raise OperationConflict("retry_target_unavailable")
+                from embodied.runtime.step_retry import validate_grant
+
+                validate_grant(self, retry_grant, prior, identity, digest)
+                self._db.execute("UPDATE operations SET state='RUNNING',evidence_json=NULL WHERE operation_id=?",
+                                 (identity.operation_id,))
+            values = (attempt, identity.operation_id, self.boot_id, epoch, json.dumps(resources), now)
+            columns = "attempt_id,operation_id,boot_id,lease_epoch,state,stop_state,resources_json,started_at"
+            if retry_grant is None:
+                self._db.execute(f"INSERT INTO attempts({columns}) VALUES(?,?,?,?,'RUNNING','NOT_REQUESTED',?,?)", values)
+            else:
+                self._db.execute(f"""INSERT INTO attempts({columns},attempt_no)
+                    VALUES(?,?,?,?,'RUNNING','NOT_REQUESTED',?,?,
+                           (SELECT MAX(attempt_no)+1 FROM attempts WHERE operation_id=?))""", (*values, identity.operation_id))
+                from embodied.runtime.step_retry import consume_grant
+
+                consume_grant(self, retry_grant, attempt, now)
             self._event(identity.operation_id, attempt, "admitted",
                         {"request_digest": digest, "stop_context": stop_context or {}})
         return self.get(identity.operation_id)
 
     def finish(self, operation_id: str, state: str, result: dict | None, stop_state: str,
-               *, event: str = "completed") -> OperationRecord:
+               *, event: str = "completed", attempt_id: str | None = None) -> OperationRecord:
         if state not in {"RETURNED", "FAILED", "OUTCOME_UNKNOWN"}:
             raise ValueError("invalid operation outcome")
         payload = json.dumps(result, ensure_ascii=False, allow_nan=False) if result is not None else None
@@ -321,12 +369,16 @@ class OperationLedger:
             record = self.get(operation_id)
             if record is None:
                 raise KeyError(operation_id)
+            if self.schema_version == 3 and record.attempt_id != attempt_id:
+                raise OperationConflict("attempt_completion_identity_mismatch")
             if record.state != "RUNNING":
                 return record
             self._db.execute("UPDATE operations SET state=?,evidence_json=? WHERE operation_id=?",
                              (state, payload, operation_id))
-            self._db.execute("UPDATE attempts SET state=?,stop_state=?,ended_at=? WHERE operation_id=?",
-                             (state, stop_state, time.time(), operation_id))
+            self._db.execute("UPDATE attempts SET state=?,stop_state=?,ended_at=? WHERE attempt_id=?",
+                             (state, stop_state, time.time(), record.attempt_id))
+            if self.schema_version == 3:
+                self._db.execute("UPDATE attempts SET result_json=? WHERE attempt_id=?", (payload, record.attempt_id))
             self._event(operation_id, record.attempt_id, event, {"state": state, "stop_state": stop_state})
             if state == "OUTCOME_UNKNOWN":
                 self._db.execute("UPDATE tasks SET state='OUTCOME_UNKNOWN',updated_at=? WHERE task_id=?",
@@ -339,17 +391,18 @@ class OperationLedger:
 
     def quarantined(self) -> dict[str, tuple[str, ...]]:
         quarantined = {}
-        for row in self._db.execute("SELECT operation_id FROM attempts WHERE state='OUTCOME_UNKNOWN'"):
-            record = self.get(row["operation_id"])
+        for row in self._db.execute("SELECT operation_id,attempt_id FROM attempts WHERE state='OUTCOME_UNKNOWN'"):
+            record = self.get(row["operation_id"], row["attempt_id"])
             if record.stop_state != "MOTION_STOPPED_OBSERVED":
-                quarantined[record.operation_id] = record.resources
+                owned = quarantined.get(record.operation_id, ())
+                quarantined[record.operation_id] = tuple(dict.fromkeys((*owned, *record.resources)))
         return quarantined
 
     def record_stop(self, evidence: StopEvidence) -> OperationRecord:
         with self._db:
             self._db.execute("BEGIN IMMEDIATE")
             record = self.get(evidence.operation_id)
-            if record is None or record.state != "OUTCOME_UNKNOWN":
+            if record is None or record.attempt_id != evidence.attempt_id or record.state != "OUTCOME_UNKNOWN":
                 raise StopRejected("operation_not_unknown")
             if record.stop_state == "MOTION_STOPPED_OBSERVED":
                 return record

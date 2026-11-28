@@ -13,7 +13,7 @@ from embodied.runtime.operations import MAX_RESULT_BYTES, request_digest
 
 
 def require_journal(ledger):
-    if ledger.schema_version != 2:
+    if ledger.schema_version < 2:
         raise TaskJournalError("task_journal_upgrade_required")
 
 
@@ -78,7 +78,7 @@ def lifecycle(history):
 
 
 def recover(ledger):
-    if ledger.schema_version != 2:
+    if ledger.schema_version < 2:
         return
     for row in ledger._db.execute("SELECT DISTINCT task_id FROM task_plans").fetchall():
         task_id = row[0]
@@ -280,7 +280,7 @@ def record_intent(registry, task_id, revision, step_id, params):
 
 def validate_dispatch(registry, identity, digest):
     ledger = registry.ledger
-    if ledger.schema_version != 2:
+    if ledger.schema_version < 2:
         return
     saved = plans(ledger, identity.task_id)
     if not saved:
@@ -323,7 +323,7 @@ def record_result(registry, task_id, revision, step_id, result):
 
 def finish_task(registry, task_id, *, interrupted=False):
     ledger = registry.ledger
-    if ledger.schema_version != 2:
+    if ledger.schema_version < 2:
         return
     saved = plans(ledger, task_id)
     if not saved:
@@ -348,7 +348,7 @@ def report_task(registry, task_id):
             "workflow": "LEGACY", "plans": [], "steps": [], "untracked_operations": operation_ids,
             "issues": ["plan_unavailable"], "recommendation": "manual_review"}
     try:
-        saved = plans(ledger, task_id) if ledger.schema_version == 2 else []
+        saved = plans(ledger, task_id) if ledger.schema_version >= 2 else []
         if not saved:
             return base
         history = events(ledger, task_id)
@@ -386,6 +386,8 @@ def report_task(registry, task_id):
             if operation and (operation.task_id != task_id or operation.skill_id != step["skill"]
                               or intent and operation.request_digest != intent["request_digest"]):
                 item["call_state"] = "IDENTITY_MISMATCH"
+            if operation and ledger.schema_version == 3:
+                item["attempts"] = ledger.attempt_history(operation.operation_id)
             base["steps"].append(item)
             if not compatible:
                 base["issues"].append("manifest_changed")

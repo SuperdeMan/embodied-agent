@@ -51,6 +51,7 @@ from embodied.contracts.stopping import StopRejected
 from embodied.runtime.arbiter import ResourceBusy
 from embodied.runtime.invocation import OBSERVATION_ONLY
 from embodied.runtime.observation import OBSERVATION_TIMEOUT_S, ObservationUnavailable
+from embodied.runtime.operations import OperationConflict
 from embodied.runtime.operator import OperatorAuthority, OperatorDenied, OperatorForbidden
 
 logger = logging.getLogger("hri.server")
@@ -453,7 +454,7 @@ async def operator_handler(request: web.Request) -> web.Response:
         return web.json_response(result, headers=headers)
     except OperatorForbidden as exc:
         return web.json_response({"error": str(exc), "task_execution_authorized": False}, status=403, headers=headers)
-    except (OperatorDenied, EffectRejected, StopRejected, ResourceBusy) as exc:
+    except (OperatorDenied, EffectRejected, StopRejected, ResourceBusy, OperationConflict, ObservationUnavailable) as exc:
         return web.json_response({"error": str(exc), "task_execution_authorized": False}, status=409, headers=headers)
     except (ValueError, TypeError):
         return web.json_response({"error": "invalid_operator_request"}, status=400, headers=headers)

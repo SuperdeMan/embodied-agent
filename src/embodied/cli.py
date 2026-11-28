@@ -127,7 +127,15 @@ def main(argv: list[str] | None = None) -> int:
     operation.add_argument("--confirm", action="store_true")
     _add_rpc_tls(operation, server=False)
 
+    retry = sub.add_parser("retry-step", help="review and confirm one operator-scoped retry over mTLS")
+    retry.add_argument("--remote", required=True)
+    retry.add_argument("--task", required=True)
+    retry.add_argument("--operation", required=True)
+    retry.add_argument("--attempt", required=True)
+    _add_rpc_tls(retry, server=False)
+
     upgrade = sub.add_parser("ledger-upgrade", help="preview or explicitly apply the task journal schema upgrade")
+    upgrade.add_argument("--to", type=int, choices=(2, 3), default=2, help="target schema (adjacent upgrade only)")
     upgrade.add_argument("--ledger", required=True)
     upgrade.add_argument("--apply", action="store_true")
     upgrade.add_argument("--backup-dir", default=None)
@@ -204,11 +212,13 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_serve_guardian(args))
     if args.cmd == "operation":
         return asyncio.run(_operation(args))
+    if args.cmd == "retry-step":
+        return asyncio.run(_retry_step(args))
     if args.cmd == "ledger-upgrade":
         import json
 
         from embodied.runtime.task_schema import upgrade_ledger
-        print(json.dumps(upgrade_ledger(args.ledger, apply=args.apply, backup_dir=args.backup_dir),
+        print(json.dumps(upgrade_ledger(args.ledger, apply=args.apply, backup_dir=args.backup_dir, target_version=args.to),
                          ensure_ascii=False, indent=2))
         return 0
     if args.cmd == "release-check":
@@ -471,6 +481,38 @@ async def _operation(args: argparse.Namespace) -> int:
             result = await action(args.id)
         print(json.dumps(MessageToDict(result, preserving_proto_field_name=True), ensure_ascii=False, indent=2))
         return 0 if result.found and not result.reconciliation_error else 1
+
+
+async def _retry_step(args: argparse.Namespace) -> int:
+    import json
+
+    from embodied.runtime.rpc_auth import build_client_channel
+    from embodied.runtime.rpcgen import import_control
+
+    tls = _parse_tls(args.tls_ca, args.tls_cert, args.tls_key)
+    pb, rpc = import_control()
+    async with build_client_channel(args.remote, tls, server_name=args.tls_server_name) as channel:
+        stub = rpc.ControlServiceStub(channel)
+        task = await stub.ReconcileTask(pb.TaskRequest(task_id=args.task), timeout=10)
+        if task.error or not task.found:
+            print(task.error or "task_not_found")
+            return 1
+        review = json.loads(task.report_json)["recovery_review"]
+        prepared = await stub.PrepareStepRetry(pb.StepRetryRequest(task_id=args.task, operation_id=args.operation,
+            attempt_id=args.attempt, state_digest=review["state_digest"]), timeout=10)
+        if prepared.error:
+            print(prepared.error)
+            return 1
+        offer = json.loads(prepared.report_json)
+        print(json.dumps({k: offer[k] for k in ("operation_id", "attempt_id", "skill", "params")}, ensure_ascii=False))
+        try:
+            answer = await asyncio.to_thread(input, "仅重新执行上面这一个步骤？输入 yes 确认，回车拒绝。 ")
+        except EOFError:
+            answer = ""
+        reply = await stub.ConfirmStepRetry(pb.StepRetryConfirmation(
+            challenge_id=offer["challenge_id"], confirmed=answer.strip().lower() == "yes"))
+        print(reply.error or reply.report_json)
+        return 1 if reply.error else 0
 
 
 async def _task_query(args: argparse.Namespace) -> int:

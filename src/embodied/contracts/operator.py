@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, IPvAnyAddress, field_validator
 
-OperatorScope = Literal["reconcile_effect", "reconcile_stop"]
+OperatorScope = Literal["reconcile_effect", "reconcile_stop", "retry_step"]
 
 
 class OperatorPolicy(BaseModel):
@@ -16,7 +16,7 @@ class OperatorPolicy(BaseModel):
     subjects: frozenset[str] = Field(min_length=1, max_length=32)
     # 未显式声明时仅授权效果重查，避免旧策略升级后静默扩大权限。
     # Default to effect review only when omitted so existing policies never silently widen scope.
-    scopes: frozenset[OperatorScope] = Field(default=frozenset({"reconcile_effect"}), min_length=1, max_length=2)
+    scopes: frozenset[OperatorScope] = Field(default=frozenset({"reconcile_effect"}), min_length=1, max_length=3)
 
     @field_validator("trusted_proxy")
     @classmethod

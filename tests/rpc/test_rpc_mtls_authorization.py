@@ -126,6 +126,40 @@ def pki(tmp_path_factory):
     return {"certs": certs, "fps": fps, "policy": policy}
 
 
+async def test_scoped_mtls_single_step_retry_rejects_other_roles_and_replay(pki, retry_scenario):
+    c = retry_scenario
+    await c.reconcile()
+    pb, rpc = import_control()
+    existing = pki["policy"]
+    peers = tuple(peer.model_copy(update={"scopes": peer.scopes | {"retry_step"}})
+                  if peer.name == "op-stop" else peer for peer in existing.peers)
+    policy = existing.model_copy(update={"peers": peers})
+    state = control_service.ControlState(c.registry, sim=c.sim)
+    server, port = await control_service.serve(state, port=0, tls=pki["certs"]["control"], policy=policy)
+    address = f"127.0.0.1:{port}"
+    try:
+        for peer in ("agent", "guardian", "op_effect"):
+            async with build_client_channel(address, pki["certs"][peer]) as channel:
+                with pytest.raises(grpc.aio.AioRpcError) as denied:
+                    await rpc.ControlServiceStub(channel).PrepareStepRetry(pb.StepRetryRequest(), timeout=3)
+                assert denied.value.code() == grpc.StatusCode.PERMISSION_DENIED
+        async with build_client_channel(address, pki["certs"]["op_stop"]) as channel:
+            stub = rpc.ControlServiceStub(channel)
+            review = await stub.ReconcileTask(pb.TaskRequest(task_id=c.identity.task_id), timeout=5)
+            state_digest = json.loads(review.report_json)["recovery_review"]["state_digest"]
+            prepared = await stub.PrepareStepRetry(pb.StepRetryRequest(task_id=c.identity.task_id,
+                operation_id=c.identity.operation_id, attempt_id=c.first.attempt_id, state_digest=state_digest), timeout=5)
+            assert not prepared.error, prepared.error
+            confirmation = pb.StepRetryConfirmation(challenge_id=json.loads(prepared.report_json)["challenge_id"], confirmed=True)
+            executed = await stub.ConfirmStepRetry(confirmation, timeout=30)
+            assert not executed.error, executed.error
+            assert json.loads(executed.report_json)["effect_verdict"] == "sat"
+            assert (await stub.ConfirmStepRetry(confirmation, timeout=3)).error == "operator_challenge_unavailable"
+            assert len(c.calls) == 2
+    finally:
+        await server.stop(0)
+
+
 async def test_non_loopback_and_misconfigured_tls_fail_closed(pki):
     registry = SkillRegistry()
     cstate = control_service.ControlState(registry)

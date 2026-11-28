@@ -124,16 +124,18 @@ class OperatorAuthority:
         db = self.registry.ledger._db
         changes = db.total_changes
         version = db.execute("PRAGMA data_version").fetchone()[0]
+        first_v3_write = self.registry.ledger.schema_version == 3 and db.execute("SELECT v3_dirty FROM schema_version").fetchone()[0] == 0
         self._audit(record, kind, payload)
-        # 只容许本次审计自身的一行写入；其他身份/日志变化使授权失效。
-        # Permit only this audit's single-row write; other identity or ledger changes invalidate authorization.
+        # 仅允许本次审计行与首次 v3 写标志。 / Allow only this audit row and the first v3 write marker.
         if (review_state(self.registry, report, include_storage=False)[0] != before
-                or db.total_changes != changes + 1 or db.execute("PRAGMA data_version").fetchone()[0] != version):
+                or db.total_changes != changes + 1 + int(first_v3_write) or db.execute("PRAGMA data_version").fetchone()[0] != version):
             raise OperatorDenied("review_snapshot_changed")
 
     async def issue(self, principal: OperatorPrincipal, request: OperatorAuthorizationRequest):
         self.registry.check_thread()
         self._principal(principal, scope=request.scope)
+        if request.scope == "retry_step":
+            return await self.registry.step_retries.issue(principal, request)
         now = self._clock()
         self._pending = {key: value for key, value in self._pending.items() if value["deadline"] > now}
         if len(self._pending) >= 128 or sum(p["principal"] == principal for p in self._pending.values()) >= 16:
@@ -169,6 +171,9 @@ class OperatorAuthority:
     async def consume(self, principal: OperatorPrincipal, confirmation: OperatorConfirmation):
         self.registry.check_thread()
         self._principal(principal)
+        if self.registry.step_retries.recognizes(confirmation.challenge_id):
+            self._principal(principal, scope="retry_step")
+            return await self.registry.step_retries.consume(principal, confirmation)
         pending = self._pending.get(confirmation.challenge_id)
         if pending is None or pending["principal"] != principal:
             raise OperatorDenied("operator_challenge_unavailable")

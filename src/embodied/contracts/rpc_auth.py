@@ -10,7 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 RpcRole = Literal["agent", "guardian", "operator"]
-RpcOperatorScope = Literal["read_only", "cancel", "reconcile_effect", "reconcile_stop", "halt", "reset_guard"]
+RpcOperatorScope = Literal["read_only", "cancel", "reconcile_effect", "reconcile_stop", "halt", "reset_guard", "retry_step"]
 
 # 内核硬编码的方法角色矩阵，策略不能放宽。
 # Hardcoded role/method matrix in core; policy files cannot widen a role beyond this map.
@@ -27,6 +27,8 @@ CONTROL_METHOD_POLICY: dict[str, tuple[frozenset[str], str | None]] = {
     "FinishTask": (frozenset({"agent"}), None),
     "GetTask": (frozenset({"agent", "operator"}), None),
     "ReconcileTask": (frozenset({"agent", "operator"}), None),
+    "PrepareStepRetry": (frozenset({"operator"}), "retry_step"),
+    "ConfirmStepRetry": (frozenset({"operator"}), "retry_step"),
     "ListTasks": (frozenset({"agent", "operator"}), None),
     "GetWorldState": (frozenset({"agent", "operator"}), None),
     "StreamState": (frozenset({"agent", "operator"}), None),
@@ -53,7 +55,7 @@ class RpcPeerRule(BaseModel):
     role: RpcRole
     cert_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     spiffe_id: str | None = None
-    scopes: frozenset[RpcOperatorScope] = Field(default=frozenset(), max_length=6)
+    scopes: frozenset[RpcOperatorScope] = Field(default=frozenset(), max_length=7)
 
     @field_validator("spiffe_id")
     @classmethod

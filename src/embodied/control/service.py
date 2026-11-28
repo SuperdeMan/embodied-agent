@@ -30,6 +30,7 @@ import grpc
 from embodied.contracts.effect import EffectRejected
 from embodied.contracts.observation import ClockMetadata, ObservationEnvelope, RemoteObjectEvidence
 from embodied.contracts.operation import OperationIdentity
+from embodied.contracts.operator import OperatorAuthorizationRequest, OperatorConfirmation
 from embodied.contracts.rpc_auth import RpcAccessPolicy, RpcTlsPaths
 from embodied.contracts.stopping import StopRejected
 from embodied.runtime.control_process import PhysicalControlUnavailable
@@ -326,6 +327,31 @@ def build_servicer(state: ControlState):
                 return self._task_reply(await state.registry.reconcile_task(request.task_id))
             except Exception as exc:
                 return self._task_reply(error=str(exc))
+
+        async def PrepareStepRetry(self, request, context):
+            principal = await _auth(context, "PrepareStepRetry")
+            if principal is None:
+                await context.abort(grpc.StatusCode.UNAUTHENTICATED, "mtls_operator_required")
+            try:
+                params = OperatorAuthorizationRequest(scope="retry_step", task_id=request.task_id,
+                    operation_id=request.operation_id, attempt_id=request.attempt_id, state_digest=request.state_digest)
+                result = await state.registry.step_retries.issue(principal, params)
+                return pb2.StepRetryReply(report_json=json.dumps(result))
+            except (ValueError, RuntimeError, sqlite3.DatabaseError) as exc:
+                return pb2.StepRetryReply(error=str(exc))
+
+        async def ConfirmStepRetry(self, request, context):
+            principal = await _auth(context, "ConfirmStepRetry")
+            if principal is None:
+                await context.abort(grpc.StatusCode.UNAUTHENTICATED, "mtls_operator_required")
+            def supervised():
+                return not state.halted and state.supervision_ok()
+            try:
+                confirmation = OperatorConfirmation(challenge_id=request.challenge_id, confirmed=request.confirmed)
+                result = await state.registry.step_retries.consume(principal, confirmation, supervision_ok=supervised)
+                return pb2.StepRetryReply(report_json=json.dumps(result))
+            except (ValueError, RuntimeError, sqlite3.DatabaseError) as exc:
+                return pb2.StepRetryReply(error=str(exc))
 
         async def ListTasks(self, request, context):
             await _auth(context, "ListTasks")

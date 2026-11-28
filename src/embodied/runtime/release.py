@@ -22,11 +22,13 @@ from embodied.contracts.release import (
     ReleasePreflightReport,
     TargetEnvironment,
 )
+from embodied.runtime.attempt_schema import ATTEMPT_COLUMNS, mark_v3_path
 from embodied.runtime.operations import LedgerUnavailable, take_ledger_lock
 from embodied.runtime.task_schema import LEGACY_TABLES, inspect_schema
 
 V2_TABLES = ("schema_version", *LEGACY_TABLES, "task_plans", "task_events")
 V1_TABLES = ("schema_version", *LEGACY_TABLES)
+V3_TABLES = (*V2_TABLES, "recovery_grants")
 
 
 def _file_sha256(path: Path) -> str:
@@ -51,16 +53,17 @@ def _safe_child(root: Path, rel: str) -> Path | None:
     return candidate
 
 
-def full_ledger_digest(db: sqlite3.Connection, version: int) -> tuple[str, dict[str, int]]:
+def full_ledger_digest(db: sqlite3.Connection, version: int, *, v2_projection: bool = False) -> tuple[str, dict[str, int]]:
     """Compute deterministic SHA-256 across all tables for schema v1 (5 tables) or v2 (7 tables).
 
     计算 schema v1（5 表）或 v2（7 表）全部行内容的确定性 SHA-256 摘要与行数统计。
     """
-    tables = V2_TABLES if version == 2 else V1_TABLES
+    tables = V2_TABLES if v2_projection else {1: V1_TABLES, 2: V2_TABLES, 3: V3_TABLES}[version]
     content: dict[str, list[list]] = {}
     counts: dict[str, int] = {}
     for table in tables:
-        rows = [list(row) for row in db.execute(f"SELECT * FROM {table}").fetchall()]
+        columns = {"schema_version": "2", "attempts": ",".join(ATTEMPT_COLUMNS)}.get(table, "*") if v2_projection else "*"
+        rows = [list(row) for row in db.execute(f"SELECT {columns} FROM {table}").fetchall()]
         # 以完整 JSON 序列稳定排序，兼容单列与复合主键（如 task_plans(task_id, revision)）。
         # Sort by full canonical JSON row representation so composite PKs (e.g. task_plans) are strictly deterministic.
         rows.sort(key=lambda r: json.dumps(r, ensure_ascii=False, allow_nan=False))
@@ -356,6 +359,10 @@ def restore_ledger_backup(
         if expected_all_tables_sha256 is not None and backup_state["all_tables_sha256"] != expected_all_tables_sha256:
             raise ValueError("backup_all_tables_sha256_mismatch")
 
+        if backup_state["version"] < 3:
+            _check_legacy_restore(target, backup_state)
+        else:
+            mark_v3_path(target)
         temp_path = target.parent / f".{target.name}.restore-{uuid4().hex[:12]}.tmp"
         with closing(sqlite3.connect(backup.as_uri() + "?mode=ro", uri=True, timeout=2)) as src:
             with closing(sqlite3.connect(temp_path)) as dst:
@@ -371,6 +378,8 @@ def restore_ledger_backup(
         restored_state = inspect_ledger_state(target, require_exclusive_lock=False)
         if restored_state["all_tables_sha256"] != backup_state["all_tables_sha256"]:
             raise ValueError("post_restore_digest_mismatch")
+        if restored_state["version"] < 3:
+            Path(str(target) + ".schema-v3").unlink(missing_ok=True)
         return {
             "restored": True,
             "target": str(target),
@@ -384,3 +393,25 @@ def restore_ledger_backup(
         raise
     finally:
         lock.close()
+
+
+def _check_legacy_restore(target: Path, backup_state: dict) -> None:
+    """Refuse a v2 restore after v3 writes or when their absence cannot be proven. v3 已写入或无法证明未写入时拒绝 v2 恢复。"""
+    migrated = Path(str(target) + ".schema-v3").exists()
+    try:
+        with closing(sqlite3.connect(target.as_uri() + "?mode=ro", uri=True)) as db:
+            row = db.execute("SELECT version FROM schema_version").fetchone()
+            if row not in ((1,), (2,), (3,)):
+                raise ValueError("unsupported target ledger schema")
+            if row == (3,):
+                migrated = True
+                if db.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
+                    raise ValueError("v3_downgrade_history_unproven")
+                inspect_schema(db)
+                origin, dirty = db.execute("SELECT v2_origin_sha256,v3_dirty FROM schema_version").fetchone()
+                if (backup_state["version"] != 2 or dirty or origin != backup_state["all_tables_sha256"]
+                        or full_ledger_digest(db, 3, v2_projection=True)[0] != origin):
+                    raise ValueError("v3_downgrade_would_discard_history")
+    except sqlite3.DatabaseError:
+        if migrated:
+            raise ValueError("v3_downgrade_history_unproven") from None

@@ -106,7 +106,8 @@ async def assess_task(registry, task_id):
     if not coherent:
         for step in report.get("steps", []):
             step["current_effect"] = {"eligible": False, "verdict": "unknown", "reason": "recovery_snapshot_changed"}
-    blockers = {"authenticated_operator_required", "execution_recovery_not_implemented", *report.get("issues", [])}
+    recovery_blocker = "separate_step_retry_authorization_required" if registry.ledger.schema_version == 3 else "execution_recovery_not_implemented"
+    blockers = {"authenticated_operator_required", recovery_blocker, *report.get("issues", [])}
     if not report.get("found"):
         blockers.add("task_not_found")
     if not coherent:

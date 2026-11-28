@@ -32,6 +32,9 @@ service ControlService {
   rpc FinishTask(TaskFinishRequest) returns (TaskReply);
   rpc GetTask(TaskRequest) returns (TaskReply);
   rpc ReconcileTask(TaskRequest) returns (TaskReply);
+  // 受信操作者申请、确认一次单步重试。 / An authenticated operator prepares and confirms one step retry.
+  rpc PrepareStepRetry(StepRetryRequest) returns (StepRetryReply);
+  rpc ConfirmStepRetry(StepRetryConfirmation) returns (StepRetryReply);
   rpc ListTasks(TaskListRequest) returns (TaskListReply);
   // 低频世界快照，校验版本与新鲜度。 / Low-rate world snapshot with version and freshness validation.
   rpc GetWorldState(WorldStateRequest) returns (WorldStateReply);
@@ -63,6 +66,15 @@ message TaskRequest { string task_id = 1; }
 message TaskReply { bool found = 1; string report_json = 2; string error = 3; }
 message TaskListRequest { uint32 limit = 1; }
 message TaskListReply { string tasks_json = 1; string error = 2; }
+
+message StepRetryRequest {
+  string task_id = 1;
+  string operation_id = 2;
+  string attempt_id = 3;
+  string state_digest = 4;
+}
+message StepRetryConfirmation { string challenge_id = 1; bool confirmed = 2; }
+message StepRetryReply { string report_json = 1; string error = 2; }
 
 message WorldStateRequest {}
 
