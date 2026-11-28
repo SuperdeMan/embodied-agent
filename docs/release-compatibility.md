@@ -29,6 +29,8 @@
 
 D038 补充。激活和回滚都要提供 `--ledger` 并取得独占检查。涉及配置或模型文件时还要提供 `--bundle-root`；ONNX 文件需由能读取其元数据的运行时核验。缺少所需证据时，CLI 返回退出码 2，报告列出原因。
 
+2026-11-28 的 `142e6eb` 在本机通过 939 项测试。Windows 实测 8 项 CLI 条件，包含实际 `pick-v1.onnx`；Linux 隔离镜像实测 7 项条件及离线 MuJoCo 抓放、监督和故障回收。候选校验前后均保留宿主原有 40 个运行容器。逐项结果见[发行预检验收记录](../eval/release-preflight-20261128.json)。
+
 ## 3. 全七表备份与原子恢复
 
 `src/embodied/runtime/release.py`（及 CLI `embodied release-check`）：

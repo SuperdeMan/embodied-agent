@@ -1,0 +1,163 @@
+{
+  "qualified_commit": "142e6eb3f84211c03271d2e63f0a9ecd6793a3cd",
+  "source_tree": "634574a08ec6c7589a5e55d2e8bb36d9a5ee875d",
+  "ruff": "passed",
+  "full_suite": {
+    "tests": 939,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "junit_sha256": "1ae3e00b2a1a9d0442a796eaa6b61a494b5c0baf8de8eabe8a7536422b73dfe8"
+  },
+  "cli_evidence": {
+    "cases": {
+      "windows": {
+        "activate_complete": {
+          "allowed": true,
+          "rollback_safe": false,
+          "reasons": [],
+          "returncode": 0
+        },
+        "activate_without_ledger": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "ledger_required"
+          ],
+          "returncode": 2
+        },
+        "activate_without_files": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "bundle_root_required"
+          ],
+          "returncode": 2
+        },
+        "rollback_complete": {
+          "allowed": true,
+          "rollback_safe": true,
+          "reasons": [],
+          "returncode": 0
+        },
+        "rollback_without_ledger": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "ledger_required"
+          ],
+          "returncode": 2
+        },
+        "rollback_without_files": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "bundle_root_required"
+          ],
+          "returncode": 2
+        },
+        "live_owner": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "ledger_locked_by_live_owner"
+          ],
+          "returncode": 2
+        },
+        "real_pick_v1_onnx": {
+          "allowed": true,
+          "rollback_safe": false,
+          "reasons": [],
+          "returncode": 0
+        }
+      },
+      "linux_candidate": {
+        "activate_complete": {
+          "allowed": true,
+          "rollback_safe": false,
+          "reasons": [],
+          "returncode": 0
+        },
+        "activate_without_ledger": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "ledger_required"
+          ],
+          "returncode": 2
+        },
+        "activate_without_files": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "bundle_root_required"
+          ],
+          "returncode": 2
+        },
+        "rollback_complete": {
+          "allowed": true,
+          "rollback_safe": true,
+          "reasons": [],
+          "returncode": 0
+        },
+        "rollback_without_ledger": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "ledger_required"
+          ],
+          "returncode": 2
+        },
+        "rollback_without_files": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "bundle_root_required"
+          ],
+          "returncode": 2
+        },
+        "live_owner": {
+          "allowed": false,
+          "rollback_safe": false,
+          "reasons": [
+            "ledger_locked_by_live_owner"
+          ],
+          "returncode": 2
+        }
+      }
+    },
+    "probe_sha256": "c240626a9aa392075f5db9e53e15bb1b61dbc156cef54bdffb7967b1e9d4cad4",
+    "ledger_schema": 2,
+    "fixture_content_unchanged": true
+  },
+  "linux_candidate": {
+    "archive_sha256": "d176c043db961ecd38cb03b52f99d5d4330d55510c764dcacff6b2e2ede0f57a",
+    "image_id": "sha256:f54796a13cee26f64abf289b0eea96681a134ab2ee7410bab352fd705e2d4720",
+    "runtime": {
+      "environment": "simulation",
+      "planner": "offline",
+      "audio": "mock",
+      "control_isolation": "process"
+    },
+    "operation_states": [
+      "RETURNED",
+      "RETURNED"
+    ],
+    "effects": [
+      "sat",
+      "sat"
+    ],
+    "compute_smoke": true,
+    "control_smoke": true,
+    "three_distinct_pids": true,
+    "host_containers_before": 40,
+    "host_containers_after": 40,
+    "host_containers_unchanged": true,
+    "preflight_only": true,
+    "smoke_receipt_sha256": "5e525e7e47b13237293eb3cd2858fc8fda6ed09f43dbd13e5a2453b3605ee17a",
+    "published": false
+  },
+  "live_console_commit_observed": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+  "hardware_verified": false,
+  "p1_complete": false
+}
