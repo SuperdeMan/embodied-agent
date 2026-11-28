@@ -74,3 +74,4 @@
 | 2026-11-28 | 463199e | tabletop_pick_place@v1 | 30/30 | PASS | D041，隔离物理控制，脚本 + 真值。完整与 Linux 证据见 `eval/controlled-step-retry-20261128.json`。 |
 | 2026-11-28 | 463199e | tabletop_pick_place@v1 | 29/30 | PASS* | 隔离 pick-v1 + 脚本放置 + 真值。第 14 局 seed 1 达到策略时域上限，M2 不劣于脚本目标仍待达成。 |
 | 2026-11-28 | 463199e | tabletop_pick_place@v1 | 30/30 | PASS | 隔离 ColorBlob + 脚本，使用独立真值裁判。 |
+| 2026-11-29 | 77b754d | tabletop_pick_place@v1 | 30/30 | PASS | D042 浏览器文本传输修复，隔离物理控制、脚本 + 真值。测试与真实浏览器证据见 `eval/console-text-receipts-20261129.json`。 |

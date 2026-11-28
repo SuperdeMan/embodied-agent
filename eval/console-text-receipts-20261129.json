@@ -1,0 +1,194 @@
+{
+  "qualified_commit": "77b754d8ac7dcf2300570f27f5fc50ca19b6f310",
+  "source_tree": "6426f45cff6fc10b085f27e8b60d3bffbbfe971f",
+  "ruff": "passed",
+  "full_suite": {
+    "tests": 961,
+    "failed": 0,
+    "skipped": 0,
+    "junit_sha256": "dd4645fc97c0cc2a79a3f2d409d746524fd537cdcb24fe51488cf99442eb9dfa"
+  },
+  "node_transport_tests": {
+    "passed": 4,
+    "failed": 0,
+    "tap_sha256": "b1d8b13b6fefb860562d38d1f8285b8d5e69f52bae4b8b984a621859798a030a"
+  },
+  "scripted_truth_reference": {
+    "wins": 30,
+    "total": 30,
+    "result_sha256": "33d87309b493944f39e20589efe16ef5d4300661664444083db8f2d98e76be1f"
+  },
+  "linux_candidate": {
+    "image_id": "sha256:2d37ef2d3ede52ae6d9b8f9646086c4bd7122a73022014d4628d8bebf0a1660e",
+    "passed": true,
+    "original_containers_unchanged": true
+  },
+  "linux_v3_text_check": {
+    "commit": "77b754d8ac7dcf2300570f27f5fc50ca19b6f310",
+    "schema": 3,
+    "probe_only_all_tables_unchanged": true,
+    "frame_order": [
+      "turn_start",
+      "step",
+      "step",
+      "reply"
+    ],
+    "steps": [
+      "ok",
+      "ok"
+    ],
+    "added_tasks": 1,
+    "added_operations": 2,
+    "after_digest": "ab0c0a1d8cdfc6f63d9e747a1c1c5466d1acfb50a3ffffae540d33d1bf0d817e",
+    "prior_v3_image_reads_new_writes": true,
+    "previous_commit": "463199e2fc41d7387f3541f314c79bf70bf629fe"
+  },
+  "browser_fault_injection": {
+    "events": [
+      "out:hello",
+      "in:ping",
+      "fixture:drop_before_text",
+      "out:hello",
+      "in:ping",
+      "out:pong",
+      "in:text",
+      "out:turn_start",
+      "out:step",
+      "out:step",
+      "out:reply",
+      "out:tts_start",
+      "out:tts_end",
+      "in:ping",
+      "out:pong",
+      "in:text",
+      "fixture:retire_after_text",
+      "out:hello"
+    ],
+    "durable_counts": {
+      "tasks": 1,
+      "operations": 2,
+      "attempts": 2
+    },
+    "unanswered_text_warning_visible": true,
+    "unsent_probe_retried": true,
+    "submitted_text_replayed": false
+  },
+  "hardware_verified": false,
+  "activation": {
+    "activation_id": "d042-20261128T162907Z",
+    "commit": "77b754d8ac7dcf2300570f27f5fc50ca19b6f310",
+    "previous_commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+    "image_id": "sha256:2d37ef2d3ede52ae6d9b8f9646086c4bd7122a73022014d4628d8bebf0a1660e",
+    "compose_sha256": "55a9bea3a639e02dc99b38ba9a6d07e73c608645b4f9fd8587a119755be7b0b7",
+    "other_containers_unchanged": true,
+    "other_container_count": 39,
+    "serve_other_mappings_unchanged": true,
+    "funnel": false,
+    "schema_before": 3,
+    "schema_after": 3,
+    "before_counts": {
+      "schema_version": 1,
+      "tasks": 22,
+      "operations": 40,
+      "attempts": 40,
+      "operation_events": 153,
+      "task_plans": 16,
+      "task_events": 89,
+      "recovery_grants": 0
+    },
+    "before_all_tables_sha256": "dd6117b49cc175b779c566dc630d38ae7e2a9aa015e6ecc257428d28a142d6a8",
+    "backup_sha256": "dfb6553e7a55cc91fa217f87e1319f7348693d6fab35b541ceb6446d33fc6b21",
+    "verified_previous_v3_pair": true,
+    "retained_named_volume": true,
+    "scopes": [
+      "reconcile_effect",
+      "reconcile_stop"
+    ],
+    "qualified_evidence_sha256": "2b220dd0be54142b541a0d0386bbafd651b5e7fea7c8daa5c48381fff76c8867"
+  },
+  "live_browser": {
+    "commit": "77b754d8ac7dcf2300570f27f5fc50ca19b6f310",
+    "activation_id": "d042-20261128T162907Z",
+    "actual_https_wss": {
+      "commit": "77b754d8ac7dcf2300570f27f5fc50ca19b6f310",
+      "runtime": {
+        "environment": "simulation",
+        "planner": "offline",
+        "audio": "mock",
+        "control_isolation": "process"
+      },
+      "scopes": [
+        "reconcile_effect",
+        "reconcile_stop"
+      ],
+      "served_asset_sha256": {
+        "app.js": "97973718a9669f98e4622fef6361911866434af101ee8774b2ebdc48023c3e0b",
+        "text-transport.js": "200c7144d03350b9213954c621575036703cba39fe3e8d59eb630619b07597c5"
+      },
+      "jpeg_bytes": 31088,
+      "preview_statuses": [
+        503,
+        200
+      ],
+      "correlated_frames": [
+        "turn_start",
+        "reply"
+      ]
+    },
+    "browser": {
+      "engine": "Microsoft Edge",
+      "idle_ms_before_single_click": 76906,
+      "ui_steps": [
+        "skill.manip.pick: OK",
+        "skill.manip.place: OK"
+      ],
+      "ui_completion_seen": true,
+      "eventual_preview_shape": [
+        640,
+        480
+      ],
+      "intermittent_broken_preview_seen": true,
+      "physical_audio_verified": false
+    },
+    "ledger": {
+      "task_id": "0f4ee6f7206049e3a0b4dd3bdd8997d8",
+      "all_prior_v3_rows_preserved": true,
+      "before_digest": "dd6117b49cc175b779c566dc630d38ae7e2a9aa015e6ecc257428d28a142d6a8",
+      "after_digest": "f2ad7f27bf8b2b23c0bfe00f7b9c05f3bbdecfd0fd94367a412ac03c16da100b",
+      "before_counts": {
+        "schema_version": 1,
+        "tasks": 22,
+        "operations": 40,
+        "attempts": 40,
+        "operation_events": 153,
+        "task_plans": 16,
+        "task_events": 89,
+        "recovery_grants": 0
+      },
+      "after_counts": {
+        "schema_version": 1,
+        "tasks": 23,
+        "operations": 42,
+        "attempts": 42,
+        "operation_events": 160,
+        "task_plans": 17,
+        "task_events": 95,
+        "recovery_grants": 0
+      },
+      "added_tasks": 1,
+      "added_operations": 2,
+      "added_attempts": 2
+    },
+    "workflow": "FINISHED",
+    "effect_verdicts": [
+      "sat",
+      "sat"
+    ],
+    "automatic_resume_allowed": false
+  },
+  "verification_notes": [
+    "The D041 predecessor was observed to disconnect on a text send in one idle native Edge session. A fresh native session completed grab and placement. The transport intermediary responsible was not established.",
+    "In the Windows-generated candidate archive, delivered JavaScript uses CRLF. Its exact HTTP byte digests match bundle-manifest.json, and LF-normalized bodies match the immutable Git objects.",
+    "The visible scene briefly showed a broken frame before a 640 by 480 image decoded. First-frame or transient 503 availability remains separate from text receipt verification."
+  ]
+}

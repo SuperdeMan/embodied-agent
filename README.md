@@ -33,7 +33,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID
 uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID --cancel
 ```
 
-**远端状态与云端入口**：D019/D036 提供带逐对象时效验证的远端仿真快照。2026-11-28 私网 HTTPS 8449 常驻控制台升级至 `463199e`，使用 v3 账本、离线规划与模拟音频。部署与恢复回执见[云端部署记录](docs/cloud-deployment.md)。
+**远端状态与云端入口**：D019/D036 提供带逐对象时效验证的远端仿真快照。私网 HTTPS 8449 常驻控制台使用 v3 账本、离线规划与模拟音频。2026-11-29 激活 `77b754d`，Edge 已验证空闲后的单次文本抓放和两步回执。详见[云端部署记录](docs/cloud-deployment.md)。
 
 **停止对账（D021）**：已实现受信仿真 profile 的确认式停止观测：等待实际工作线程退出，观测关节速度与夹持接触，证据落账后才释放资源。原操作仍保持 UNKNOWN，不自动重放，也不解除 Guard 闩锁。使用方式与验证范围见[停止与受信恢复](docs/stop-reconciliation.md)。
 
