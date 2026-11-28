@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import subprocess
 import sys
 import sysconfig
 import threading
@@ -10,9 +11,18 @@ from pathlib import Path
 
 import pytest
 
-from embodied.runtime.compute import ComputeProcess, ComputeUnavailable
+from embodied.runtime.compute import ComputeProcess, ComputeUnavailable, worker_environment
 from embodied.runtime.invocation import CURRENT_INVOCATION, InvocationPermit
 from embodied.runtime.observation import ObservationLane, ObservationUnavailable
+
+
+def test_worker_libraries_can_resolve_a_user_without_receiving_the_parent_login(monkeypatch):
+    for key in ("USER", "USERNAME", "LOGNAME", "LNAME"):
+        monkeypatch.setenv(key, "parent-login")
+    child = worker_environment()
+    assert not {"USERNAME", "LOGNAME", "LNAME"}.intersection(child)
+    assert subprocess.check_output([sys.executable, "-I", "-c", "import getpass; print(getpass.getuser())"],
+                                   env=child, text=True).strip() == "embodied-worker"
 
 
 def fixture_worker(tmp_path, **config):

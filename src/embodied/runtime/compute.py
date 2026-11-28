@@ -33,7 +33,9 @@ def worker_environment() -> dict[str, str]:
              "APPDATA", "LANG", "LC_ALL", "DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "MUJOCO_GL", "PYOPENGL_PLATFORM",
              "HF_HOME", "HUGGINGFACE_HUB_CACHE", "XDG_CACHE_HOME"}
     env = {key: value for key, value in os.environ.items() if key in names}
-    env.update(OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", LP_NUM_THREADS="1")
+    # 模型缓存需要 getpass.getuser()，子进程使用固定标签而不继承父进程身份。
+    # Model caches call getpass.getuser(); use a fixed worker label instead of forwarding the parent identity.
+    env.update(USER="embodied-worker", OPENBLAS_NUM_THREADS="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", LP_NUM_THREADS="1")
     return env
 
 
