@@ -1,0 +1,154 @@
+{
+  "qualified_commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+  "source_tree": "090e3d7f3148eb84786760fbdf122394db869f32",
+  "ruff": "passed",
+  "full_suite": {
+    "tests": 961,
+    "skipped": 0,
+    "failures": 0,
+    "junit_sha256": "c580abd8263f19fc1df371cbd3bfa8685f6426bca00fecd3901dd826630ccd8b"
+  },
+  "node_tests": {
+    "passed": 6,
+    "failed": 0,
+    "tap_sha256": "a592a6f1aa86202f4645a07d85aae0c1570dd522e0a0e1caa16e319b6e1d75ec"
+  },
+  "browser_fault": {
+    "two_initial_503": true,
+    "decoded_shape": [
+      640,
+      480
+    ],
+    "failure_after_good_frame_kept_same_src": true,
+    "last_received_time_visible": true,
+    "first_new_good_frame_replaced_old_src": true,
+    "notice_hidden_after_recovery": true,
+    "total_503_observed": 23,
+    "tasks_created": 0,
+    "operations_created": 0
+  },
+  "linux_candidate": {
+    "passed": true,
+    "image_id": "sha256:1fef0bd36f183cdf5c7d9bdd11ef707b0cc7817f5203d449e2e0090d018f41a8",
+    "previous_running_containers_unchanged": true
+  },
+  "linux_v3": {
+    "commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+    "schema": 3,
+    "probe_only_all_tables_unchanged": true,
+    "frame_order": [
+      "turn_start",
+      "step",
+      "step",
+      "reply"
+    ],
+    "steps": [
+      "ok",
+      "ok"
+    ],
+    "added_tasks": 1,
+    "added_operations": 2,
+    "after_digest": "5f90fd3305b5afea54b0b1ffa7cb85c1ff278760a2a93c0798363aaf47ff53fb",
+    "prior_v3_image_reads_new_writes": true,
+    "previous_commit": "77b754d8ac7dcf2300570f27f5fc50ca19b6f310"
+  },
+  "hardware_verified": false,
+  "activation": {
+    "activation_id": "d043-20261128T170754Z",
+    "commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+    "previous_commit": "77b754d8ac7dcf2300570f27f5fc50ca19b6f310",
+    "image_id": "sha256:1fef0bd36f183cdf5c7d9bdd11ef707b0cc7817f5203d449e2e0090d018f41a8",
+    "compose_sha256": "55a9bea3a639e02dc99b38ba9a6d07e73c608645b4f9fd8587a119755be7b0b7",
+    "other_containers_unchanged": true,
+    "other_container_count": 39,
+    "serve_other_mappings_unchanged": true,
+    "funnel": false,
+    "schema_before": 3,
+    "schema_after": 3,
+    "before_counts": {
+      "schema_version": 1,
+      "tasks": 23,
+      "operations": 42,
+      "attempts": 42,
+      "operation_events": 160,
+      "task_plans": 17,
+      "task_events": 95,
+      "recovery_grants": 0
+    },
+    "before_all_tables_sha256": "f2ad7f27bf8b2b23c0bfe00f7b9c05f3bbdecfd0fd94367a412ac03c16da100b",
+    "backup_sha256": "eba1e630f8efc4f2b79e80c3449810ca7d7a73706762376dabf6ae9c078249ad",
+    "verified_previous_v3_pair": true,
+    "retained_named_volume": true,
+    "scopes": [
+      "reconcile_effect",
+      "reconcile_stop"
+    ],
+    "qualified_evidence_sha256": "3a44d49d3f7164fb61b7c0c1787f7d6f1c2a551024f34e084f01b10025c4895b"
+  },
+  "live_preview": {
+    "commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+    "activation_id": "d043-20261128T170754Z",
+    "ledger": {
+      "schema": 3,
+      "all_eight_tables_unchanged": true,
+      "all_tables_sha256": "f2ad7f27bf8b2b23c0bfe00f7b9c05f3bbdecfd0fd94367a412ac03c16da100b",
+      "row_counts": {
+        "schema_version": 1,
+        "tasks": 23,
+        "operations": 42,
+        "attempts": 42,
+        "operation_events": 160,
+        "task_plans": 17,
+        "task_events": 95,
+        "recovery_grants": 0
+      },
+      "preview_created_tasks": 0
+    },
+    "https_wss": {
+      "commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+      "runtime": {
+        "environment": "simulation",
+        "planner": "offline",
+        "audio": "mock",
+        "control_isolation": "process"
+      },
+      "scopes": [
+        "reconcile_effect",
+        "reconcile_stop"
+      ],
+      "served_asset_sha256": {
+        "app.js": "0d3dcb1cf6290a58c4edbc028c1b63bb39170907c2e378e9c1b5818b77b12f60",
+        "text-transport.js": "200c7144d03350b9213954c621575036703cba39fe3e8d59eb630619b07597c5",
+        "scene-preview.js": "5e14661eacb0fb66931d7a1c268156f8ed5e470d3e1572d879dc498db4364999"
+      },
+      "jpeg_bytes": 31088,
+      "preview_statuses": [
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        200
+      ],
+      "correlated_frames": [
+        "turn_start",
+        "reply"
+      ]
+    },
+    "browser_preview": {
+      "visible": true,
+      "complete": true,
+      "width": 640,
+      "height": 480,
+      "scene_contents": [
+        "simulated arm",
+        "red cube",
+        "blue bin"
+      ],
+      "real_sensor_input": false
+    }
+  }
+}
