@@ -69,6 +69,8 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID 
 
 ## 学习闭环管线（M2 · 进行中）
 
+`uv run embodied failures` 汇总评测与录制里的失败案例，可用 `--category policy_horizon` 定位策略时域耗尽的局次，或用 `--root` 指定历史结果文件、采集目录。输出给出原始证据位置、可用的种子、局号与提交。仅保存评测结果的局次没有轨迹可回放。
+
 「采数据→转数据集→训练→部署回系统」全程命令化，学习技能与脚本技能**共用同一 manifest 与同一真值裁判**——替换实现对 planner 完全透明：
 
 ```bash

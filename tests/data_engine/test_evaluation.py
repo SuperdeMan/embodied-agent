@@ -111,6 +111,8 @@ async def test_run_judges_from_ground_truth_and_persists(task, tmp_path, monkeyp
     assert data["task"]["id"] == "fake_task@v9"
     assert data["total"] == 4 and data["wins"] == 2 and data["passed"] is False
     assert len(data["failures"]) == 2
+    assert {e["failure_category"] for e in data["failures"]} == {"judge_unsatisfied"}
+    assert all("failure_category" not in e for e in data["episodes"] if e["success"])
     assert all(e["steps"][0]["id"] == "s1" for e in data["episodes"])
 
 

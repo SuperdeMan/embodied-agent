@@ -17,10 +17,12 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import yaml
 
 from embodied.cognition.world_state import WorldSnapshot, object_in_region
+from embodied.data_engine.failures import eval_failure_category
 
 TASK_SCHEMA = "eval.task/v1"
 RESULT_SCHEMA = "eval.result/v1"
@@ -190,10 +192,13 @@ async def run_task(
                     {"id": r.step_id, "status": r.status.value, "detail": (r.detail or r.error)[:160]}
                     for r in turn.results
                 ]
-                episodes.append({
+                episode = {
                     "index": idx, "seed": seed, "start_pos": start_pos, "success": bool(success),
                     "steps": steps, "report": turn.text[:300], "episode_dir": episode_dir,
-                })
+                }
+                if not success:
+                    episode["failure_category"] = eval_failure_category(episode)
+                episodes.append(episode)
                 summary = " ".join(f"{s['id']}={s['status']}" for s in steps) or "no-steps"
                 progress(f"[{task.task_id}] episode {idx:>3}: seed={seed} pos={start_pos[:2]} "
                          f"{summary} -> {'SUCCESS' if success else 'FAIL'}")
@@ -210,7 +215,15 @@ def _persist(task: EvalTask, report: EvalReport, out_dir: Path | str | None) -> 
     root = Path(out_dir or os.getenv("EVAL_OUT_DIR", "outputs/eval"))
     root.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    out = root / f"{task.name}@{task.version}-{stamp}.json"
+    out = root / f"{task.name}@{task.version}-{stamp}-{uuid4().hex}.json"
+    for episode in report.episodes:
+        if episode["episode_dir"]:
+            directory = Path(episode["episode_dir"]).resolve()
+            try:
+                episode["episode_relative_to_report"] = Path(os.path.relpath(directory, root.resolve())).as_posix()
+            except ValueError:
+                # Windows 上不同卷之间只能保留绝对路径。 / Windows cross-volume paths must remain absolute.
+                episode["episode_relative_to_report"] = str(directory)
     payload = {
         "schema": RESULT_SCHEMA,
         "task": {"id": task.task_id, "file": task.path, "command": task.command,
@@ -225,5 +238,10 @@ def _persist(task: EvalTask, report: EvalReport, out_dir: Path | str | None) -> 
         "failures": [e for e in report.episodes if not e["success"]],
         "episodes": report.episodes,
     }
-    out.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    partial = out.with_suffix(".partial")
+    try:
+        partial.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+        partial.replace(out)
+    finally:
+        partial.unlink(missing_ok=True)
     return out

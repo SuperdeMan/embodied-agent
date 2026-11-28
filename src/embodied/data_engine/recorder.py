@@ -385,6 +385,10 @@ class EpisodeWriter:
             "extra_meta": self._extra_meta,
             "lerobot_field_map": LEROBOT_FIELD_MAP,
         }
+        if success is False:
+            from embodied.data_engine.failures import failure_category
+
+            payload["failure_category"] = failure_category(detail, aborted=aborted)
         if steps_sha256 is not None:
             payload["steps_sha256"] = steps_sha256
         _write_json(self.path / "meta.json", payload)
@@ -673,6 +677,7 @@ def recover_episode(path: Path | str, *, detail: str = "recovered from abrupt cr
         "success": False,
         "aborted": True,
         "recovered_from_crash": True,
+        "failure_category": "interrupted",
         "dropped_corrupt_tail_lines": dropped_corrupt_tail_lines,
         "detail": detail,
         "length": n,

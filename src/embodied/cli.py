@@ -84,6 +84,10 @@ def main(argv: list[str] | None = None) -> int:
     conv.add_argument("--include-failures", action="store_true", help="also convert success=false episodes")
     conv.add_argument("--repo-id", default="", help="dataset repo id (default local/<out dirname>)")
 
+    failures = sub.add_parser("failures", help="index failed eval runs and recorded episodes")
+    failures.add_argument("--root", action="append", help="eval or episode file/directory; repeat for several roots")
+    failures.add_argument("--category", help="filter by recorded failure category")
+
     console = sub.add_parser("console", help="web console: voice/text control of the tabletop sim")
     _add_common(console)
     console.add_argument("--host", default="127.0.0.1")
@@ -165,6 +169,18 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_collect(args))
     if args.cmd == "convert":
         return _convert(args)
+    if args.cmd == "failures":
+        import json
+        from pathlib import Path
+
+        from embodied.data_engine.failures import failure_index
+
+        defaults = (os.getenv("EVAL_OUT_DIR") or "outputs/eval", os.getenv("EPISODES_DIR") or "outputs/episodes",
+                    "outputs/collect")
+        roots = [Path(p) for p in args.root] if args.root else [Path(p) for p in defaults if Path(p).exists()]
+        report = failure_index(roots, args.category)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 1 if report["issues"] else 0
     if args.cmd == "teleop":
         return _teleop(args)
     if args.cmd == "console":
