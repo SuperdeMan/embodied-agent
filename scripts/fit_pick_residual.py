@@ -43,6 +43,48 @@ class ResidualBank:
     parity_inputs: list[dict[str, np.ndarray]]
 
 
+@dataclass
+class ColorCalibration:
+    truth: np.ndarray
+    position_error: np.ndarray
+    table_height: float
+    digest: str
+
+    @classmethod
+    def load(cls, path: Path) -> ColorCalibration:
+        raw = path.read_bytes()
+        data = json.loads(raw)
+        if (data.get("schema") != "embodied.pick-color-calibration/v1" or data.get("provider") != "color"
+                or data.get("robot_id") != "sim.mujoco.so_arm100" or data.get("object") != "obj_cube"):
+            raise ValueError("calibration must describe the reference ColorBlob cube and robot")
+        asset = data.get("asset_digest", "")
+        if not isinstance(asset, str) or len(asset) != 64 or any(ch not in "0123456789abcdef" for ch in asset):
+            raise ValueError("calibration asset digest missing or invalid")
+        rows = [row for row in data["samples"] if "observed" in row]
+        if (len(rows) != data.get("available") or len(data["samples"]) != data.get("total")
+                or len({row["index"] for row in data["samples"]}) != data["total"]):
+            raise ValueError("inconsistent calibration sample counts")
+        if len(rows) < 8 or any(row.get("quaternion") != [1.0, 0.0, 0.0, 0.0] for row in rows):
+            raise ValueError("invalid sample count or orientation for the position-only provider")
+        truth = np.asarray([row["truth"] for row in rows], dtype=np.float32)
+        errors = np.asarray([np.subtract(row["observed"], row["truth"]) for row in rows], dtype=np.float32)
+        if truth.shape != (len(rows), 3) or errors.shape != truth.shape or not all(np.isfinite(x).all() for x in (truth, errors)):
+            raise ValueError("invalid paired positions")
+        return cls(truth, errors, float(np.median(truth[:, 2])), hashlib.sha256(raw).hexdigest())
+
+    def observation(self, environment: np.ndarray, episode: int, sample: int) -> np.ndarray | None:
+        """Apply an empirical local offset only in the sampled height band. 仅在标定的桌面高度带内施加局部实测偏差。"""
+        if abs(float(environment[0, 2]) - self.table_height) > 0.005:
+            return None
+        distance = np.sum((self.truth[:, :2] - environment[0, :2]) ** 2, axis=1)
+        nearest = np.argsort(distance)[:8]
+        index = nearest[(episode * 13 + sample) % len(nearest)]
+        augmented = environment.copy()
+        augmented[0, :3] += self.position_error[index]
+        augmented[0, 3:] = (1.0, 0.0, 0.0, 0.0)
+        return augmented
+
+
 def file_digest(path: Path) -> str:
     with path.open("rb") as source:
         return hashlib.file_digest(source, "sha256").hexdigest()
@@ -63,7 +105,8 @@ def check_dataset(dataset: Path, control_hz: float) -> dict:
             "task_index": int(tasks["task_index"].iloc[0])}
 
 
-def fit_bank(dataset: Path, session: ort.InferenceSession, metadata: dict[str, str], stride: int) -> ResidualBank:
+def fit_bank(dataset: Path, session: ort.InferenceSession, metadata: dict[str, str], stride: int,
+             calibration: ColorCalibration | None = None) -> ResidualBank:
     """Fit residuals only where the expert recorded a target. 仅对专家实际记录的未来动作拟合残差。"""
     expected = check_dataset(dataset, float(metadata["control_hz"]))
     files = sorted((dataset / "data").rglob("*.parquet"))
@@ -90,19 +133,25 @@ def fit_bank(dataset: Path, session: ort.InferenceSession, metadata: dict[str, s
             raise ValueError(f"non-contiguous frame indices in episode {episode_id}")
         state, environment, actions = (vectors[name][ids] for name in (STATE, ENV, ACTION))
         for tick in range(0, len(ids), stride):
-            inputs = {INPUT_STATE: state[tick:tick + 1], INPUT_ENV: environment[tick:tick + 1]}
-            prediction = session.run([OUTPUT_CHUNK], inputs)[0][0]
-            if prediction.shape != (horizon, len(JOINTS)) or not np.isfinite(prediction).all():
-                raise ValueError("invalid output from frozen pick policy")
+            observations = [environment[tick:tick + 1]]
+            if calibration is not None:
+                augmented = calibration.observation(observations[0], int(episode_id), tick // stride)
+                if augmented is not None:
+                    observations.append(augmented)
             count = min(horizon, len(ids) - tick)
-            # 尾段没有观测目标的位置保持零修正。 / Leave unobserved targets at the end of an episode uncorrected.
-            delta = np.zeros_like(prediction)
-            delta[:count] = actions[tick:tick + count] - prediction[:count]
-            corrections.append(delta)
-            features.append(np.concatenate((state[tick], environment[tick, :3])))
-            valid_target_rows += count
-            if len(checks) < 4 and tick in (0, 30, 100, 160):
-                checks.append({key: value.copy() for key, value in inputs.items()})
+            for observation in observations:
+                inputs = {INPUT_STATE: state[tick:tick + 1], INPUT_ENV: observation}
+                prediction = session.run([OUTPUT_CHUNK], inputs)[0][0]
+                if prediction.shape != (horizon, len(JOINTS)) or not np.isfinite(prediction).all():
+                    raise ValueError("invalid output from frozen pick policy")
+                # 尾段没有观测目标的位置保持零修正。 / Leave unobserved targets at the end of an episode uncorrected.
+                delta = np.zeros_like(prediction)
+                delta[:count] = actions[tick:tick + count] - prediction[:count]
+                corrections.append(delta)
+                features.append(np.concatenate((state[tick], observation[0, :3])))
+                valid_target_rows += count
+                if len(checks) < 4 and tick in (0, 30, 100, 160):
+                    checks.append({key: value.copy() for key, value in inputs.items()})
 
     raw_features = np.asarray(features, dtype=np.float32)
     raw_corrections = np.asarray(corrections, dtype=np.float32)
@@ -183,7 +232,7 @@ def verify_parity(base_session, compiled_session, bank: ResidualBank, neighbors:
         expected = original + (strength / (1.0 + distances[indices[0]])) * correction
         actual = compiled_session.run([OUTPUT_CHUNK], inputs)[0]
         maximum = max(maximum, float(np.max(np.abs(expected - actual))))
-        if not np.isfinite(actual).all() or maximum >= 1e-4:
+        if not np.isfinite(expected).all() or not np.isfinite(actual).all() or maximum >= 1e-4:
             raise ValueError(f"residual ONNX parity failed: {maximum}")
     return maximum
 
@@ -209,6 +258,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-policy", type=Path, default=Path("outputs/policies/pick-v1.onnx"))
     parser.add_argument("--dataset", type=Path, required=True, help="LeRobot v3, pick-only, sim.mujoco.so_arm100")
+    parser.add_argument("--color-calibration", type=Path, help="paired ColorBlob calibration from calibrate_pick_observation.py")
     parser.add_argument("--out-dir", type=Path, default=Path("outputs/policies"))
     parser.add_argument("--stride", type=int, default=10)
     parser.add_argument("--neighbors", type=int, default=8)
@@ -229,7 +279,8 @@ def main() -> None:
     metadata = dict(base_session.get_modelmeta().custom_metadata_map)
     if metadata.get("embodied.schema") != POLICY_ONNX_SCHEMA or metadata.get("task") != "skill.manip.pick":
         parser.error("base policy metadata does not match the pick contract")
-    bank = fit_bank(args.dataset, base_session, metadata, args.stride)
+    calibration = ColorCalibration.load(args.color_calibration) if args.color_calibration else None
+    bank = fit_bank(args.dataset, base_session, metadata, args.stride, calibration)
     if args.neighbors > len(bank.features):
         parser.error("neighbor count exceeds demonstration samples")
     model = compile_model(base, bank, args.neighbors, args.strength)
@@ -239,6 +290,8 @@ def main() -> None:
         "strength": args.strength, "dataset_sha256": bank.parquet_digests, "feature_scale": bank.scale.tolist(),
         "residual_clip": bank.clip.tolist(),
     }
+    if calibration is not None:
+        provenance["calibration_sha256"] = calibration.digest
     metadata.update(source="ACT with a demonstration-fitted local residual", residual_fit=json.dumps(provenance, sort_keys=True))
     helper.set_model_props(model, metadata)
     onnx.checker.check_model(model)

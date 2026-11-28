@@ -16,6 +16,22 @@ pd = pytest.importorskip("pandas")
 builder = runpy.run_path(str(Path(__file__).resolve().parents[2] / "scripts/fit_pick_residual.py"))
 
 
+def test_color_calibration_uses_paired_local_offsets_only_at_table_height(tmp_path):
+    rows = [{"index": i, "truth": [i / 100, -0.2, 0.015], "observed": [i / 100 + 0.001, -0.2, 0.015],
+             "quaternion": [1.0, 0.0, 0.0, 0.0]} for i in range(8)]
+    raw = {"schema": "embodied.pick-color-calibration/v1", "provider": "color", "robot_id": "sim.mujoco.so_arm100",
+           "object": "obj_cube", "asset_digest": "1" * 64, "samples": rows, "available": 8, "total": 8}
+    path = tmp_path / "calibration.json"
+    path.write_text(json.dumps(raw), encoding="utf-8")
+    calibration = builder["ColorCalibration"].load(path)
+    observation = np.array([[0.03, -0.2, 0.015, 0.5, 0.5, 0.5, 0.5]], dtype=np.float32)
+    adjusted = calibration.observation(observation, episode=1, sample=0)
+    np.testing.assert_allclose(adjusted[0], [0.031, -0.2, 0.015, 1, 0, 0, 0], atol=1e-6)
+    assert observation[0, 3] == 0.5
+    observation[0, 2] = 0.1
+    assert calibration.observation(observation, episode=1, sample=0) is None
+
+
 def test_reference_layout_and_no_future_label_padding(tmp_path):
     state_key = builder["STATE"]
     env_key = builder["ENV"]
