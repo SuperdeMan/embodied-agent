@@ -35,6 +35,7 @@ import io
 import json
 import logging
 import os
+import re
 import sqlite3
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -122,11 +123,21 @@ class ConsoleSession:
         except json.JSONDecodeError:
             await self.send({"type": "error", "message": "bad json"})
             return
+        if not isinstance(msg, dict):
+            await self.send({"type": "error", "message": "expected JSON object"})
+            return
         kind = msg.get("type")
-        if kind == "text":
+        request_id = msg.get("request_id")
+        if kind == "ping" or (kind == "text" and "request_id" in msg):
+            if not isinstance(request_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", request_id):
+                await self.send({"type": "error", "message": "invalid request_id"})
+                return
+        if kind == "ping":
+            await self.send({"type": "pong", "request_id": request_id})
+        elif kind == "text":
             text = str(msg.get("text", "")).strip()
             if text:
-                self._spawn(self.run_turn(text))
+                self._spawn(self.run_turn(text, request_id=request_id))
         elif kind == "audio_start":
             self.audio_buf.clear()
             self.recording = True
@@ -174,9 +185,10 @@ class ConsoleSession:
         if text.strip():
             await self.run_turn(text)
 
-    async def run_turn(self, text: str) -> None:
+    async def run_turn(self, text: str, *, request_id: str | None = None) -> None:
         async with self._turn_lock:
-            await self.send({"type": "turn_start"})
+            correlation = {"request_id": request_id} if request_id is not None else {}
+            await self.send({"type": "turn_start", **correlation})
             try:
                 recording = None
                 if self.ctx.recorder is None:
@@ -185,21 +197,21 @@ class ConsoleSession:
                     turn, recording = await self.ctx.recorder.turn(self.engine, text)
             except Exception as e:
                 logger.exception("engine turn failed")
-                await self.send({"type": "error", "message": f"turn failed: {e}"})
+                await self.send({"type": "error", "message": f"turn failed: {e}", **correlation})
                 return
             for r in turn.results:
                 plan_step = next(
                     (s for s in (turn.plan.steps if turn.plan else []) if s.id == r.step_id), None
                 )
                 await self.send({
-                    "type": "step", "step_id": r.step_id,
+                    "type": "step", "step_id": r.step_id, **correlation,
                     "task_id": getattr(turn, "task_id", ""),
                     "skill": plan_step.skill if plan_step else "",
                     "status": r.status.value, "detail": r.detail or r.error,
                     "operation_id": r.operation_id, "attempt_id": r.attempt_id,
                     "invocation_state": r.invocation_state, "stop_state": r.stop_state,
                 })
-            reply = {"type": "reply", "text": turn.text, "task_id": getattr(turn, "task_id", "")}
+            reply = {"type": "reply", "text": turn.text, "task_id": getattr(turn, "task_id", ""), **correlation}
             if recording is not None:
                 reply["recording"] = recording
             await self.send(reply)
@@ -367,7 +379,7 @@ async def ws_handler(request: web.Request) -> web.WebSocketResponse:
     await session.send({
         "type": "hello", "skills": skills,
         "embodiment": ctx.sim.spec().embodiment_id, "pcm_sample_rate": PCM_SAMPLE_RATE,
-        "runtime": ctx.runtime_info,
+        "runtime": ctx.runtime_info, "capabilities": ["text_probe"],
     })
     try:
         async for msg in ws:

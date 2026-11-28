@@ -1,6 +1,7 @@
 // hri.v0 WebSocket 控制台客户端，协议说明见服务端文档字符串。
 // Console client for the hri.v0 WS contract (see src/embodied/hri/server.py docstring).
 import { PcmPlayer, PcmRecorder } from "/console/pcm.js";
+import { sendCheckedText } from "/console/text-transport.js";
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $("status"), logEl = $("log"), tlEl = $("timeline");
@@ -11,6 +12,12 @@ let ws = null;
 let player = new PcmPlayer();
 let recorder = null;
 let pendingConfirm = null;
+let session = null;
+let reconnectTimer = null;
+let checkingText = false;
+let nextRequest = 0;
+let voiceSocket = null;
+const outstanding = new Set();
 
 function logMsg(who, text, cls) {
   const div = document.createElement("div");
@@ -31,15 +38,33 @@ function addStep(s) {
 }
 
 function connect() {
-  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/session`);
+  clearTimeout(reconnectTimer);
+  const socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/session`);
+  ws = socket;
+  let settle;
+  const own = {socket, canProbe: false, ready: new Promise(resolve => { settle = resolve; })};
+  session = own;
   ws.binaryType = "arraybuffer";
-  ws.onopen = () => (statusEl.textContent = "已连接");
-  ws.onclose = () => { statusEl.textContent = "连接断开，3s 后重连…"; setTimeout(connect, 3000); };
+  ws.onopen = () => { if (session === own) statusEl.textContent = "正在建立会话…"; };
+  ws.onclose = () => {
+    settle(false);
+    if (session !== own) return;
+    if (outstanding.size) logMsg("连接", `有 ${outstanding.size} 条已发送的指令尚无回执，执行结果待查。`, "err");
+    outstanding.clear();
+    pendingConfirm = null;
+    if (dlg.open) dlg.close();
+    statusEl.textContent = "连接断开，3s 后重连…";
+    reconnectTimer = setTimeout(connect, 3000);
+  };
   ws.onmessage = (e) => {
+    if (session !== own) return;
     if (e.data instanceof ArrayBuffer) { player.feed(e.data); return; }
     const m = JSON.parse(e.data);
+    if (m.type === "reply" || m.type === "error") outstanding.delete(m.request_id);
     switch (m.type) {
       case "hello":
+        own.canProbe = Array.isArray(m.capabilities) && m.capabilities.includes("text_probe");
+        settle(true);
         statusEl.textContent = `已连接 · ${m.embodiment} · ${m.skills.length} skills`;
         if (m.runtime?.planner === "offline") statusEl.textContent += " · 仿真 / 离线规划";
         if (m.runtime?.audio === "mock") statusEl.textContent += " · 模拟音频（请用文本）";
@@ -61,6 +86,7 @@ function connect() {
       case "error": logMsg("error", m.message, "err"); break;
     }
   };
+  return own;
 }
 
 function showConfirm(m) {
@@ -80,12 +106,34 @@ function answerConfirm(approved) {
   if (dlg.open) dlg.close();
 }
 
-function sendText() {
+async function sendText() {
   const t = textEl.value.trim();
-  if (!t || ws?.readyState !== 1) return;
-  logMsg("you", t, "user");
-  ws.send(JSON.stringify({ type: "text", text: t }));
-  textEl.value = "";
+  if (!t || checkingText) return;
+  const id = `text-${++nextRequest}`;
+  checkingText = true;
+  try {
+    const outcome = await sendCheckedText({
+      current: () => session,
+      wanted: () => textEl.value.trim() === t,
+      reconnect: old => {
+        if (outstanding.size || pendingConfirm || recorder) return null;
+        old?.socket.close();
+        return connect();
+      },
+      dispatch: own => { if (own.canProbe) outstanding.add(id); },
+    }, t, id);
+    if (outcome === "sent") {
+      logMsg("you", t, "user");
+      if (textEl.value.trim() === t) textEl.value = "";
+    } else if (outcome === "unavailable") {
+      logMsg("连接", "未能确认连接，本条指令尚未发送。", "err");
+    }
+  } catch {
+    outstanding.delete(id);
+    logMsg("连接", "发送遇到错误，执行状态待查。", "err");
+  } finally {
+    checkingText = false;
+  }
 }
 $("send").onclick = sendText;
 textEl.addEventListener("keydown", (e) => { if (e.key === "Enter") sendText(); });
@@ -96,14 +144,17 @@ async function talkStart(e) {
   e.preventDefault();
   if (ws?.readyState !== 1 || recorder) return;
   try {
-    recorder = new PcmRecorder((buf) => { if (ws?.readyState === 1) ws.send(buf); });
-    ws.send(JSON.stringify({ type: "audio_start" }));
+    const channel = ws;
+    voiceSocket = channel;
+    recorder = new PcmRecorder((buf) => { if (channel.readyState === 1 && channel === ws) channel.send(buf); });
+    channel.send(JSON.stringify({ type: "audio_start" }));
     await recorder.start();
     talkBtn.classList.add("rec");
     talkBtn.textContent = "松开结束";
   } catch (err) {
     logMsg("error", `麦克风不可用: ${err.message}`, "err");
     recorder = null;
+    voiceSocket = null;
   }
 }
 async function talkEnd() {
@@ -112,7 +163,9 @@ async function talkEnd() {
   recorder = null;
   talkBtn.classList.remove("rec");
   talkBtn.textContent = "按住说话";
-  if (ws?.readyState === 1) ws.send(JSON.stringify({ type: "audio_end" }));
+  const channel = voiceSocket;
+  voiceSocket = null;
+  if (channel?.readyState === 1 && channel === ws) channel.send(JSON.stringify({ type: "audio_end" }));
 }
 talkBtn.addEventListener("pointerdown", talkStart);
 talkBtn.addEventListener("pointerup", talkEnd);

@@ -144,6 +144,18 @@ async def test_hello_and_text_turn(client):
         assert len(pcm) == 2 * 320  # both fake chunks arrived
 
 
+async def test_read_only_ping_and_text_receipt_correlation(client):
+    async with client.ws_connect("/ws/session") as ws:
+        assert "text_probe" in (await recv_json(ws, "hello"))["capabilities"]
+        await ws.send_json({"type": "ping", "request_id": "r-4"})
+        assert await recv_json(ws) == {"type": "pong", "request_id": "r-4"}
+        await ws.send_json({"type": "ping", "request_id": []})
+        assert (await recv_json(ws))["type"] == "error"
+        await ws.send_json({"type": "text", "text": "hello", "request_id": "r-4"})
+        for kind in ("turn_start", "step", "reply"):
+            assert (await recv_json(ws, kind))["request_id"] == "r-4"
+
+
 async def test_voice_turn_streams_pcm_to_asr():
     asr = FakeASR("回零")
     ctx = make_ctx(asr=asr)
