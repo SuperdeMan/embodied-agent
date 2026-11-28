@@ -1,6 +1,7 @@
 // hri.v0 WebSocket 控制台客户端，协议说明见服务端文档字符串。
 // Console client for the hri.v0 WS contract (see src/embodied/hri/server.py docstring).
 import { PcmPlayer, PcmRecorder } from "/console/pcm.js";
+import { startScenePreview } from "/console/scene-preview.js";
 import { sendCheckedText } from "/console/text-transport.js";
 
 const $ = (id) => document.getElementById(id);
@@ -171,16 +172,7 @@ talkBtn.addEventListener("pointerdown", talkStart);
 talkBtn.addEventListener("pointerup", talkEnd);
 talkBtn.addEventListener("pointerleave", talkEnd);
 
-  // 上一帧完成后再刷新，避免慢渲染时反复中止图片请求。
-  // Refresh after the previous frame finishes; do not abort slow image requests repeatedly.
-  function refreshScene() {
-    const next = () => {
-      sceneEl.onload = sceneEl.onerror = null;
-      setTimeout(refreshScene, 200);
-    };
-    sceneEl.onload = sceneEl.onerror = next;
-    sceneEl.src = `/api/scene.jpg?t=${Date.now()}`;
-  }
-  refreshScene();
+const stopPreview = startScenePreview(sceneEl, $("scene-state"));
+window.addEventListener("pagehide", event => { if (!event.persisted) stopPreview(); });
 
 connect();

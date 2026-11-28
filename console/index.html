@@ -13,9 +13,11 @@
   header { grid-column: 1 / 3; display: flex; align-items: center; gap: 12px; }
   header h1 { font-size: 16px; font-weight: 600; }
   #status { font-size: 12px; color: #8b98a5; }
-  #scene-pane { background: #000; border-radius: 8px; overflow: hidden; display: flex;
+  #scene-pane { position: relative; background: #000; border-radius: 8px; overflow: hidden; display: flex;
                 align-items: center; justify-content: center; min-height: 0; }
   #scene { max-width: 100%; max-height: 100%; }
+  #scene-state { position: absolute; bottom: 10px; left: 10px; padding: 3px 8px;
+                 border-radius: 4px; background: #101418e6; color: #c9d2df; font-size: 12px; }
   #side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
   .card { background: #1a2027; border-radius: 8px; padding: 10px; overflow-y: auto; }
   #log { flex: 3; min-height: 0; }
@@ -49,7 +51,7 @@
   <h1>embodied console</h1>
   <span id="status">connecting…</span>
 </header>
-<div id="scene-pane"><img id="scene" alt="scene"></div>
+<div id="scene-pane"><img id="scene" alt="scene" hidden><span id="scene-state" role="status">正在等待仿真画面…</span></div>
 <div id="side">
   <div class="card" id="log"></div>
   <div class="card" id="timeline"><em style="color:#8b98a5">执行时间线</em></div>
