@@ -200,7 +200,9 @@ def test_model_bundle_same_shape_different_semantics_is_rejected(tmp_path):
         config_digests={"config/profile.json": cfg_digest},
         model_bundles=(_model("models/pick-v1.bin", digest),),
     )
-    rep_ok = preflight_release(ok_bundle, target, bundle_root=tmp_path)
+    db_path = tmp_path / "operations.sqlite3"
+    OperationLedger(db_path).close()
+    rep_ok = preflight_release(ok_bundle, target, bundle_root=tmp_path, ledger_path=db_path)
     assert rep_ok.allowed is True
     assert rep_ok.rollback_safe is False  # 未提供 current_bundle 或已验证回滚对时绝不标 rollback_safe。
 
@@ -256,6 +258,47 @@ def test_model_bundle_same_shape_different_semantics_is_rejected(tmp_path):
     )
     assert not rep_escape.allowed
     assert "model:pick-v1:artifact_path_traversal" in rep_escape.reasons
+
+
+@pytest.mark.parametrize("action", ["activate", "rollback"])
+def test_release_requires_exclusive_ledger_and_declared_artifacts(tmp_path, action):
+    """Missing evidence cannot approve a release. 缺少现场或文件证据时拒绝发行。"""
+    current = _release(verified_rollback_targets=(_COMMIT_OLD,))
+    bundle = _release(commit_sha=_COMMIT_OLD)
+    args = {"action": action, "current_bundle": current}
+    db_path = tmp_path / "operations.sqlite3"
+    OperationLedger(db_path).close()
+
+    for options, reason in [
+        ({}, "ledger_required"),
+        ({"ledger_path": db_path, "require_exclusive_lock": False}, "exclusive_ledger_lock_required"),
+    ]:
+        report = preflight_release(bundle, _target(), **args, **options)
+        assert report.reasons == (reason,)
+        assert not report.allowed and not report.rollback_safe
+
+    for files in [{"model_bundles": (_model(),)}, {"config_digests": {"profile.json": _SHA_C}}]:
+        report = preflight_release(_release(commit_sha=_COMMIT_OLD, **files), _target(), ledger_path=db_path, **args)
+        assert report.reasons == ("bundle_root_required",)
+        assert not report.allowed and not report.rollback_safe
+
+
+def test_release_requires_readable_onnx_metadata(tmp_path, monkeypatch):
+    """A matching hash cannot replace graph inspection. 哈希匹配时仍需读取图元数据。"""
+    from embodied.providers import policy
+
+    def unavailable(path):
+        raise RuntimeError("policy runtime unavailable")
+
+    monkeypatch.setattr(policy, "OnnxPolicy", unavailable)
+    model = tmp_path / "pick.onnx"
+    model.write_bytes(b"metadata-test")
+    bundle = _release(model_bundles=(_model(model.name, hashlib.sha256(model.read_bytes()).hexdigest()),))
+    db_path = tmp_path / "operations.sqlite3"
+    OperationLedger(db_path).close()
+    report = preflight_release(bundle, _target(), bundle_root=tmp_path, ledger_path=db_path)
+    assert report.reasons == ("model:pick-v1:onnx_metadata_unavailable",)
+    assert not report.allowed and not report.rollback_safe
 
 
 def test_maintenance_mode_blocks_live_owner_running_and_unconfirmed_stop(tmp_path):

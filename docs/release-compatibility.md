@@ -27,6 +27,8 @@
 | Schema 兼容 | 账本损坏、未知 schema（如 v99），或目标版本 `[min_ledger_schema, max_ledger_schema]` 不覆盖当前账本（如 v1-only 降级读 v2） | `allowed=false, rollback_safe=false` |
 | 回滚资格 | 目标回滚版本不在当前版本的 `verified_rollback_targets` 中 | `allowed=false, rollback_safe=false`（`unverified_rollback_target`） |
 
+D038 补充。激活和回滚都要提供 `--ledger` 并取得独占检查。涉及配置或模型文件时还要提供 `--bundle-root`；ONNX 文件需由能读取其元数据的运行时核验。缺少所需证据时，CLI 返回退出码 2，报告列出原因。
+
 ## 3. 全七表备份与原子恢复
 
 `src/embodied/runtime/release.py`（及 CLI `embodied release-check`）：

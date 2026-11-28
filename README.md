@@ -33,7 +33,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID
 uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID --cancel
 ```
 
-**远端状态与云端入口**：D019 已接入有时效的仿真快照，用于远端规划和效果验证；丢失、过期或旧代次不按成功处理。云端应用 `5b080dd` 已激活为私网 HTTPS 8449 仿真控制台，使用离线规划和模拟音频；真实地址从服务器 `current-release.json` 读取。范围、配置版本和实际验收见[云端部署记录](docs/cloud-deployment.md)。
+**远端状态与云端入口**：D019 和 D036 提供远端仿真快照及逐对象感知时效验证。最近一次常驻激活为 2026-11-22 的 `cb05aee`，私网 HTTPS 8449，采用离线规划和模拟音频。部署范围、运行配置及回执见[云端部署记录](docs/cloud-deployment.md)。
 
 **停止对账（D021）**：已实现受信仿真 profile 的确认式停止观测：等待实际工作线程退出，观测关节速度与夹持接触，证据落账后才释放资源。原操作仍保持 UNKNOWN，不自动重放，也不解除 Guard 闩锁。使用方式与验证范围见[停止与受信恢复](docs/stop-reconciliation.md)。
 
@@ -53,18 +53,18 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID 
 
 **恢复审查（D029）**：报告绑定任务/操作/尝试和控制上下文；异步检查期间发生变更或证据过期时失效，明确返回未授权执行。审查本身不授予任务执行权限，见[恢复审查边界](docs/recovery-review.md)。
 
-**操作者维护（D030）**：受控代理身份、精确账号白名单、短时一次性确认与消费审计已接入，仅授权效果重查；不开放停止、复位、重试或续跑。见[操作者授权](docs/operator-authorization.md)。
+**操作者维护（D030/D032）**：受控代理身份、精确账号白名单和一次性确认分别保护效果重查与停止对账。当前常驻策略显式开启这两个作用域。详见[操作者授权](docs/operator-authorization.md)与[停止授权](docs/stop-authorization.md)。
 
 **本体反馈（D031）**：关节/夹爪读取不再附带视觉采样，必要的物体观测仍保留，TTL 不放宽。见[反馈分离](docs/body-feedback.md)。
 
-云端已于 2026-11-04 升级至 `5b080dd`，保持既有 v2 账本、原数据卷与全部历史行；仍是私网仿真/离线规划/模拟音频。实际运行与访问链证据见[云端部署](docs/cloud-deployment.md)。
+**发行预检（D037/D038）**：`embodied release-check` 核对模型与本体兼容性、维护态账本和发行文件。v2 账本已经过双镜像降级读写与备份恢复演练。运行条件见[发行兼容](docs/release-compatibility.md)。
 
 ## 现在就能跑的（M1 · 仿真闭环）
 
 - **语音/文本 → 规划 → 执行 → 验证 → 汇报**全链路：Web 控制台按住说话或文本下令，LLM 产出结构化计划（DAG of skills），确定性执行器逐步执行并**对账世界状态**（动作完成 ≠ 任务完成：夹取滑落会被如实报告），最终汇报由代码从真实执行结果生成——结构性杜绝「嘴上说做了」。
 - **评测有数字**：随机化 pick&place 评测 harness，当前基线**三种子 30/30**；成功与否由仿真真值独立裁判，不信 agent 自报。
 - **安全默认在场**：LLM 永不直接触达执行通道；工作区围栏越界即闩锁停机、指令速率限幅、命令来源白名单；危险技能须经用户确认（无确认通道时 fail-closed 拒绝）。
-- **数据采集管线**：sim 使用 `--record` 开启，collect/teleop 接入 episode 录制与 LeRobot 转换；console 和异常中断恢复尚待补齐，不能保证所有入口默认落盘。
+- **数据采集管线**：版本化 sim 评测可用 `--record` 录制，collect/teleop 可产出可转换为 LeRobot 的 episode。已有录制支持[增量日志与进程崩溃恢复](docs/p1-metrics-baseline.md)，交互入口覆盖见[路线图](docs/roadmap.md)。
 - **离线可跑**：不配任何 API key 也能完整体验（确定性离线规划器 + mock 语音），配上 key（Anthropic/DeepSeek/Qwen/MiniMax + DashScope 语音）即切换真实模型，**换模型是配置不是重构**。
 
 ## 学习闭环管线（M2 · 进行中）

@@ -28,6 +28,15 @@ D025 已验收[有界只读观察](bounded-observation.md)：线程阻塞、取�
 
 D026 已验收[纯计算进程隔离](isolated-compute.md)，应用 `505b60e` 曾部署：Windows/Linux 生命周期、实际模型/渲染回归和数据保留均有证据；本批不迁移父进程物理控制。D027 已验收[任务日志与只读恢复评估](task-recovery.md)，应用 `f27d0ac` 及账本 v2 已部署，旧行逐条保留。D028 已修复存储故障下批量取消与 Guard 闩锁遗漏，应用 `c1fc926` 已部署；[参考故障矩阵](p1-fault-matrix.md) 120 项通过，实际设备/跨机故障门禁仍保留。D029 已验收[恢复审查快照与权限边界](recovery-review.md)，部署 `a29ad0e`，参考矩阵为 150 项。D030 已在受控 HTTP 接入身份与一次性效果重查审计；D031 去除本体反馈中的冗余视觉采样，`5b080dd` 曾部署，参考矩阵 185 项通过。D032 已在受控 HTTP 接入显式作用域隔离与一次性 `reconcile_stop` 审计授权（[受控停止授权](stop-authorization.md)），应用 `90135f0` 已部署，参考矩阵 10 组 222 项通过。D033 已为 `ControlService`/`SafetyService` 接入固定 CA/叶证书 SHA-256 的 BoringSSL mTLS、非回环明文拒止、硬编码角色方法隔离与维护审计（[RPC mTLS 认证](rpc-mtls-authorization.md)），`25343fa` 通过本机 878 项测试、11 组 241 项参考矩阵与 Linux Docker 三进程 mTLS 真栈验证。D034 已验收[物理控制进程隔离](physical-control-isolation.md)：无头 MuJoCo 物理子进程与父控制面及 D026 渲染子进程三进程分离，原生挂起/崩溃强杀回收并保留 Guard 闩锁与资源隔离，`cb05aee` 通过本机 897 项测试、12 组 260 项参考矩阵、Linux 容器 19 项 D034 + mTLS 实测并已部署云端控制台（HTTPS 8449）。D035 已验收[P1 可观测延迟与崩溃完整性基线](p1-metrics-baseline.md)：隔离仿真下 Guard 闩锁、持 GIL 强杀回收、仿真停止观测、100% 过期/重放拦截、人工介入率与 `EpisodeWriter` 增量刷盘硬杀恢复（损失严格 `< 10` 步、兼容 `v0`/LeRobot），`b723417` 通过本机 904 项测试、13 组 267 项参考矩阵及 Windows/Linux 容器双平台实测（云端常驻维持 `cb05aee`）。D036 已验收[跨机视觉与观察时钟契约](cross-host-observation-clock.md)：禁止跨主机 `local_monotonic`，执行 `wall_ntp`/`wall_ptp` 同步/偏斜/漂移/本地跳变与 Cristian 中点反查，修复 `PerceivedSim.read_reference_state()` 真值泄漏，并将 RPC 逐对象感知剩余 TTL 重基准至接收端单调时钟，`c549839` 通过本机 924 项测试、49 项 RPC、14 组 287 项参考矩阵及 Linux Docker 35 项 BoringSSL mTLS + OSMesa ColorBlob 实测（云端常驻维持 `cb05aee`）。D037 已验收[发行兼容与降级恢复](release-compatibility.md)：冻结 `ReleaseBundle`/`ModelBundle` 纯契约，执行超越张量维度的物理语义与维护态独占锁/活跃操作/未确认停止/schema 区间预检，并在 Linux Docker 隔离容器完成 `75853f5` ↔ `cb05aee` 真实双镜像 v2 写入降级与受损账本（含脏 WAL）认证原子恢复演练，`75853f5` 通过本机 936 项测试、49 项 RPC、15 组 299 项参考矩阵（云端常驻维持 `cb05aee`）。下一步优先经 schema v3 评审与授权推进受控执行恢复与多 attempt，或并行推进 M2 学习策略方差收敛；不提供自动续跑，真机 SG-0 停止、物理相机断连、硬件 PTP/NTP 同步与固件 OTA 保留实机门禁。历史感知失败与归因边界见[反馈分离](body-feedback.md)。
 
+## 2026-11-28 待办顺序
+
+1. 补齐 D038 发行预检的账本与文件证据，在 Linux 候选容器验证准入与拒绝。
+2. 评审[账本 v3 与受控单步恢复提案](controlled-recovery-v3.md)，获准后按副本迁移、授权消费和故障注入分别验收。
+3. 在固定 `tabletop_pick_place@v1`、种子与裁判上改善学习 pick。脚本 30/30，`pick-v1` 为 29/30，第 14 局达到策略时域上限。保留历史模型权重和负结果。
+4. 补齐交互 sim 和控制台录制、失败案例归档、浏览器麦克风/扬声器及人工示教验收。开放词汇 DINO 仍需评估误检与延迟，ColorBlob 是独立的已验收仿真配置。
+5. P2 在 SO-101、RGB-D 与现场控制器就绪后完成标定、安全停止和首条分拣任务，起步至少 50 次受控任务与故障注入。逐条记录[现场未关闭门禁](../eval/p1-fault-matrix.json)中的停机延迟、存储/供电、视觉时钟、网络分区、数据损失及固件发行证据。
+6. P3 验证同一技能跨第二本体与导航能力，P4 验证第二算力和设备代理的维护态激活/回滚，P5 待现场需求确定。
+
 ## 历史进展与保留事项
 
 [M0–M5 历史路线与进展](roadmap-milestones.md)保存原任务、完成记录和未闭环项；[评测账本](../eval/BASELINES.md)继续只增。M1 控制台人工验证、RPC 世界状态，M2 学习策略方差、DINO 鲁棒化、失败归档均未自动销项。它们按平台计划迁入 P1/P2，原 M3 真机对应 P2，M4 学习策略对应 P2/P4，M5 扩展对应 P3/P4/P5。

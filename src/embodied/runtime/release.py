@@ -138,7 +138,10 @@ def verify_model_compatibility(
         elif not artifact.is_file():
             reasons.append(f"{prefix}:artifact_missing")
         else:
-            actual_sha = _file_sha256(artifact)
+            try:
+                actual_sha = _file_sha256(artifact)
+            except OSError:
+                return [*reasons, f"{prefix}:artifact_unreadable"]
             if actual_sha != bundle.artifact_sha256:
                 reasons.append(f"{prefix}:artifact_sha256_mismatch")
             elif verify_onnx_metadata and artifact.suffix.lower() == ".onnx":
@@ -155,9 +158,7 @@ def verify_model_compatibility(
                     ):
                         reasons.append(f"{prefix}:onnx_metadata_mismatch")
                 except RuntimeError:
-                    # 无 policy 依赖组（onnxruntime）时跳过图元数据解析，仍强制保留 SHA-256 与语义检查。
-                    # Skip ONNX runtime inspection when the optional policy group is absent; SHA-256 & semantic gates still hold.
-                    pass
+                    reasons.append(f"{prefix}:onnx_metadata_unavailable")
                 except Exception:
                     reasons.append(f"{prefix}:onnx_artifact_invalid")
     return reasons
@@ -189,6 +190,8 @@ def preflight_release(
     if bundle.stop_profile_digest != target.stop_profile_digest:
         reasons.append("stop_profile_digest_mismatch")
 
+    if root is None and (bundle.config_digests or bundle.model_bundles):
+        reasons.append("bundle_root_required")
     if root is not None:
         for rel, expected in bundle.config_digests.items():
             resolved = _safe_child(root, rel)
@@ -196,20 +199,28 @@ def preflight_release(
                 reasons.append(f"config_path_traversal:{rel}")
             elif not resolved.is_file():
                 reasons.append(f"config_file_missing:{rel}")
-            elif _file_sha256(resolved) != expected:
-                reasons.append(f"config_digest_mismatch:{rel}")
+            else:
+                try:
+                    if _file_sha256(resolved) != expected:
+                        reasons.append(f"config_digest_mismatch:{rel}")
+                except OSError:
+                    reasons.append(f"config_file_unreadable:{rel}")
 
     for model in bundle.model_bundles:
         reasons.extend(verify_model_compatibility(model, target, artifact_root=root))
 
     ledger_version: int | None = None
     ledger_sha = ""
-    if ledger_path is not None:
+    if ledger_path is None:
+        reasons.append("ledger_required")
+    elif not require_exclusive_lock:
+        reasons.append("exclusive_ledger_lock_required")
+    else:
         try:
-            state = inspect_ledger_state(ledger_path, require_exclusive_lock=require_exclusive_lock)
+            state = inspect_ledger_state(ledger_path, require_exclusive_lock=True)
         except LedgerUnavailable:
             reasons.append("ledger_locked_by_live_owner")
-        except (FileNotFoundError, sqlite3.DatabaseError, ValueError):
+        except (OSError, sqlite3.DatabaseError, ValueError):
             reasons.append("ledger_corrupt_or_unsupported_schema")
         else:
             ledger_version = int(state["version"])
@@ -248,10 +259,8 @@ def preflight_release(
                 current_bundle.commit_sha in bundle.verified_rollback_targets
                 or current_bundle.release_id in bundle.verified_rollback_targets
             )
-            and (
-                ledger_version is None
-                or (current_bundle.min_ledger_schema <= ledger_version <= current_bundle.max_ledger_schema)
-            )
+            and ledger_version is not None
+            and current_bundle.min_ledger_schema <= ledger_version <= current_bundle.max_ledger_schema
         )
 
     return ReleasePreflightReport(
