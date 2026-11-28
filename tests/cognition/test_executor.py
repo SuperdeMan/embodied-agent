@@ -193,12 +193,19 @@ async def test_confirm_denied_and_approved():
     async def deny(skill, params):
         return False
 
+    async def invalid_answer(skill, params):
+        return "denied"
+
     async def approve(skill, params):
         return True
 
     plan = Plan(steps=[step("s1", "skill.test.danger", require_confirm=True)])
     denied = await collect(DagExecutor(registry, confirm=deny), plan)
     assert denied[0].status == StepStatus.NEED_CONFIRM and ran == []
+    malformed = await collect(DagExecutor(registry, confirm=invalid_answer), Plan(steps=[
+        step("s1", "skill.test.danger", require_confirm=True)
+    ]))
+    assert malformed[0].error == "confirm_denied" and ran == []
     approved = await collect(DagExecutor(registry, confirm=approve), Plan(steps=[
         step("s1", "skill.test.danger", require_confirm=True)
     ]))

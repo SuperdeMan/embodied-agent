@@ -97,10 +97,10 @@ class ConsoleSession:
         finally:
             self._pending_confirms.pop(rid, None)
 
-    def resolve_confirm(self, rid: str, approved: bool) -> None:
+    def resolve_confirm(self, rid: str, approved: object) -> None:
         fut = self._pending_confirms.get(rid)
         if fut is not None and not fut.done():
-            fut.set_result(bool(approved))
+            fut.set_result(approved is True)
 
     # -- io --------------------------------------------------------------------
 
@@ -136,7 +136,9 @@ class ConsoleSession:
             if pcm:
                 self._spawn(self.run_voice_turn(pcm))
         elif kind == "confirm_reply":
-            self.resolve_confirm(str(msg.get("rid", "")), bool(msg.get("approved")))
+            rid = msg.get("rid")
+            if isinstance(rid, str):
+                self.resolve_confirm(rid, msg.get("approved"))
         else:
             await self.send({"type": "error", "message": f"unknown type {kind!r}"})
 

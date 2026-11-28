@@ -159,7 +159,7 @@ class DagExecutor:
                     detail="dangerous step denied: no confirmation channel",
                 )
             confirmed = await self._confirm(step.skill, dict(step.params))
-            if not confirmed:
+            if confirmed is not True:
                 return StepResult(
                     step_id=step.id, status=StepStatus.NEED_CONFIRM,
                     error="confirm_denied", detail="user denied confirmation",

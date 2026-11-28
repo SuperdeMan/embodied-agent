@@ -166,7 +166,8 @@ async def test_voice_turn_streams_pcm_to_asr():
         await client.close()
 
 
-async def test_confirm_bridge_roundtrip():
+@pytest.mark.parametrize(("answer", "expected"), [(True, True), (False, False), ("false", False), (1, False)])
+async def test_confirm_bridge_roundtrip(answer, expected):
     """Danger gate reaches the browser and the reply resolves the engine's future.
 
     确认门抵达浏览器，回复解除引擎等待。
@@ -194,10 +195,10 @@ async def test_confirm_bridge_roundtrip():
             await ws.send_str(json.dumps({"type": "text", "text": "关机"}))
             req = await recv_json(ws, "confirm_request")
             assert req["skill"] == "skill.system.power_off"
-            await ws.send_str(json.dumps({"type": "confirm_reply", "rid": req["rid"], "approved": True}))
+            await ws.send_str(json.dumps({"type": "confirm_reply", "rid": req["rid"], "approved": answer}))
             reply = await recv_json(ws, "reply")
-            assert reply["text"] == "done"
-        assert outcomes == [True]
+            assert reply["text"] == ("done" if expected else "denied")
+        assert outcomes == [expected]
     finally:
         await client.close()
 
