@@ -24,6 +24,9 @@ class FakeSpec:
 
 
 class FakeSim:
+    def set_hooks(self, on_step, on_guard_event):
+        self.step_hook = on_step
+
     def spec(self):
         return FakeSpec()
 
@@ -210,6 +213,22 @@ async def test_scene_endpoint_serves_jpeg(client):
     body = await resp.read()
     # JPEG 文件起始标记。
     assert body[:2] == b"\xff\xd8"  # JPEG SOI
+
+
+async def test_recorded_reply_identifies_unjudged_episode(tmp_path):
+    from embodied.data_engine.interactive import InteractiveRecorder
+    from embodied.data_engine.recorder import replay_episode
+
+    ctx = make_ctx()
+    ctx.recorder = InteractiveRecorder(ctx.sim, source="console", seed=1, root=tmp_path)
+    async with TestClient(TestServer(build_app(ctx))) as client:
+        async with client.ws_connect("/ws/session") as ws:
+            await recv_json(ws, "hello")
+            await ws.send_json({"type": "text", "text": "hello"})
+            reply = await recv_json(ws, "reply")
+            assert reply["recording"]["status"] == "complete"
+            recorded = replay_episode(tmp_path / reply["recording"]["episode_id"])
+            assert recorded["ok"] and recorded["success"] is None
 
 
 async def test_bad_json_yields_error_frame(client):

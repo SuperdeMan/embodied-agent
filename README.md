@@ -64,7 +64,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID 
 - **语音/文本 → 规划 → 执行 → 验证 → 汇报**全链路：Web 控制台按住说话或文本下令，LLM 产出结构化计划（DAG of skills），确定性执行器逐步执行并**对账世界状态**（动作完成 ≠ 任务完成：夹取滑落会被如实报告），最终汇报由代码从真实执行结果生成——结构性杜绝「嘴上说做了」。
 - **评测有数字**：随机化 pick&place 评测 harness，当前基线**三种子 30/30**；成功与否由仿真真值独立裁判，不信 agent 自报。
 - **安全默认在场**：LLM 永不直接触达执行通道；工作区围栏越界即闩锁停机、指令速率限幅、命令来源白名单；危险技能须经用户确认（无确认通道时 fail-closed 拒绝）。
-- **数据采集管线**：版本化 sim 评测可用 `--record` 录制，collect/teleop 可产出可转换为 LeRobot 的 episode。已有录制支持[增量日志与进程崩溃恢复](docs/p1-metrics-baseline.md)，交互入口覆盖见[路线图](docs/roadmap.md)。
+- **数据采集管线**：本地 `embodied sim --record` 和 `embodied console --record` 可按轮录制，版本化评测、collect 与 teleop 也支持录制。交互回复给出 episode ID 和丢样情况。`embodied replay outputs/episodes/<ID> --frame 0` 校验文件后读取时间线和指定采样。普通交互缺少独立裁判，成功标签保留为空。写入器的崩溃恢复范围见[增量日志基线](docs/p1-metrics-baseline.md)。
 - **离线可跑**：不配任何 API key 也能完整体验（确定性离线规划器 + mock 语音），配上 key（Anthropic/DeepSeek/Qwen/MiniMax + DashScope 语音）即切换真实模型，**换模型是配置不是重构**。
 
 ## 学习闭环管线（M2 · 进行中）

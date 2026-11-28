@@ -1,7 +1,7 @@
 """Episode recording: capture every run as a data asset (docs/architecture.md §4.6).
 
-Recording is enabled by the caller: collect/teleop use it by default, local sim
-requires --record, and console integration remains pending. Failed episodes are
+Recording is enabled by the caller: collect/teleop use it by default, and local
+sim and console enable it with --record. Failed episodes are
 labeled and retained. The v0 intermediate format (npz + json) maps to
 LeRobotDataset; the M2 converter uses optional lerobot/torch dependencies (D014).
 
@@ -14,7 +14,7 @@ Episode directory layout (``<root>/<YYYYMMDD-HHMMSS>-<NNN>/``):
 - ``events.jsonl`` — skill/safety/note events, streamed to disk as they happen.
 
 
-记录器保存 episode：步骤数组在结束或中止时写出，元数据在开始即落盘，事件逐条写入。字段对齐 LeRobot；是否开启由调用入口决定，当前并非所有入口默认开启。
+记录器保存 episode。步骤按检查点写入增量日志，结束时生成步骤数组，元数据在开始即落盘，事件逐条写入。字段对齐 LeRobot。collect/teleop 默认录制，本地 sim 和 console 通过 --record 开启。
 """
 
 from __future__ import annotations
@@ -327,7 +327,12 @@ class EpisodeWriter:
             return self.path
         return self._finalize(success=False, detail=reason, aborted=True)
 
-    def _finalize(self, *, success: bool, detail: str, aborted: bool) -> Path:
+    def finish_unjudged(self, detail: str) -> Path:
+        """Finalize a recording without a task-level judge. 保存缺少任务级裁判的完整录制。"""
+        self._ensure_open("finish_unjudged")
+        return self._finalize(success=None, detail=detail, aborted=False)
+
+    def _finalize(self, *, success: bool | None, detail: str, aborted: bool) -> Path:
         # 先写数组再写最终元数据；成功标记意味着数据已完整写出，最后清理增量日志。
         # Arrays first, meta last: a meta.json with success set implies a complete episode, then remove journal.
         steps_sha256 = self._write_steps()
@@ -585,6 +590,31 @@ def _valid_finite_seq(values: Any, length: int | None = None) -> bool:
     if length is not None and len(values) != length:
         return False
     return all(type(v) in (int, float) and math.isfinite(float(v)) for v in values)
+
+
+def replay_episode(path: Path | str, *, frame: int | None = None) -> dict:
+    """Read the event timeline and an optional sample after integrity checks. 校验录制后读取事件时间线及指定采样。"""
+    audit = audit_episode(path)
+    if not audit.intact:
+        return {"ok": False, "issues": list(audit.issues), "needs_recovery": audit.needs_recovery}
+    episode = load_episode(path)
+    try:
+        json.dumps(episode.events, allow_nan=False)
+    except ValueError:
+        return {"ok": False, "issues": ["non_finite_event_value"]}
+    if frame is not None and not 0 <= frame < len(episode):
+        return {"ok": False, "issues": ["frame_out_of_range"], "samples": len(episode)}
+    report = {"ok": True, "episode_id": episode.path.name, "samples": len(episode),
+              "success": episode.meta.get("success"), "aborted": episode.meta.get("aborted"),
+              "events": episode.events}
+    if frame is not None:
+        report["frame"] = {
+            "index": frame, "time": float(episode.timestamp[frame]), "state": episode.state[frame].tolist(),
+            "action": episode.action[frame].tolist(), "ee_pos": episode.ee_pos[frame].tolist(),
+            "objects": {name: poses[frame].tolist() if np.isfinite(poses[frame]).all() else None
+                        for name, poses in episode.objects.items()},
+        }
+    return report
 
 
 def recover_episode(path: Path | str, *, detail: str = "recovered from abrupt crash journal") -> Episode:

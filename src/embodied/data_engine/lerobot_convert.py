@@ -174,7 +174,7 @@ def convert_episodes(
     env_names: list[str] = []
     for ep_dir in candidates:
         meta = json.loads((ep_dir / "meta.json").read_text(encoding="utf-8"))
-        if not include_failures and meta.get("success") is not True:
+        if meta.get("success") is not True and not (include_failures and meta.get("success") is False):
             report.skipped.append((ep_dir.name, f"success={meta.get('success')}"))
             continue
         if not (ep_dir / "steps.npz").is_file():

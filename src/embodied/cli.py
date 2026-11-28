@@ -88,11 +88,16 @@ def main(argv: list[str] | None = None) -> int:
     failures.add_argument("--root", action="append", help="eval or episode file/directory; repeat for several roots")
     failures.add_argument("--category", help="filter by recorded failure category")
 
+    replay = sub.add_parser("replay", help="inspect a recorded timeline or a single control sample")
+    replay.add_argument("episode", help="episode directory containing meta.json and steps.npz")
+    replay.add_argument("--frame", type=int, help="zero-based recorded sample")
+
     console = sub.add_parser("console", help="web console: voice/text control of the tabletop sim")
     _add_common(console)
     console.add_argument("--host", default="127.0.0.1")
     console.add_argument("--port", type=int, default=8390)
     console.add_argument("--seed", type=int, default=0)
+    console.add_argument("--record", action="store_true", help="record each conversation turn to EPISODES_DIR")
     console.add_argument("--ledger", default="outputs/runtime/operations.sqlite3")
     console.add_argument("--operator-policy", default="", help="explicit trusted proxy and operator allowlist JSON")
     console.add_argument("--in-process-sim", action="store_true",
@@ -169,6 +174,14 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(_collect(args))
     if args.cmd == "convert":
         return _convert(args)
+    if args.cmd == "replay":
+        import json
+
+        from embodied.data_engine.recorder import replay_episode
+
+        result = replay_episode(args.episode, frame=args.frame)
+        print(json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False))
+        return 0 if result.get("ok") else 2
     if args.cmd == "failures":
         import json
         from pathlib import Path
@@ -303,7 +316,7 @@ def _build_provider(kind: str, plan_rules: Any = None) -> tuple[Any, str]:
     return p, f"guarded({type(p.inner).__name__})"
 
 
-async def _repl(engine: Any, registry: Any, banner: str) -> int:
+async def _repl(engine: Any, registry: Any, banner: str, *, recorder=None) -> int:
     print(banner)
     print("输入自然语言指令；/skills 列出技能；/exit 退出。")
     while True:
@@ -321,7 +334,11 @@ async def _repl(engine: Any, registry: Any, banner: str) -> int:
                 flag = " [confirm]" if m.require_confirm else ""
                 print(f"  {m.name}{flag} — {m.description}")
             continue
-        turn = await engine.turn(line)
+        if recorder is None:
+            turn = await engine.turn(line)
+        else:
+            turn, receipt = await recorder.turn(engine, line)
+            print(f"[episode] {receipt}")
         for r in turn.results:
             plan_step = next((s for s in (turn.plan.steps if turn.plan else []) if s.id == r.step_id), None)
             skill = plan_step.skill if plan_step else r.step_id
@@ -601,6 +618,8 @@ async def _sim(args: argparse.Namespace) -> int:
     from embodied.skills.registry import SkillRegistry
 
     if args.remote:
+        if args.record:
+            raise SystemExit("--record requires a local sim with driver feedback")
         return await _sim_remote(args)
     if args.task and not args.snapshot:
         return await _sim_eval_task(args)
@@ -611,6 +630,7 @@ async def _sim(args: argparse.Namespace) -> int:
     _register_skills(registry, sim, pick_policy=str(args.pick_policy), place_policy=str(args.place_policy))
 
     code: int
+    recorder = None
     try:
         if args.task:
             code = await _sim_eval_task(args)
@@ -619,9 +639,14 @@ async def _sim(args: argparse.Namespace) -> int:
         else:
             provider, pname = _build_provider(args.provider, plan_rules=SIM_PLAN_RULES)
             engine = _make_sim_engine(sim, registry, provider, _make_confirm(bool(args.yes)))
+            if args.record:
+                from embodied.data_engine.interactive import InteractiveRecorder
+
+                recorder = InteractiveRecorder(sim, source="interactive_sim", seed=int(args.seed))
             code = await _repl(
                 engine, registry,
                 f"embodied sim · provider={pname} · {sim.spec().embodiment_id} · skills={len(registry.catalog())}",
+                recorder=recorder,
             )
         if args.snapshot:
             from PIL import Image
@@ -629,6 +654,8 @@ async def _sim(args: argparse.Namespace) -> int:
             Image.fromarray(sim.render("side")).save(args.snapshot)
             print(f"snapshot -> {args.snapshot}")
     finally:
+        if recorder is not None:
+            await recorder.close()
         await registry.drain_compute()
         registry.close()
         close = getattr(sim, "close", None)
@@ -804,7 +831,12 @@ def _console(args: argparse.Namespace) -> int:
     # Factory returns None when streaming TTS is unconfigured (origin semantics: off);
     # the console always speaks, so fall back to the silent mock.
     tts = build_tts_stream_provider() or MockStreamingTTSProvider()
-    ctx = AppContext(sim, registry, make_engine, asr, tts, operator_policy=policy,
+    recorder = None
+    if args.record:
+        from embodied.data_engine.interactive import InteractiveRecorder
+
+        recorder = InteractiveRecorder(sim, source="console", seed=int(args.seed))
+    ctx = AppContext(sim, registry, make_engine, asr, tts, operator_policy=policy, recorder=recorder,
                      runtime_info={"environment": "simulation", "planner": args.provider,
                                    "audio": "mock" if isinstance(asr, MockASRProvider) else "configured",
                                    "control_isolation": "in_process" if args.in_process_sim else "process"})

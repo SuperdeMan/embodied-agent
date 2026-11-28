@@ -177,7 +177,11 @@ class ConsoleSession:
         async with self._turn_lock:
             await self.send({"type": "turn_start"})
             try:
-                turn = await self.engine.turn(text)
+                recording = None
+                if self.ctx.recorder is None:
+                    turn = await self.engine.turn(text)
+                else:
+                    turn, recording = await self.ctx.recorder.turn(self.engine, text)
             except Exception as e:
                 logger.exception("engine turn failed")
                 await self.send({"type": "error", "message": f"turn failed: {e}"})
@@ -194,7 +198,10 @@ class ConsoleSession:
                     "operation_id": r.operation_id, "attempt_id": r.attempt_id,
                     "invocation_state": r.invocation_state, "stop_state": r.stop_state,
                 })
-            await self.send({"type": "reply", "text": turn.text, "task_id": getattr(turn, "task_id", "")})
+            reply = {"type": "reply", "text": turn.text, "task_id": getattr(turn, "task_id", "")}
+            if recording is not None:
+                reply["recording"] = recording
+            await self.send(reply)
             await self._speak(turn.text)
 
     async def _speak(self, text: str) -> None:
@@ -237,9 +244,10 @@ class AppContext:
         self, sim: Any, registry: Any, make_engine, asr: Any, tts_stream: Any,
         tts_sample_rate: int = 24000,
         runtime_info: dict[str, str] | None = None,
-        operator_policy: OperatorPolicy | None = None,
+        operator_policy: OperatorPolicy | None = None, recorder=None,
     ):
         self.sim = sim
+        self.recorder = recorder
         self.registry = registry
         self.operator = OperatorAuthority(registry, operator_policy) if operator_policy is not None else None
         # 从确认回调构建规划引擎。
@@ -308,6 +316,8 @@ class AppContext:
 
     async def close(self) -> None:
         self._render_closed = True
+        if self.recorder is not None:
+            await self.recorder.close()
         if self._frame_future is not None and not self._frame_future.done():
             cancel = getattr(self.sim, "cancel_render", None)
             if cancel is None:

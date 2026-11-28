@@ -47,7 +47,14 @@ function connect() {
       case "asr": logMsg("you (voice)", m.text, "user"); break;
       case "turn_start": break;
       case "step": addStep(m); break;
-      case "reply": logMsg("agent", m.text, "agent"); break;
+      case "reply":
+        logMsg("agent", m.text, "agent");
+        if (m.recording) {
+          const r = m.recording;
+          const status = { complete: "已保存", partial: "部分保存", unavailable: "未能保存", interrupted: "已中断" };
+          logMsg("录制", [status[r.status] || r.status, r.episode_id, r.dropped ? `缺失 ${r.dropped} 条` : ""].filter(Boolean).join(" · "), "sys");
+        }
+        break;
       case "tts_start": player.begin(m.sample_rate); break;
       case "tts_end": break;
       case "confirm_request": showConfirm(m); break;
