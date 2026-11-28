@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -13,6 +14,7 @@ import pytest
 from embodied.cognition.plan import StepResult, StepStatus
 from embodied.control.hal import Observation, Pose
 from embodied.data_engine.evaluation import RESULT_SCHEMA, EvalTask, run_task
+from embodied.data_engine.failures import failure_index
 
 TASK_YAML = """\
 schema: eval.task/v1
@@ -122,6 +124,72 @@ async def test_all_pass(task, tmp_path):
         make_engine=lambda sim: FakeEngine(), out_dir=tmp_path / "o",
     )
     assert report.passed and report.rate == 1.0
+
+
+@pytest.mark.parametrize("remains_busy", [False, True])
+async def test_seed_reset_waits_for_existing_observation_and_preserves_failures(task, tmp_path, monkeypatch, remains_busy):
+    import embodied.data_engine.evaluation as evaluation
+
+    class Registry:
+        observation_pending = False
+
+        async def drain_compute(self):
+            pass
+
+        def close(self):
+            pass
+
+    class Sim(FakeSim):
+        def __init__(self, seed):
+            super().__init__(seed, [False, True])
+            self._eval_registry = Registry()
+
+        def reset(self, randomize=False):
+            assert not self._eval_registry.observation_pending
+            return super().reset(randomize=randomize)
+
+    def engine(sim):
+        class Delayed(FakeEngine):
+            async def turn(self, text):
+                if sim.n == 0:
+                    sim._eval_registry.observation_pending = True
+                    if not remains_busy:
+                        asyncio.get_running_loop().call_later(0.01, setattr, sim._eval_registry, "observation_pending", False)
+                return await super().turn(text)
+
+        return Delayed()
+
+    out = tmp_path / "eval_results"
+    if not remains_busy:
+        report = await run_task(task, make_sim=Sim, make_engine=engine, out_dir=out)
+        assert [r["success"] for r in report.episodes] == [False, True, False, True]
+        assert not report.passed
+        return
+
+    monkeypatch.setattr(evaluation, "OBSERVATION_TIMEOUT_S", 0.01)
+    with pytest.raises(evaluation.ObservationUnavailable, match="previous_episode_observation_still_running"):
+        await run_task(task, make_sim=Sim, make_engine=engine, out_dir=out)
+    saved = json.loads(next(out.glob("*.json")).read_text(encoding="utf-8"))
+    assert saved["schema"] == evaluation.INTERRUPTED_SCHEMA and not saved["complete"] and not saved["passed"]
+    assert saved["total"] == 1 and saved["planned_total"] == 4 and saved["rate"] is None
+    assert saved["interruption"]["stage"] == "reset" and saved["interruption"]["index"] == 2
+    indexed = failure_index([out])
+    assert indexed["total"] == 1 and indexed["issues"][0]["reason"] == "evaluation_interrupted"
+
+
+def test_archived_eval_requires_matching_manifest_and_build_identity(tmp_path, monkeypatch):
+    import embodied.data_engine.evaluation as evaluation
+
+    def missing_git(*args, **kwargs):
+        raise FileNotFoundError("git")
+
+    monkeypatch.setattr(evaluation.subprocess, "run", missing_git)
+    monkeypatch.setenv("EMBODIED_RELEASE", "a" * 40)
+    manifest = tmp_path / "bundle-manifest.json"
+    manifest.write_text(json.dumps({"commit": "b" * 40}), encoding="utf-8")
+    assert evaluation._git_commit(tmp_path) == ""
+    manifest.write_text(json.dumps({"commit": "a" * 40}), encoding="utf-8")
+    assert evaluation._git_commit(tmp_path) == "aaaaaaa"
 
 
 def test_shipped_task_file_is_valid():

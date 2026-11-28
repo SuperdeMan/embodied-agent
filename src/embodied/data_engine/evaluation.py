@@ -10,7 +10,9 @@ Task files are immutable per version (eval/tasks/); results land in outputs/eval
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import os
 import subprocess
 from dataclasses import dataclass, field
@@ -23,9 +25,13 @@ import yaml
 
 from embodied.cognition.world_state import WorldSnapshot, object_in_region
 from embodied.data_engine.failures import eval_failure_category
+from embodied.runtime.obs.redact import gate_content
+from embodied.runtime.observation import OBSERVATION_TIMEOUT_S, ObservationUnavailable
 
 TASK_SCHEMA = "eval.task/v1"
 RESULT_SCHEMA = "eval.result/v1"
+INTERRUPTED_SCHEMA = "eval.interrupted/v1"
+logger = logging.getLogger("data_engine.evaluation")
 
 
 @dataclass
@@ -99,16 +105,29 @@ async def _close_sim(sim) -> None:
         fn()
 
 
-def _git_commit() -> str:
+def _git_commit(source_root: Path | None = None) -> str:
+    root = source_root or Path(__file__).resolve().parents[3]
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
             capture_output=True, text=True, timeout=10,
-            cwd=Path(__file__).resolve().parents[3],
+            cwd=root,
         )
-        return out.stdout.strip() if out.returncode == 0 else ""
-    except Exception:
-        return ""
+        if out.returncode == 0 and out.stdout.strip():
+            return out.stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        pass
+    # 发行镜像没有 Git 元数据，要求其构建身份与清单一致。
+    # Archive images lack Git metadata; require an agreeing build identity and release manifest.
+    release = os.environ.get("EMBODIED_RELEASE", "")
+    if len(release) == 40 and all(c in "0123456789abcdef" for c in release):
+        try:
+            manifest = json.loads((root / "bundle-manifest.json").read_text(encoding="utf-8"))
+            if isinstance(manifest, dict) and manifest.get("commit") == release:
+                return release[:7]
+        except (OSError, ValueError):
+            pass
+    return ""
 
 
 @dataclass
@@ -151,12 +170,54 @@ async def run_task(
         recorder = EpisodeRecorder()
 
     episodes: list[dict[str, Any]] = []
+    current: dict[str, Any] = {}
+    try:
+        await _run_seed_groups(task, make_sim, make_engine, recorder, episodes, current, progress)
+    except (Exception, asyncio.CancelledError) as exc:
+        report = EvalReport(task_id=task.task_id, episodes=episodes, passed=False, out_path=None)
+        interruption = {**current, "error_type": type(exc).__name__, "detail": gate_content(str(exc), 300)}
+        if exc.__context__ is not None:
+            interruption["prior_error"] = {"error_type": type(exc.__context__).__name__,
+                                           "detail": gate_content(str(exc.__context__), 300)}
+        try:
+            path = _persist(task, report, out_dir, interruption=interruption)
+            logger.warning("incomplete evaluation saved: %s", path)
+        except Exception as storage_error:
+            exc.add_note(f"interrupted evaluation could not be saved: {type(storage_error).__name__}")
+        raise
+
+    report = EvalReport(task_id=task.task_id, episodes=episodes, passed=False, out_path=None)
+    report.passed = report.rate >= task.pass_threshold
+    report.out_path = _persist(task, report, out_dir)
+    return report
+
+
+async def _wait_for_previous_observation(sim):
+    registry = getattr(sim, "_eval_registry", None)
+    if not getattr(registry, "observation_pending", False):
+        return
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + OBSERVATION_TIMEOUT_S
+    while registry.observation_pending:
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            raise ObservationUnavailable("previous_episode_observation_still_running")
+        await asyncio.sleep(min(0.005, remaining))
+
+
+async def _run_seed_groups(task, make_sim, make_engine, recorder, episodes, current, progress):
     idx = 0
     for seed in task.seeds:
+        current.clear()
+        current.update(seed=seed, index=idx + 1, stage="create_sim")
         sim = make_sim(seed)
         try:
             for k in range(task.per_seed):
                 idx += 1
+                current.clear()
+                current.update(seed=seed, index=idx, stage="reset")
+                if k:
+                    await _wait_for_previous_observation(sim)
                 sim.reset(randomize=True)
                 truth0 = _truth_obs(sim)
                 start_pos = tuple(round(v, 4) for v in truth0.objects[task.judge.get("object", "obj_cube")].pos)
@@ -167,13 +228,16 @@ async def run_task(
                         task=task.command, embodiment_id=sim.spec().embodiment_id,
                         seed=seed, extra_meta={"eval_task": task.task_id, "episode_index": idx},
                     )
+                    current["episode_dir"] = str(writer.path)
                     sim.set_hooks(
                         on_step=writer.on_step,
                         on_guard_event=lambda e, w=writer: w.on_event("safety", {"kind": e.kind, "reason": e.reason}),
                     )
                 episode_dir = ""
                 try:
+                    current["stage"] = "turn"
                     turn = await engine.turn(task.command)
+                    current["stage"] = "judge"
                     snap = WorldSnapshot.from_observation(_truth_obs(sim))
                     success = task.judge_success(snap)
                     if writer:
@@ -181,7 +245,7 @@ async def run_task(
                             writer.on_event("skill_end", {"step": r.step_id, "status": r.status.value,
                                                           "detail": (r.detail or r.error)[:200]})
                         episode_dir = str(writer.finish(bool(success), detail=turn.text[:200]))
-                except Exception as e:
+                except (Exception, asyncio.CancelledError) as e:
                     if writer:
                         episode_dir = str(writer.abort(repr(e)))
                     raise
@@ -202,16 +266,16 @@ async def run_task(
                 summary = " ".join(f"{s['id']}={s['status']}" for s in steps) or "no-steps"
                 progress(f"[{task.task_id}] episode {idx:>3}: seed={seed} pos={start_pos[:2]} "
                          f"{summary} -> {'SUCCESS' if success else 'FAIL'}")
+            current["stage"] = "close_seed"
         finally:
-            await _close_sim(sim)
+            try:
+                await _close_sim(sim)
+            except Exception as close_error:
+                current["cleanup_error"] = gate_content(str(close_error), 160)
+                raise
 
-    report = EvalReport(task_id=task.task_id, episodes=episodes, passed=False, out_path=None)
-    report.passed = report.rate >= task.pass_threshold
-    report.out_path = _persist(task, report, out_dir)
-    return report
 
-
-def _persist(task: EvalTask, report: EvalReport, out_dir: Path | str | None) -> Path:
+def _persist(task: EvalTask, report: EvalReport, out_dir: Path | str | None, *, interruption: dict | None = None) -> Path:
     root = Path(out_dir or os.getenv("EVAL_OUT_DIR", "outputs/eval"))
     root.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
@@ -225,19 +289,23 @@ def _persist(task: EvalTask, report: EvalReport, out_dir: Path | str | None) -> 
                 # Windows 上不同卷之间只能保留绝对路径。 / Windows cross-volume paths must remain absolute.
                 episode["episode_relative_to_report"] = str(directory)
     payload = {
-        "schema": RESULT_SCHEMA,
+        "schema": RESULT_SCHEMA if interruption is None else INTERRUPTED_SCHEMA,
         "task": {"id": task.task_id, "file": task.path, "command": task.command,
                  "judge": task.judge, "randomization": task.randomization,
                  "pass_threshold": task.pass_threshold},
         "commit": _git_commit(),
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "total": len(report.episodes),
+        "planned_total": len(task.seeds) * task.per_seed,
+        "complete": interruption is None,
         "wins": report.wins,
-        "rate": round(report.rate, 4),
+        "rate": round(report.rate, 4) if interruption is None else None,
         "passed": report.passed,
         "failures": [e for e in report.episodes if not e["success"]],
         "episodes": report.episodes,
     }
+    if interruption is not None:
+        payload["interruption"] = interruption
     partial = out.with_suffix(".partial")
     try:
         partial.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")

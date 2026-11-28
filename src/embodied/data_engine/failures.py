@@ -41,7 +41,7 @@ def eval_failure_category(episode: dict) -> str:
 
 def failure_index(roots: list[Path], category: str | None = None) -> dict:
     """Rebuild the index from current and historical files. 从新旧评测和录制文件重建只读索引。"""
-    from embodied.data_engine.evaluation import RESULT_SCHEMA
+    from embodied.data_engine.evaluation import INTERRUPTED_SCHEMA, RESULT_SCHEMA
     from embodied.data_engine.recorder import SCHEMA_VERSION
 
     files: set[Path] = set()
@@ -60,7 +60,10 @@ def failure_index(roots: list[Path], category: str | None = None) -> dict:
     for path in sorted(files):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            if data.get("schema") == RESULT_SCHEMA:
+            if data.get("schema") in (RESULT_SCHEMA, INTERRUPTED_SCHEMA):
+                if data["schema"] == INTERRUPTED_SCHEMA:
+                    issues.append({"source": str(path), "reason": "evaluation_interrupted",
+                                   "completed": data["total"], "planned": data["planned_total"]})
                 for episode in data["failures"]:
                     if episode["success"] is not False:
                         continue
