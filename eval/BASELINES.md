@@ -75,3 +75,20 @@
 | 2026-11-28 | 463199e | tabletop_pick_place@v1 | 29/30 | PASS* | 隔离 pick-v1 + 脚本放置 + 真值。第 14 局 seed 1 达到策略时域上限，M2 不劣于脚本目标仍待达成。 |
 | 2026-11-28 | 463199e | tabletop_pick_place@v1 | 30/30 | PASS | 隔离 ColorBlob + 脚本，使用独立真值裁判。 |
 | 2026-11-29 | 77b754d | tabletop_pick_place@v1 | 30/30 | PASS | D042 浏览器文本传输修复，隔离物理控制、脚本 + 真值。测试与真实浏览器证据见 `eval/console-text-receipts-20261129.json`。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 30/30 | PASS | Windows 脚本真值。失败局 无。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 30/30 | PASS | Windows 脚本 ColorBlob。失败局 无。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 29/30 | PASS* | Windows 旧 pick-v1 + 脚本放置。失败局 14。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 30/30 | PASS | Windows 双学习真值。失败局 无。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 30/30 | PASS | Windows 双学习 ColorBlob。失败局 无。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place_validation_13_17_23@v1 | 30/30 | PASS | Windows 双学习真值比较集。失败局 无。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place_validation_13_17_23@v1 | 29/30 | PASS* | Windows 双学习 ColorBlob 比较集。失败局 1。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place_reserve_31_37_41@v1 | 30/30 | PASS | Windows 双学习真值保留集。失败局 无。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place_reserve_31_37_41@v1 | 29/30 | PASS* | Windows 双学习 ColorBlob 保留集。失败局 19。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 29/30 | PASS* | Windows 新学习抓取 + 脚本放置。失败局 19。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 11/30 | FAIL | Windows 旧数据独立训练 seed 1001，第 4000 步。失败局 1、3、4、6、7、10、11、12、13、15、17、18、20、21、22、24、28、29、30。配置与原始报告摘要见 [D044–D047](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 30/30 | PASS | Linux 1 CPU，双学习，输入 off，计划 30 局。[原始配置](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place_reserve_31_37_41@v1 | 30/30 | PASS | Linux 1 CPU，双学习，输入 off，计划 30 局。[原始配置](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 中断，已评 3/30，成功 0 | INCOMPLETE | Linux 1 CPU，双学习，输入 color，计划 30 局。[原始配置](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place_reserve_31_37_41@v1 | 中断，已评 2/30，成功 0 | INCOMPLETE | Linux 1 CPU，双学习，输入 color，计划 30 局。[原始配置](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place@v1 | 中断，已评 1/30，成功 1 | INCOMPLETE | Linux 2 CPU，双学习，输入 color，计划 30 局。[原始配置](learned-pick-residual-20261129.json)。 |
+| 2026-11-29 | 8618b8a | tabletop_pick_place_reserve_31_37_41@v1 | 0/30 | FAIL | Linux 2 CPU，双学习，输入 color，计划 30 局。[原始配置](learned-pick-residual-20261129.json)。 |

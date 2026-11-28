@@ -4,7 +4,7 @@
 
 ## 当前阶段
 
-**平台升级 P1 仿真与跨主机单步恢复已验收（2026-11-28）**。当前主线为 M2 学习抓取评测和 P2 设备准备，仍保留现场故障门禁。优先级见 `docs/roadmap.md`，各批次退出条件见 `docs/platform-upgrade.md`。脚本、感知、策略与部署证据按提交和运行配置分别记录。
+**当前进度（2026-11-29）**。P1 仿真与跨主机单步恢复已验收。Windows 上 M2 双学习抓放在原任务的真值与 ColorBlob 两种配置各 30/30，Linux 单核的真值原任务和保留集各 30/30。Linux 相机闭环和 P2 现场设备仍待验收。证据见 `docs/learned-pick-residual.md`。优先级见 `docs/roadmap.md`，各批次退出条件见 `docs/platform-upgrade.md`。脚本、感知、策略与部署证据按提交和运行配置分别记录。
 
 本地开发组：`uv sync --group sim --group rpc --group learn --group policy --group perceive`。抓取/策略与动作写路径变更须复测原任务；权重、数据和录制不进 Git。本轮 commit/push、D018 新 SQLite 五表、D027 两表追加及 v2 云端迁移部署、nightly 注释补齐已获用户明确授权；后续不同范围的敏感变更仍按红线确认。
 

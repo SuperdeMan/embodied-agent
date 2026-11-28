@@ -83,7 +83,7 @@ D019 远端状态进展见 [remote-world-state.md](remote-world-state.md)；D020
 
 ## 6. 不丢失的旧路线
 
-旧 M0–M2 实现保留；M2 的学习 pick 29/30 尚未达到原“不劣于脚本”DoD。多种子训练与 temporal ensembling 属后续策略改进，不应阻塞可信执行整改。DINO 仍是实验性；控制台人工验证、远程世界状态、失败归档等缺口迁入本计划。原 M3/M4/M5 分别映射到 P2、P2/P4 学习能力、P3/P4/P5；不将旧日期当新承诺。
+原 M2 的 29/30 基线保留。新增 200 条示教后的双学习抓放，在 Windows 原任务真值和 ColorBlob 上分别追平脚本 30/30。Linux 单核真值复现，云端相机时延和 DINO 仍需优化。真实语音及人工示教等待现场验收。[学习抓放记录](learned-pick-residual.md)。原 M3/M4/M5 分别映射到 P2、P2/P4 学习能力、P3/P4/P5；不将旧日期当新承诺。
 
 D021 停止与受信恢复的实际边界见 [stop-reconciliation.md](stop-reconciliation.md)：只对绑定正确本体与 profile 的受跟踪操作生效，原 UNKNOWN 目标不被改成成功。
 

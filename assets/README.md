@@ -7,3 +7,5 @@
 | `menagerie/<model>/` | `uv run python scripts/fetch_assets.py` | [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie)（SO-ARM101 优先，回退 SO-ARM100；版本记录在 `<model>/.source`） |
 
 自建 MJCF 场景放 `sim/`（进 git，见 `docs/architecture.md` §10）；本目录只放外部模型资产与来源指针。
+
+ACT 参考权重放在 `outputs/policies/`。原始抓取与放置权重摘要见[原资产记录](../eval/upgrade-20261030.json)。按观察来源选择的两个新抓取模型、200 条示教与标定的重建命令见[模型卡](../docs/learned-pick-residual.md)。

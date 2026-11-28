@@ -1,0 +1,193 @@
+{
+  "schema": "embodied.dino-cpu-evaluation/v1",
+  "date": "2026-11-29",
+  "qualified_runtime_commit": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+  "provider": "IDEA-Research/grounding-dino-tiny",
+  "upstream_revision": "a2bb814dd30d776dcf7e30523b00659f4f141c71",
+  "model_files": [
+    {
+      "name": "added_tokens.json",
+      "sha256": "909e96cb32d92ce728a01bc99850cbba26196d74115c17ebeb019275412588f2"
+    },
+    {
+      "name": "config.json",
+      "sha256": "eec82c5ab66e16df12a9a212e68ac011779927c2536cf9078658e35d85f0c67a"
+    },
+    {
+      "name": "model.safetensors",
+      "sha256": "1a2412ef99bd74bcd3c2a246fa1e48581f8889a1300c9051974741314fc042f3"
+    },
+    {
+      "name": "preprocessor_config.json",
+      "sha256": "8454179ba95e2ad22947835aad7b45862a601fc0055ab88bf1ee70892d3aea60"
+    },
+    {
+      "name": "special_tokens_map.json",
+      "sha256": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3"
+    },
+    {
+      "name": "tokenizer.json",
+      "sha256": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66"
+    },
+    {
+      "name": "tokenizer_config.json",
+      "sha256": "d40ab645b68211910b9170d22433d43186a6ec8ee6fd10ba170524b25bf4fb56"
+    }
+  ],
+  "hardware": "Windows CPU",
+  "framework": {
+    "torch": "2.10.0",
+    "transformers": "4.57.6",
+    "mujoco": "3.11.0"
+  },
+  "initialization_change": {
+    "commit": "097111f41f661ed5641d84ec0e073ddf71012c9b",
+    "pre_fix_direct": {
+      "loaded": true,
+      "init_s": 23.175,
+      "transformer_type": "GroundingDinoForObjectDetection"
+    },
+    "pre_fix_child": {
+      "loaded": false,
+      "errors": [
+        {
+          "type": "OSError",
+          "message": "No username set in the environment"
+        },
+        {
+          "type": "ModuleNotFoundError",
+          "message": "No module named 'pwd'"
+        }
+      ],
+      "init_s": 8.781
+    },
+    "isolated_fixed_user": "embodied-worker",
+    "offline_diagnostics_source": "exploratory working tree; the separate end_to_end run is bound to the qualified runtime"
+  },
+  "geometry_probe": {
+    "method": "offline geometric diagnostic, 4 stationary positions x top/side, CPU 1 thread",
+    "scene_seed": 81471,
+    "model_revision": "a2bb814dd30d776dcf7e30523b00659f4f141c71",
+    "direct_startup_s": 7.959,
+    "direct_frames": [
+      {
+        "fixture": 0,
+        "camera": "top",
+        "elapsed_s": 23.807,
+        "found": true,
+        "covers_projected_center": false,
+        "score": 0.5312
+      },
+      {
+        "fixture": 0,
+        "camera": "side",
+        "elapsed_s": 19.121,
+        "found": true,
+        "covers_projected_center": true,
+        "score": 0.8002
+      },
+      {
+        "fixture": 1,
+        "camera": "top",
+        "elapsed_s": 18.62,
+        "found": true,
+        "covers_projected_center": true,
+        "score": 0.6629
+      },
+      {
+        "fixture": 1,
+        "camera": "side",
+        "elapsed_s": 23.487,
+        "found": true,
+        "covers_projected_center": true,
+        "score": 0.7918
+      },
+      {
+        "fixture": 2,
+        "camera": "top",
+        "elapsed_s": 21.63,
+        "found": true,
+        "covers_projected_center": true,
+        "score": 0.5719
+      },
+      {
+        "fixture": 2,
+        "camera": "side",
+        "elapsed_s": 21.886,
+        "found": true,
+        "covers_projected_center": true,
+        "score": 0.8312
+      },
+      {
+        "fixture": 3,
+        "camera": "top",
+        "elapsed_s": 19.608,
+        "found": true,
+        "covers_projected_center": true,
+        "score": 0.7822
+      },
+      {
+        "fixture": 3,
+        "camera": "side",
+        "elapsed_s": 23.358,
+        "found": true,
+        "covers_projected_center": true,
+        "score": 0.6915
+      }
+    ],
+    "production_worker_one_frame": {
+      "ready": true,
+      "elapsed_s": 2.0252692999783903,
+      "reason": "compute_timeout",
+      "type": "ComputeUnavailable"
+    }
+  },
+  "geometry_raw_sha256": "31621eb1374001be05f33576a17f5a912a4ec8f4f53fc671b9440bcc0784f379",
+  "coverage_definition": "One red-cube prompt, four static scenes, top and side. The reported box either encloses the independently projected center or misses it. No annotated IoU or recognition precision estimate.",
+  "end_to_end": {
+    "task_id": "tabletop_dino_probe@v1",
+    "task": {
+      "path": "outputs/act-study-20261128/dino-cpu-probe/probe.yaml",
+      "sha256": "e06b527d457ca669d4c1fd671cdbfcf906c0cf88a468ae2d5e23fe86656dffff"
+    },
+    "task_seeds": [
+      81471
+    ],
+    "raw_report": {
+      "path": "outputs/m2-8618b8a/dino-cpu/tabletop_dino_probe@v1-20261128-182341-008c2615039a443cb523c4d3b249285c.json",
+      "sha256": "3099d3a35e5c5bac809625a2469f2141a8c6d74694d7a023e0f24840db1f9d1e"
+    },
+    "total": 1,
+    "planned": 1,
+    "complete": true,
+    "wins": 0,
+    "passed": false,
+    "failures": [
+      {
+        "index": 1,
+        "seed": 81471,
+        "steps": [
+          {
+            "id": "s1",
+            "status": "failed",
+            "detail": "unknown object 'obj_cube'"
+          },
+          {
+            "id": "s2",
+            "status": "skipped",
+            "detail": "dependency s1 failed"
+          }
+        ]
+      }
+    ],
+    "configured_worker_timeout_s": 2,
+    "ground_truth_judge": {
+      "predicate": "object_in_region",
+      "object": "obj_cube",
+      "region": "bin_region",
+      "margin_m": 0.005
+    }
+  },
+  "eligible_for_default": false,
+  "hardware_robot_verified": false
+}

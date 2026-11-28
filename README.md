@@ -67,7 +67,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID 
 - **数据采集管线**：本地 `embodied sim --record` 和 `embodied console --record` 可按轮录制，版本化评测、collect 与 teleop 也支持录制。交互回复给出 episode ID 和丢样情况。`embodied replay outputs/episodes/<ID> --frame 0` 校验文件后读取时间线和指定采样。普通交互缺少独立裁判，成功标签保留为空。写入器的崩溃恢复范围见[增量日志基线](docs/p1-metrics-baseline.md)。
 - **离线可跑**：不配任何 API key 也能完整体验（确定性离线规划器 + mock 语音），配上 key（Anthropic/DeepSeek/Qwen/MiniMax + DashScope 语音）即切换真实模型，**换模型是配置不是重构**。
 
-## 学习闭环管线（M2 · 进行中）
+## 学习闭环管线（M2）
 
 `uv run embodied failures` 汇总评测与录制里的失败案例，可用 `--category policy_horizon` 定位策略时域耗尽的局次，或用 `--root` 指定历史结果文件、采集目录。输出给出原始证据位置、可用的种子、局号与提交。仅保存评测结果的局次没有轨迹可回放。
 
@@ -89,9 +89,7 @@ uv run --group sim embodied sim --task eval/tasks/tabletop_pick_place_v1.yaml \
 
 部署侧只需 onnxruntime（零 torch）；训练侧依赖隔离在 `learn` 组（lerobot/torch），CI 不受影响。设计与格式契约见 [decisions.md](docs/decisions.md) D014。
 
-**首个学习策略已出数**（2026-08-07，60 条专家示教、CPU 数小时训练）：同任务同裁判下脚本技能 30/30，学习 pick 29/30，双学习（pick+place 均为策略）29/30——策略替换对 planner 透明，成功与否仍由仿真真值独立裁判。全部数字只增写入 [eval/BASELINES.md](eval/BASELINES.md)。
-
-**感知 v1 已落地**（2026-08-08，[D015](docs/decisions.md)）：`--perception color` 下 agent 全程只见「检测 + 深度反投影」得到的感知物体（多相机后备、可见度门、运动学附着信念；估计误差 ~2mm），评测裁判仍读真值——感知驱动闭环 **30/30**，与真值基线打平。开放词汇检测（Grounding DINO）已接通、本场景鲁棒化进行中。
+2026-11-29，`8618b8a` 在 Windows 原版桌面任务上，学习抓放的仿真真值和 ColorBlob 配置分别为 30/30。Linux 单核真值在原任务和保留集各 30/30，相机配置尚未通过。旧 `pick-v1` 同提交仍为 29/30。模型、复现命令与其余种子的失败局次见[学习抓放验收](docs/learned-pick-residual.md)。开放词汇检测的 Windows 子进程已可启动，CPU 端到端探针为 0/1。[Grounding DINO 记录](eval/dino-cpu-20261129.json)。
 
 ## 快速开始
 
@@ -148,7 +146,7 @@ flowchart TB
 |---|---|---|---|
 | M0 | 规范与骨架 | ✅ 2026-08-04 | 文档规范齐备，car-agent 复用移植完成，CI 绿 |
 | M1 | 仿真闭环 | ✅ 2026-08-05 | 语音指令完成 pick&place 全链路，运行即产数据；版本化评测基线 30/30；三进程拆分 + 活性链（kill 任一上游进程即闩锁停机） |
-| M2 | 学习闭环 | 🚧 主体已通 | 训练→部署一条命令 ✓、感知驱动闭环 30/30 ✓、nightly 评测报告 ✓；余「学习策略不劣于脚本」最后一局（29/30，方差攻坚中） |
+| M2 | 学习闭环 | Windows 原任务达标 | 双学习按观察来源各 30/30。额外种子、Linux 相机和现场感知分别验收 |
 | M3 | 真机落地 | ⏳ | SO-101 真机复现仿真闭环，安全防线全部生效 |
 | M4 | VLA 与泛化 | ⏳ | 微调 VLA 接管 ≥2 个技能，未见任务组合可测泛化 |
 | M5 | 数据飞轮 | ⏳ | 周级「数据→训练→评测→部署」自动循环，第二本体接入 ≤2 周 |

@@ -1,0 +1,2791 @@
+{
+  "schema": "embodied.learned-pick-qualification/v1",
+  "date": "2026-11-29",
+  "qualification": {
+    "source_commit": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+    "source_clean_before_and_after": true,
+    "ruff": "All checks passed!",
+    "full_suite": {
+      "tests": 967,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "elapsed_s": 146.367,
+      "junit": {
+        "path": "outputs/m2-8618b8a/full.xml",
+        "sha256": "f1cb85702a4821aee5bde9c150a1f19bf4e4c4deb4c6a560d6753092b23795b5"
+      }
+    },
+    "rpc_suite": {
+      "tests": 50,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "elapsed_s": 16.244,
+      "junit": {
+        "path": "outputs/m2-8618b8a/rpc.xml",
+        "sha256": "bcfc7e8cc4abf5e6b5405079e1af1a507e7e9e69e93f0c51732db3d2649c9a4f"
+      }
+    },
+    "reference_fault_matrix": {
+      "groups": 16,
+      "passed": 315,
+      "skipped": 0,
+      "p1_complete": false,
+      "open_gates": [
+        "Real storage-medium I/O failure and power loss",
+        "Independent hardware stop (SG-0) and real-device physical controller faults",
+        "Real physical camera disconnection and hardware PTP/NTP clock synchronization (software cross-host clock-domain, skew/RTT freshness, and RPC per-object evidence contract verified in D036)",
+        "Field-device evidence for controlled single-step recovery after a physical stop and current effect check",
+        "Real network partition and field-device supervision",
+        "Real-hardware physical stop latency and field-deployment episode data loss metrics (simulation isolated-process baseline measured in D035)",
+        "Field hardware/firmware OTA activation and model/driver compatibility on actual devices"
+      ],
+      "raw": {
+        "path": "outputs/p1-faults/20261128T180625Z-8618b8a/report.json",
+        "sha256": "ca4353f2f74402f03b7d211ae0d819daee33628282995f409d7eb35c2d888667"
+      }
+    },
+    "github_ci": {
+      "sha": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+      "conclusion": "success",
+      "url": "https://github.com/SuperdeMan/embodied-agent/actions/runs/46174541903"
+    }
+  },
+  "target": "sim.mujoco.so_arm100",
+  "strategy": "Configure one pick artifact per sensor source before the run and pair it with the frozen learned place-v1. Same skill manifest, isolated control, guard, horizon, reference judge and placements.",
+  "task_sets": {
+    "reference": {
+      "path": "eval/tasks/tabletop_pick_place_v1.yaml",
+      "sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "per_seed": 10,
+      "lf_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+      "git_blob": "ee7ccd61190f2fb2f7756657c3b7f4fe83ec37bc",
+      "linux_archive_sha256": "1f5c2117e47e6f639e990f1367fc1f292918fa1e19b12fb0612432e03bb12c4e",
+      "linux_archive_lf_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+    },
+    "selection": {
+      "path": "eval/tasks/tabletop_pick_place_validation_v1.yaml",
+      "sha256": "b13192b90739515169002443b5c2df839dff2428b6e27f7329a8d78c90de1160",
+      "seeds": [
+        13,
+        17,
+        23
+      ],
+      "per_seed": 10,
+      "lf_sha256": "b13192b90739515169002443b5c2df839dff2428b6e27f7329a8d78c90de1160",
+      "git_blob": "c366535e54075efbaf134fb4234d2b87d8525037",
+      "linux_archive_sha256": "3be4fa3bc98288aa3851391ab86a5dce3992f451c24fc7b7edc130ba6b9f3304",
+      "linux_archive_lf_sha256": "b13192b90739515169002443b5c2df839dff2428b6e27f7329a8d78c90de1160"
+    },
+    "additional_holdout": {
+      "path": "eval/tasks/tabletop_pick_place_holdout_v1.yaml",
+      "sha256": "876867ddacb77d9bb97ff490772bcc037d74cfb2f7f0d0e9ab00fd51d09b4950",
+      "seeds": [
+        31,
+        37,
+        41
+      ],
+      "per_seed": 10,
+      "lf_sha256": "876867ddacb77d9bb97ff490772bcc037d74cfb2f7f0d0e9ab00fd51d09b4950",
+      "git_blob": "ae346aa399b36c566d904b91d93bda69e1082919",
+      "linux_archive_sha256": "215065d15128f114e174897d3d21c2292af11c5a8b1bdebff1796badeb7edd98",
+      "linux_archive_lf_sha256": "876867ddacb77d9bb97ff490772bcc037d74cfb2f7f0d0e9ab00fd51d09b4950"
+    }
+  },
+  "models": {
+    "runtime_source_commit": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+    "calibration": {
+      "calibration": "outputs/calibration/pick-color-e6e00768df2999dbfe01b718084b47e02bc746ee3140778058340e7a9fa65a0b.json",
+      "sha256": "e6e00768df2999dbfe01b718084b47e02bc746ee3140778058340e7a9fa65a0b",
+      "available": 64,
+      "total": 64,
+      "median_l2_m": 0.0008954813501464
+    },
+    "truth": {
+      "artifact": "outputs/policies/pick-act-residual-0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51.onnx",
+      "onnx_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+      "parity_max_abs": 1.1920928955078125e-07,
+      "fit": {
+        "base_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+        "episodes": 200,
+        "frames": 55800,
+        "exemplars": 5600,
+        "valid_target_rows": 259000,
+        "stride": 10,
+        "neighbors": 8,
+        "strength": 0.5,
+        "dataset_sha256": {
+          "data/chunk-000/file-000.parquet": "5b0f75e7bce4dfd3f20f18eab02d981a4efb7b5e1863f17bacc187e74647c0dd"
+        },
+        "feature_scale": [
+          0.7639488577842712,
+          0.45808202028274536,
+          0.676032543182373,
+          0.4839155077934265,
+          0.48779699206352234,
+          0.4961109459400177,
+          0.10958994179964066,
+          0.04971066117286682,
+          0.02152033895254135
+        ],
+        "residual_clip": [
+          0.0446404404938221,
+          0.04725075513124466,
+          0.05216383934020996,
+          0.054529912769794464,
+          0.03064391016960144,
+          0.06613728404045105
+        ]
+      },
+      "bytes": 46322286
+    },
+    "color": {
+      "artifact": "outputs/policies/pick-act-residual-4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c.onnx",
+      "onnx_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+      "parity_max_abs": 1.862645149230957e-09,
+      "fit": {
+        "base_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+        "episodes": 200,
+        "frames": 55800,
+        "exemplars": 10400,
+        "valid_target_rows": 498800,
+        "stride": 10,
+        "neighbors": 8,
+        "strength": 0.5,
+        "dataset_sha256": {
+          "data/chunk-000/file-000.parquet": "5b0f75e7bce4dfd3f20f18eab02d981a4efb7b5e1863f17bacc187e74647c0dd"
+        },
+        "feature_scale": [
+          0.7524131536483765,
+          0.4513024091720581,
+          0.6762917637825012,
+          0.49435022473335266,
+          0.48049449920654297,
+          0.47937801480293274,
+          0.11034826189279556,
+          0.04986804351210594,
+          0.016214802861213684
+        ],
+        "residual_clip": [
+          0.04567233473062515,
+          0.0485612228512764,
+          0.05359632894396782,
+          0.05634082481265068,
+          0.03132880851626396,
+          0.07010479271411896
+        ],
+        "calibration_sha256": "e6e00768df2999dbfe01b718084b47e02bc746ee3140778058340e7a9fa65a0b"
+      },
+      "bytes": 52255179
+    }
+  },
+  "place": {
+    "path": "outputs/policies/place-v1.onnx",
+    "sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d"
+  },
+  "original_pick": {
+    "path": "outputs/policies/pick-v1.onnx",
+    "sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd"
+  },
+  "source_data": {
+    "method": "200 uniform scripted demonstrations, full original workspace sector, --seed 94173, pick segment only",
+    "completed_episodes": 200,
+    "successful_expert_episodes": 200,
+    "frames": 55800,
+    "rate_hz": 50,
+    "excluded_segments": 0,
+    "collector_log": {
+      "path": "outputs/act-study-20261128/collect-uniform200.log",
+      "sha256": "ddc2adfed4b3aee8cca521b9f914c68cd791606ee258dec61603a2be636dd337"
+    },
+    "converter_log": {
+      "path": "outputs/act-study-20261128/convert-uniform200.log",
+      "sha256": "c5d252776b1d5f485bbe9af6cdea2662125cd392003271d9620d684cfb9bce67"
+    },
+    "calibration_seed": 81471
+  },
+  "windows": {
+    "platform": "Windows",
+    "packages": {
+      "mujoco": "3.11.0",
+      "onnxruntime": "1.28.0",
+      "onnx": "1.22.0",
+      "torch": "2.10.0",
+      "lerobot": "0.4.4"
+    },
+    "runs": {
+      "script-truth": {
+        "wins": 30,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "pick_sha256": null,
+        "place_sha256": null,
+        "perception": "off",
+        "exit_code": 0,
+        "file_sha256": "0b4232d1c2d77390c558992bdb02783a6db0256727f72ded4027dd9dff66dbb8",
+        "failures": [],
+        "report_path": "outputs/m2-8618b8a/script-truth/tabletop_pick_place@v1-20261128-180822-0138527e2e234f5ea79bb4ad4a79ce9a.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 30,
+        "rate": 1.0
+      },
+      "script-color": {
+        "wins": 30,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "pick_sha256": null,
+        "place_sha256": null,
+        "perception": "color",
+        "exit_code": 0,
+        "file_sha256": "050e2b7d39811a23e7ad5c30aedff0f780ce2fd3dfefaba41ae4e68ae1ab78c2",
+        "failures": [],
+        "report_path": "outputs/m2-8618b8a/script-color/tabletop_pick_place@v1-20261128-180938-55dea85c18c84ba18a64e95599a04265.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 30,
+        "rate": 1.0
+      },
+      "old-pick-truth": {
+        "wins": 29,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "pick_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+        "place_sha256": null,
+        "perception": "off",
+        "exit_code": 0,
+        "file_sha256": "42a775ad8d86878d46f8283d2fa2d61bbcfa35c6a5c89a33e3226dc56fbe3aa6",
+        "failures": [
+          {
+            "index": 14,
+            "seed": 1,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          }
+        ],
+        "report_path": "outputs/m2-8618b8a/old-pick-truth/tabletop_pick_place@v1-20261128-181011-732ce1ef13c840c8a57e551195c017d6.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 29,
+        "rate": 0.9667
+      },
+      "learned-official-truth": {
+        "wins": 30,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "pick_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "perception": "off",
+        "exit_code": 0,
+        "file_sha256": "7e641900904fddd8b541041c5103d0ea602df460c47fc525c2c95bdc7c043c6d",
+        "failures": [],
+        "report_path": "outputs/m2-8618b8a/learned-official-truth/tabletop_pick_place@v1-20261128-181049-c2219e6973ad4710b33bdbdaf55f9496.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 30,
+        "rate": 1.0
+      },
+      "learned-official-color": {
+        "wins": 30,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "pick_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "perception": "color",
+        "exit_code": 0,
+        "file_sha256": "9418f5c3946acdb928bb1fbf0ef288d26be3e10125c94bd72e2b8a238e51c28f",
+        "failures": [],
+        "report_path": "outputs/m2-8618b8a/learned-official-color/tabletop_pick_place@v1-20261128-181411-aefb16b391cb4424825da1ccf1f86c2b.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 30,
+        "rate": 1.0
+      },
+      "learned-holdout-truth": {
+        "wins": 30,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place_reserve_31_37_41@v1",
+        "task_sha256": "876867ddacb77d9bb97ff490772bcc037d74cfb2f7f0d0e9ab00fd51d09b4950",
+        "pick_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "perception": "off",
+        "exit_code": 0,
+        "file_sha256": "06e88f9c2bd487d32d9a94c38b778faad0d30ebf38e4901eea023079ec0edd89",
+        "failures": [],
+        "report_path": "outputs/m2-8618b8a/learned-holdout-truth/tabletop_pick_place_reserve_31_37_41@v1-20261128-181451-47538d2708aa49c9a2fc63f471120cab.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 30,
+        "rate": 1.0
+      },
+      "learned-validation-truth": {
+        "wins": 30,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place_validation_13_17_23@v1",
+        "task_sha256": "b13192b90739515169002443b5c2df839dff2428b6e27f7329a8d78c90de1160",
+        "pick_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "perception": "off",
+        "exit_code": 0,
+        "file_sha256": "79bec27916514aac16cdf7739e22586f7160aaff2805f366516fe6c46b81e2c6",
+        "failures": [],
+        "report_path": "outputs/m2-8618b8a/learned-validation-truth/tabletop_pick_place_validation_13_17_23@v1-20261128-181532-b480ea38f54844df8a022bf1399bcade.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 30,
+        "rate": 1.0
+      },
+      "learned-holdout-color": {
+        "wins": 29,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place_reserve_31_37_41@v1",
+        "task_sha256": "876867ddacb77d9bb97ff490772bcc037d74cfb2f7f0d0e9ab00fd51d09b4950",
+        "pick_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "perception": "color",
+        "exit_code": 0,
+        "file_sha256": "1ade1a7033d61cc1db98d27ddde55e649d06b8b90d339ad81a9eb7ed6c1d1617",
+        "failures": [
+          {
+            "index": 19,
+            "seed": 37,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "failed",
+                "detail": "policy place failed (horizon reached)"
+              }
+            ]
+          }
+        ],
+        "report_path": "outputs/m2-8618b8a/learned-holdout-color/tabletop_pick_place_reserve_31_37_41@v1-20261128-181851-85fabb237c374f50b3ea9d1d1c632de9.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 30,
+        "rate": 0.9667
+      },
+      "learned-validation-color": {
+        "wins": 29,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place_validation_13_17_23@v1",
+        "task_sha256": "b13192b90739515169002443b5c2df839dff2428b6e27f7329a8d78c90de1160",
+        "pick_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "perception": "color",
+        "exit_code": 0,
+        "file_sha256": "d1fe975e82d055036528d01f2ffb92131d23552183a41099e0caad6f9efe3c8f",
+        "failures": [
+          {
+            "index": 1,
+            "seed": 13,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          }
+        ],
+        "report_path": "outputs/m2-8618b8a/learned-validation-color/tabletop_pick_place_validation_13_17_23@v1-20261128-182210-2f612091dd864a408b946a61ee8c048c.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 29,
+        "rate": 0.9667
+      },
+      "single-pick-official-truth": {
+        "wins": 29,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "pick_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+        "place_sha256": null,
+        "perception": "off",
+        "exit_code": 0,
+        "file_sha256": "6dc1cb2690a52a8f92806d3f760c6f4bd2e4c60f32d3d83917ef17405b041475",
+        "failures": [
+          {
+            "index": 19,
+            "seed": 1,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "failed",
+                "detail": "obj_cube not in bin_region after release"
+              }
+            ]
+          }
+        ],
+        "report_path": "outputs/m2-8618b8a/single-pick-official-truth/tabletop_pick_place@v1-20261128-182244-aa987f4ecb764d72b9e860a5fb88ba18.json",
+        "planned_total": 30,
+        "passed_task_threshold": true,
+        "pick_successes": 30,
+        "rate": 0.9667
+      },
+      "seed1001-final-official": {
+        "wins": 11,
+        "total": 30,
+        "complete": true,
+        "interruption": null,
+        "task": "tabletop_pick_place@v1",
+        "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+        "pick_sha256": "687e44b301dba94ac7e6476c9f5838597e8be7d3cd855ebf9022315499ad381d",
+        "place_sha256": null,
+        "perception": "off",
+        "exit_code": 1,
+        "file_sha256": "2653c621d2bff7348263b1debe61271e7d37ffb7f38a3b5250125655f594feb0",
+        "failures": [
+          {
+            "index": 1,
+            "seed": 0,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 3,
+            "seed": 0,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 4,
+            "seed": 0,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 6,
+            "seed": 0,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 7,
+            "seed": 0,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 10,
+            "seed": 0,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 11,
+            "seed": 1,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 12,
+            "seed": 1,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 13,
+            "seed": 1,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "failed",
+                "detail": "obj_cube not in bin_region after release"
+              }
+            ]
+          },
+          {
+            "index": 15,
+            "seed": 1,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 17,
+            "seed": 1,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 18,
+            "seed": 1,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 20,
+            "seed": 1,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 21,
+            "seed": 2,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 22,
+            "seed": 2,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 24,
+            "seed": 2,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 28,
+            "seed": 2,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          },
+          {
+            "index": 29,
+            "seed": 2,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "ok",
+                "detail": "obj_cube grasped by policy"
+              },
+              {
+                "id": "s2",
+                "status": "failed",
+                "detail": "obj_cube not in bin_region after release"
+              }
+            ]
+          },
+          {
+            "index": 30,
+            "seed": 2,
+            "steps": [
+              {
+                "id": "s1",
+                "status": "failed",
+                "detail": "policy pick failed (horizon reached)"
+              },
+              {
+                "id": "s2",
+                "status": "skipped",
+                "detail": "dependency s1 failed"
+              }
+            ]
+          }
+        ],
+        "report_path": "outputs/m2-8618b8a/seed1001-final-official/tabletop_pick_place@v1-20261128-182319-439e5995515e4ff0ac3ad9d91831fd49.json",
+        "planned_total": 30,
+        "passed_task_threshold": false,
+        "pick_successes": 13,
+        "rate": 0.3667
+      }
+    }
+  },
+  "isolated_linux": {
+    "one_cpu": {
+      "runtime_commit": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+      "embedded_manifest_verified": true,
+      "image_id": "sha256:67a4c2767cbb9d05e6355d6d6f790854312c092c174acd474f90452c56b972f8",
+      "dependency_image": {
+        "base_commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+        "tag": "embodied-policy-eval:abccd2e17679-723cc80",
+        "image_id": "sha256:e5314df9df0dfa70d3c199b398e41071f49176e83fc5628449723686fd0b1622",
+        "onnxruntime": "1.28.0",
+        "lock_sha256": "abccd2e176793fe9b6d72c699824dd075bbdf77675f90a08a6ee05ef5158530b"
+      },
+      "limits": {
+        "cpu": 1,
+        "memory_mib": 1536,
+        "pids": 128,
+        "network": "none"
+      },
+      "files": {
+        "pick-truth.onnx": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+        "pick-color.onnx": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+        "place-v1.onnx": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "old-pick-v1.onnx": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+        "source.tar.gz": "69b0c685dc7137df593eee20f4c51fc30a0652a8b3bcae54925ffc0758707568"
+      },
+      "runs": {
+        "scripted_truth": {
+          "schema": "eval.result/v1",
+          "complete": true,
+          "wins": 30,
+          "total": 30,
+          "planned_total": 30,
+          "raw_report_sha256": "ce806655ffd28d94cd74776fac939283ae74856fc18777e2ea40aef0bae64efd",
+          "report_commit": "8618b8a",
+          "interruption": null,
+          "failures": [],
+          "exit_code": 0,
+          "task": "eval/tasks/tabletop_pick_place_v1.yaml",
+          "task_sha256": "1f5c2117e47e6f639e990f1367fc1f292918fa1e19b12fb0612432e03bb12c4e",
+          "pick_sha256": null,
+          "place_sha256": null,
+          "perception": "off",
+          "rate": 1.0
+        },
+        "dual_truth": {
+          "schema": "eval.result/v1",
+          "complete": true,
+          "wins": 30,
+          "total": 30,
+          "planned_total": 30,
+          "raw_report_sha256": "45a39f692c8cd83fd141875c38592c06e793f310e85a468c429d451f68710044",
+          "report_commit": "8618b8a",
+          "interruption": null,
+          "failures": [],
+          "exit_code": 0,
+          "task": "eval/tasks/tabletop_pick_place_v1.yaml",
+          "task_sha256": "1f5c2117e47e6f639e990f1367fc1f292918fa1e19b12fb0612432e03bb12c4e",
+          "pick_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+          "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+          "perception": "off",
+          "rate": 1.0
+        },
+        "dual_color": {
+          "schema": "eval.interrupted/v1",
+          "complete": false,
+          "wins": 0,
+          "total": 3,
+          "planned_total": 30,
+          "raw_report_sha256": "b917aa9683fbb7c05a5e5f1076faa0fb259d9c204a3a5ddb62b0aae7e2633960",
+          "report_commit": "8618b8a",
+          "interruption": {
+            "seed": 0,
+            "index": 4,
+            "stage": "reset",
+            "error_type": "ComputeUnavailable",
+            "detail": "compute_requires_explicit_restart"
+          },
+          "failures": [
+            {
+              "index": 1,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "failed",
+                  "detail": "observation_timeout"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "observation_worker_busy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            }
+          ],
+          "exit_code": 1,
+          "task": "eval/tasks/tabletop_pick_place_v1.yaml",
+          "task_sha256": "1f5c2117e47e6f639e990f1367fc1f292918fa1e19b12fb0612432e03bb12c4e",
+          "pick_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+          "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+          "perception": "color",
+          "rate": null
+        },
+        "scripted_color": {
+          "schema": "eval.interrupted/v1",
+          "complete": false,
+          "wins": 0,
+          "total": 1,
+          "planned_total": 30,
+          "raw_report_sha256": "e284776455f6b181e672e6b8a9c34504385d1893ffbbcdd864f3300c8170e5f4",
+          "report_commit": "8618b8a",
+          "interruption": {
+            "seed": 0,
+            "index": 2,
+            "stage": "reset",
+            "error_type": "ComputeUnavailable",
+            "detail": "compute_requires_explicit_restart"
+          },
+          "failures": [
+            {
+              "index": 1,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped and lifted"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            }
+          ],
+          "exit_code": 1,
+          "task": "eval/tasks/tabletop_pick_place_v1.yaml",
+          "task_sha256": "1f5c2117e47e6f639e990f1367fc1f292918fa1e19b12fb0612432e03bb12c4e",
+          "pick_sha256": null,
+          "place_sha256": null,
+          "perception": "color",
+          "rate": null
+        },
+        "dual_holdout_truth": {
+          "schema": "eval.result/v1",
+          "complete": true,
+          "wins": 30,
+          "total": 30,
+          "planned_total": 30,
+          "raw_report_sha256": "a7a2abf076bad4ef66c47b8f2ddbd7c3b2a41029ab42a7cf1454a18b5c19d669",
+          "report_commit": "8618b8a",
+          "interruption": null,
+          "failures": [],
+          "exit_code": 0,
+          "task": "eval/tasks/tabletop_pick_place_holdout_v1.yaml",
+          "task_sha256": "215065d15128f114e174897d3d21c2292af11c5a8b1bdebff1796badeb7edd98",
+          "pick_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+          "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+          "perception": "off",
+          "rate": 1.0
+        },
+        "old_pick": {
+          "schema": "eval.result/v1",
+          "complete": true,
+          "wins": 29,
+          "total": 30,
+          "planned_total": 30,
+          "raw_report_sha256": "d1faedb3f82fd76061cba8bbb57d8b1761a9906eb0c2eccf97c9253a6f69f8d0",
+          "report_commit": "8618b8a",
+          "interruption": null,
+          "failures": [
+            {
+              "index": 14,
+              "seed": 1,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "policy pick failed (horizon reached)"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            }
+          ],
+          "exit_code": 0,
+          "task": "eval/tasks/tabletop_pick_place_v1.yaml",
+          "task_sha256": "1f5c2117e47e6f639e990f1367fc1f292918fa1e19b12fb0612432e03bb12c4e",
+          "pick_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+          "place_sha256": null,
+          "perception": "off",
+          "rate": 0.9666666666666667
+        },
+        "dual_holdout_color": {
+          "schema": "eval.interrupted/v1",
+          "complete": false,
+          "wins": 0,
+          "total": 2,
+          "planned_total": 30,
+          "raw_report_sha256": "323bf858f915a1c00f2db8b1a3b55dbfeec18813b42acebd1488ae8d6843b276",
+          "report_commit": "8618b8a",
+          "interruption": {
+            "seed": 31,
+            "index": 3,
+            "stage": "reset",
+            "error_type": "ComputeUnavailable",
+            "detail": "compute_requires_explicit_restart"
+          },
+          "failures": [
+            {
+              "index": 1,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "failed",
+                  "detail": "observation_timeout"
+                }
+              ]
+            }
+          ],
+          "exit_code": 1,
+          "task": "eval/tasks/tabletop_pick_place_holdout_v1.yaml",
+          "task_sha256": "215065d15128f114e174897d3d21c2292af11c5a8b1bdebff1796badeb7edd98",
+          "pick_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+          "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+          "perception": "color",
+          "rate": null
+        }
+      },
+      "permanent_model_changed": false,
+      "hardware_verified": false
+    },
+    "two_cpu": {
+      "runtime_commit": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+      "embedded_manifest_verified": true,
+      "image_id": "sha256:67a4c2767cbb9d05e6355d6d6f790854312c092c174acd474f90452c56b972f8",
+      "dependency_image": {
+        "base_commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+        "tag": "embodied-policy-eval:abccd2e17679-723cc80",
+        "image_id": "sha256:e5314df9df0dfa70d3c199b398e41071f49176e83fc5628449723686fd0b1622",
+        "onnxruntime": "1.28.0",
+        "lock_sha256": "abccd2e176793fe9b6d72c699824dd075bbdf77675f90a08a6ee05ef5158530b"
+      },
+      "limits": {
+        "cpu": 2,
+        "memory_mib": 1536,
+        "pids": 128,
+        "network": "none"
+      },
+      "files": {
+        "pick-truth.onnx": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+        "pick-color.onnx": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+        "place-v1.onnx": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "old-pick-v1.onnx": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+        "source.tar.gz": "69b0c685dc7137df593eee20f4c51fc30a0652a8b3bcae54925ffc0758707568"
+      },
+      "runs": {
+        "dual_color": {
+          "schema": "eval.interrupted/v1",
+          "complete": false,
+          "wins": 1,
+          "total": 1,
+          "planned_total": 30,
+          "raw_report_sha256": "89ebc2845bdcf60a678f954fd6bde315de0dfb1561165d612846cb4c2e992661",
+          "report_commit": "8618b8a",
+          "interruption": {
+            "seed": 0,
+            "index": 2,
+            "stage": "reset",
+            "error_type": "ActionRejected",
+            "detail": "controller_not_idle"
+          },
+          "failures": [],
+          "exit_code": 1,
+          "task": "eval/tasks/tabletop_pick_place_v1.yaml",
+          "task_sha256": "1f5c2117e47e6f639e990f1367fc1f292918fa1e19b12fb0612432e03bb12c4e",
+          "pick_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+          "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+          "perception": "color",
+          "rate": null
+        },
+        "scripted_color": {
+          "schema": "eval.interrupted/v1",
+          "complete": false,
+          "wins": 0,
+          "total": 11,
+          "planned_total": 30,
+          "raw_report_sha256": "959807c0f3749f00b9b03814f57c188a9cc00e9be72f2b42c05666c4851c16d1",
+          "report_commit": "8618b8a",
+          "interruption": {
+            "seed": 1,
+            "index": 12,
+            "stage": "reset",
+            "error_type": "ComputeUnavailable",
+            "detail": "compute_requires_explicit_restart"
+          },
+          "failures": [
+            {
+              "index": 1,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped and lifted"
+                },
+                {
+                  "id": "s2",
+                  "status": "failed",
+                  "detail": "observation_timeout"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "observation_worker_busy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 4,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 5,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 6,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 7,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 8,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 9,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 10,
+              "seed": 0,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 11,
+              "seed": 1,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped and lifted"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            }
+          ],
+          "exit_code": 1,
+          "task": "eval/tasks/tabletop_pick_place_v1.yaml",
+          "task_sha256": "1f5c2117e47e6f639e990f1367fc1f292918fa1e19b12fb0612432e03bb12c4e",
+          "pick_sha256": null,
+          "place_sha256": null,
+          "perception": "color",
+          "rate": null
+        },
+        "dual_holdout_color": {
+          "schema": "eval.result/v1",
+          "complete": true,
+          "wins": 0,
+          "total": 30,
+          "planned_total": 30,
+          "raw_report_sha256": "eee1c9d3f23b14ecf029c7151cdfeab0e1aa0dce60e9c6be924684f94b1e8ed0",
+          "report_commit": "8618b8a",
+          "interruption": null,
+          "failures": [
+            {
+              "index": 1,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            },
+            {
+              "index": 2,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 3,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 4,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 5,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 6,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 7,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 8,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 9,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 10,
+              "seed": 31,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 11,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            },
+            {
+              "index": 12,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            },
+            {
+              "index": 13,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 14,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 15,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 16,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 17,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 18,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 19,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 20,
+              "seed": 37,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 21,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            },
+            {
+              "index": 22,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            },
+            {
+              "index": 23,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            },
+            {
+              "index": 24,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "ok",
+                  "detail": "obj_cube grasped by policy"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 ok"
+                }
+              ]
+            },
+            {
+              "index": 25,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 26,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 27,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 28,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 29,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            },
+            {
+              "index": 30,
+              "seed": 41,
+              "steps": [
+                {
+                  "id": "s1",
+                  "status": "failed",
+                  "detail": "unknown object 'obj_cube'"
+                },
+                {
+                  "id": "s2",
+                  "status": "skipped",
+                  "detail": "dependency s1 failed"
+                }
+              ]
+            }
+          ],
+          "exit_code": 1,
+          "task": "eval/tasks/tabletop_pick_place_holdout_v1.yaml",
+          "task_sha256": "215065d15128f114e174897d3d21c2292af11c5a8b1bdebff1796badeb7edd98",
+          "pick_sha256": "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+          "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+          "perception": "color",
+          "rate": 0.0
+        }
+      },
+      "permanent_model_changed": false,
+      "hardware_verified": false
+    }
+  },
+  "release_preflight": {
+    "source_commit": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+    "ledger_schema": 3,
+    "eight_tables_digest_preserved": "b66c2205fc65cf01f213593a66d5e034316ca20cf71a14f8b1669e74cd22250d",
+    "target": {
+      "api_version": "embodied.dev/v1alpha1",
+      "kind": "TargetEnvironment",
+      "robot_id": "sim.mujoco.so_arm100",
+      "asset_digest": "2ba78e6a4d302054d0c310cf56d6e54f296570a7bdec2736ddcfd09bc55f2715",
+      "stop_profile_digest": "68e51d3e0afcb86fd5d5c90a120159bc84d00b6b09c640e20206aae171a56ab9",
+      "joint_order": [
+        "Rotation",
+        "Pitch",
+        "Elbow",
+        "Wrist_Pitch",
+        "Wrist_Roll",
+        "Jaw"
+      ],
+      "units": "m_rad",
+      "supported_backends": [
+        "onnxruntime_cpu"
+      ],
+      "supported_action_semantics": [
+        "absolute_joint_targets"
+      ],
+      "supported_normalization_modes": [
+        "baked_in_graph"
+      ],
+      "driver_firmware_version": "sim_reference_v1"
+    },
+    "skills_catalog_source": "src/embodied/skills/scripted/manip.py",
+    "cases": {
+      "truth": {
+        "bundle_digest": "12bff0d3de41c1a4d68d0aa1960b8e5ad0fa307e66d191f6e7cfec1d68d61f0c",
+        "descriptor_sha256": "009ab565fc582e255ce424cf15917f033ce7fd58e86db123fe0431c4de506d1b",
+        "eval_report_sha256": "7e641900904fddd8b541041c5103d0ea602df460c47fc525c2c95bdc7c043c6d",
+        "model_sha256": [
+          "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+          "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d"
+        ],
+        "returncode": 0,
+        "report": {
+          "api_version": "embodied.dev/v1alpha1",
+          "kind": "ReleasePreflightReport",
+          "action": "activate",
+          "target_release_id": "windows-sim-truth",
+          "target_commit_sha": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+          "current_release_id": null,
+          "allowed": true,
+          "rollback_safe": false,
+          "ledger_schema_version": 3,
+          "ledger_all_tables_sha256": "b66c2205fc65cf01f213593a66d5e034316ca20cf71a14f8b1669e74cd22250d",
+          "reasons": [],
+          "hardware_verified": false
+        }
+      },
+      "color": {
+        "bundle_digest": "51bc415132fdd9700e2f830a6a3870bff692961e4f994658907da2db0434dea6",
+        "descriptor_sha256": "e01861511a1972f7a63dcb34b91f20290d311b0b9d6a5406fe988e79072c3985",
+        "eval_report_sha256": "9418f5c3946acdb928bb1fbf0ef288d26be3e10125c94bd72e2b8a238e51c28f",
+        "model_sha256": [
+          "4f7f3c33a647e247c2132f7ca9726815a8061186e980ee271d3fe8612ca8965c",
+          "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d"
+        ],
+        "returncode": 0,
+        "report": {
+          "api_version": "embodied.dev/v1alpha1",
+          "kind": "ReleasePreflightReport",
+          "action": "activate",
+          "target_release_id": "windows-sim-color",
+          "target_commit_sha": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+          "current_release_id": null,
+          "allowed": true,
+          "rollback_safe": false,
+          "ledger_schema_version": 3,
+          "ledger_all_tables_sha256": "b66c2205fc65cf01f213593a66d5e034316ca20cf71a14f8b1669e74cd22250d",
+          "reasons": [],
+          "hardware_verified": false
+        }
+      }
+    },
+    "activated": false
+  },
+  "exploratory": {
+    "scope": "Reports created at different working states using study harnesses. Commit tags and original report hashes preserved per run. Do not pool or attribute these to final source or canonical model bytes.",
+    "seed_study_protocol": {
+      "dataset": "outputs/lerobot/pick-v1",
+      "files": 5,
+      "dataset_digest": "1834b00c8697b3c7ca7d08eed3532a0b98514b126c387c128d6fbf616da6460b",
+      "digest_convention": "sorted POSIX path + NUL + SHA256 bytes for each JSON/parquet file",
+      "original_seed": 1000,
+      "candidate_seed": 1001,
+      "training_source_commit": "142e6eb3f84211c03271d2e63f0a9ecd6793a3cd",
+      "steps": 4000,
+      "batch_size": 32,
+      "chunk_size": 50,
+      "lr": 0.0001,
+      "width": 256,
+      "device": "cpu",
+      "checkpoints": [
+        1000,
+        2000,
+        3000,
+        4000
+      ],
+      "selection": "extra seeds 13,17,23 (10 episodes each), ranked by completed tasks; later checkpoint breaks ties. Frozen regular task is the final gate. Retain deployed v1 if neither criterion improves.",
+      "official_eval": "eval/tasks/tabletop_pick_place_v1.yaml",
+      "reference_seeds": [
+        0,
+        1,
+        2
+      ],
+      "original_prefix_test_script_sha256": "107382d4393200968777f99b88ccccfa087c2900fbb700ea7f2ed450bea7221c"
+    },
+    "fixed_v1_pair_diagnostics": [
+      {
+        "seed": 1,
+        "k": 3,
+        "rows": 300,
+        "ok": true,
+        "held_ticks": 25,
+        "max_cube_z": 0.0794
+      },
+      {
+        "seed": 1,
+        "k": 4,
+        "rows": 600,
+        "ok": false,
+        "held_ticks": 0,
+        "max_cube_z": 0.0215
+      },
+      {
+        "seed": 1,
+        "k": 5,
+        "rows": 300,
+        "ok": true,
+        "held_ticks": 15,
+        "max_cube_z": 0.0748
+      },
+      {
+        "seed": 23,
+        "k": 3,
+        "rows": 300,
+        "ok": true,
+        "held_ticks": 30,
+        "max_cube_z": 0.081
+      },
+      {
+        "seed": 23,
+        "k": 4,
+        "rows": 600,
+        "ok": false,
+        "held_ticks": 0,
+        "max_cube_z": 0.0184
+      },
+      {
+        "seed": 23,
+        "k": 5,
+        "rows": 300,
+        "ok": true,
+        "held_ticks": 18,
+        "max_cube_z": 0.0779
+      }
+    ],
+    "diagnostics_file": {
+      "path": "outputs/act-study-20261128/v1-pick-diagnostics.json",
+      "sha256": "218d1fc1fdf51c24992b4dc06c11d9fa0a6f00e547d54cae9d71aacd4595b1e7"
+    },
+    "comparisons": {
+      "anchor-4-1-1-holdout": {
+        "runtime_report_commit": "6eeb090",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 28,
+        "total": 30,
+        "failed_indices": [
+          1,
+          24
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/anchor-4-1-1-holdout/tabletop_pick_place_holdout_13_17_23@v1-20261128-164443-5b21bdc0a9d74db1b67197e260fb7c07.json",
+          "sha256": "fe7f3032f9839a8bd3ea1b2fb5ab722c2febb6760b81e7ea43c886ffaa886ad7"
+        },
+        "model_sha256": "ebc94aacac7ee3697df919bda01a30222caaaa4244be341f91843a585fe7f922",
+        "prefix": 50,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "calibrated-original-color": {
+        "runtime_report_commit": "097111f",
+        "task_id": "tabletop_pick_place@v1",
+        "wins": 30,
+        "total": 30,
+        "failed_indices": [],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/calibrated-original-color/tabletop_pick_place@v1-20261128-174601-3e2fc20c402a4c34b1d2abd8f3d4ef11.json",
+          "sha256": "87516952a9a1fba4a31f2acc54bd6b4f83b20efcc5ba23a5021d8d620283bd51"
+        },
+        "pick_sha256": "c056c49db2ea15a20aa5e4a9a56be0b8c052acc502ce6ef05922f715e8f77b8b",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "effective_task_seeds": [
+          0,
+          1,
+          2
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "calibrated-original-truth": {
+        "runtime_report_commit": "097111f",
+        "task_id": "tabletop_pick_place@v1",
+        "wins": 28,
+        "total": 30,
+        "failed_indices": [
+          6,
+          19
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/calibrated-original-truth/tabletop_pick_place@v1-20261128-174642-17c0bcb3f0384c3896f269956e6c054f.json",
+          "sha256": "80e48c119dc5686daaf76a42ffc392218fd1f82175481d6c87b0cbf40a29717b"
+        },
+        "pick_sha256": "c056c49db2ea15a20aa5e4a9a56be0b8c052acc502ce6ef05922f715e8f77b8b",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "effective_task_seeds": [
+          0,
+          1,
+          2
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "calibrated-validation-color": {
+        "runtime_report_commit": "85a63e2",
+        "task_id": "tabletop_pick_place_validation_13_17_23@v1",
+        "wins": 29,
+        "total": 30,
+        "failed_indices": [
+          1
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/calibrated-validation-color/tabletop_pick_place_validation_13_17_23@v1-20261128-173432-c134001d31654dafa05d3a2b998187a8.json",
+          "sha256": "5f484ce36004c3f8de1d35da2519155a07d2788cb7220938eb22b7163d3ce384"
+        },
+        "pick_sha256": "c056c49db2ea15a20aa5e4a9a56be0b8c052acc502ce6ef05922f715e8f77b8b",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "b13192b90739515169002443b5c2df839dff2428b6e27f7329a8d78c90de1160"
+      },
+      "calibrated-validation-off": {
+        "runtime_report_commit": "85a63e2",
+        "task_id": "tabletop_pick_place_validation_13_17_23@v1",
+        "wins": 30,
+        "total": 30,
+        "failed_indices": [],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/calibrated-validation-off/tabletop_pick_place_validation_13_17_23@v1-20261128-173049-1185a0bdaaee4b128acfb1bc6f0aa8c2.json",
+          "sha256": "769927fbfdbbf3584fcf549aedc7585a362794bd9d9c9a22d907187f4c175752"
+        },
+        "pick_sha256": "c056c49db2ea15a20aa5e4a9a56be0b8c052acc502ce6ef05922f715e8f77b8b",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "b13192b90739515169002443b5c2df839dff2428b6e27f7329a8d78c90de1160"
+      },
+      "canonical-base-validation-color": {
+        "runtime_report_commit": "097111f",
+        "task_id": "tabletop_pick_place_validation_13_17_23@v1",
+        "wins": 28,
+        "total": 30,
+        "failed_indices": [
+          1,
+          19
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/canonical-base-validation-color/tabletop_pick_place_validation_13_17_23@v1-20261128-174222-28fb187640164d32bfc48e2f99964f79.json",
+          "sha256": "91b4342f144fd83db8bd990201445f7961eb99b2135faec43690329f35b3c940"
+        },
+        "pick_sha256": "0b75781ed8666b39f954a3f21f82c078276dfe30225555ffb45b4ec38c60be51",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "b13192b90739515169002443b5c2df839dff2428b6e27f7329a8d78c90de1160"
+      },
+      "dual-official-color": {
+        "runtime_report_commit": "85a63e2",
+        "task_id": "tabletop_pick_place@v1",
+        "wins": 29,
+        "total": 30,
+        "failed_indices": [
+          28
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/dual-official-color/tabletop_pick_place@v1-20261128-172019-5dace9815dc4414994c7e7209aca2dc2.json",
+          "sha256": "2e15190d8192ab2f4ccb98d6a6f900bafc6e43b4bb7a3f2ba5340accfe32cb20"
+        },
+        "pick_sha256": "8722e662be64e8270766977aa60f9decf6f1b27a7ffb539aff71a19f9b8c20bb",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "effective_task_seeds": [
+          0,
+          1,
+          2
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "dual-official-truth": {
+        "runtime_report_commit": "723cc80",
+        "task_id": "tabletop_pick_place@v1",
+        "wins": 30,
+        "total": 30,
+        "failed_indices": [],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/dual-official-truth/tabletop_pick_place@v1-20261128-171445-cd0bb3edbe06476d880068277c6ef745.json",
+          "sha256": "5d7596ac6004a35e348242aba3ec08ca0e4f26089a0c9eb26ab7d4e6128a7354"
+        },
+        "pick_sha256": "8722e662be64e8270766977aa60f9decf6f1b27a7ffb539aff71a19f9b8c20bb",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "effective_task_seeds": [
+          0,
+          1,
+          2
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "dual-reserve": {
+        "runtime_report_commit": "723cc80",
+        "task_id": "tabletop_pick_place_reserve_31_37_41@v1",
+        "wins": 30,
+        "total": 30,
+        "failed_indices": [],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/dual-reserve/tabletop_pick_place_reserve_31_37_41@v1-20261128-171531-ee5f813883aa425e86b8f8eabfdd7d3c.json",
+          "sha256": "7b5b631251866e479549dcced45ed80cf6ff1667f050578df5624816bdb95fa6"
+        },
+        "pick_sha256": "8722e662be64e8270766977aa60f9decf6f1b27a7ffb539aff71a19f9b8c20bb",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "effective_task_seeds": [
+          31,
+          37,
+          41
+        ],
+        "source_task_file_sha256": "876867ddacb77d9bb97ff490772bcc037d74cfb2f7f0d0e9ab00fd51d09b4950"
+      },
+      "dual-validation": {
+        "runtime_report_commit": "723cc80",
+        "task_id": "tabletop_pick_place_validation_13_17_23@v1",
+        "wins": 30,
+        "total": 30,
+        "failed_indices": [],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/dual-validation/tabletop_pick_place_validation_13_17_23@v1-20261128-171615-78336126d66d4854acf3efd24b1b7633.json",
+          "sha256": "feecf08ebd3e9148f2b3fbe468db687a3fd394d88ab8520cf79fa62ba2affff8"
+        },
+        "pick_sha256": "8722e662be64e8270766977aa60f9decf6f1b27a7ffb539aff71a19f9b8c20bb",
+        "place_sha256": "1adfaa2ed02759295b0cc5f1b3f096b20af8fff103fbb9783c8b14b6ed9fb02d",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "b13192b90739515169002443b5c2df839dff2428b6e27f7329a8d78c90de1160"
+      },
+      "holdout-25": {
+        "runtime_report_commit": "142e6eb",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 22,
+        "total": 30,
+        "failed_indices": [
+          1,
+          6,
+          10,
+          11,
+          16,
+          20,
+          24,
+          26
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/holdout-25/tabletop_pick_place_holdout_13_17_23@v1-20261128-143156.json",
+          "sha256": "3010057e8eb4212e25dcf11ae79e327e44f2c6f1154bc84161acd4b7733dcabf"
+        },
+        "model_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+        "prefix": 25,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "holdout-50": {
+        "runtime_report_commit": "142e6eb",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 29,
+        "total": 30,
+        "failed_indices": [
+          24
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/holdout-50/tabletop_pick_place_holdout_13_17_23@v1-20261128-143109.json",
+          "sha256": "5bfe71a7fed2f9d61f03bfbd5e73c46d45e629935133ad335fc46fb02a9d2917"
+        },
+        "model_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+        "prefix": 50,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "local-residual-holdout": {
+        "runtime_report_commit": "723cc80",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 30,
+        "total": 30,
+        "failed_indices": [],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/local-residual-holdout/tabletop_pick_place_holdout_13_17_23@v1-20261128-170808-575c17c993e5420ea6701410f8fa0c67.json",
+          "sha256": "df671d7d4796ea6b5ad7f36d6c5dd15e054d73d572667a187e13fa39fbbade44"
+        },
+        "model_sha256": "8722e662be64e8270766977aa60f9decf6f1b27a7ffb539aff71a19f9b8c20bb",
+        "prefix": 50,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "residual-official-truth": {
+        "runtime_report_commit": "723cc80",
+        "task_id": "tabletop_pick_place@v1",
+        "wins": 29,
+        "total": 30,
+        "failed_indices": [
+          19
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/residual-official-truth/tabletop_pick_place@v1-20261128-170951-2187d918cf8d40ca9d4cff61ce8c3d58.json",
+          "sha256": "ea7bccbced9adbb92d4614cefafac323e256928077a91879300aa8512fed97fb"
+        },
+        "pick_sha256": "8722e662be64e8270766977aa60f9decf6f1b27a7ffb539aff71a19f9b8c20bb",
+        "effective_task_seeds": [
+          0,
+          1,
+          2
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "residual-reserve": {
+        "runtime_report_commit": "723cc80",
+        "task_id": "tabletop_pick_place_reserve_31_37_41@v1",
+        "wins": 30,
+        "total": 30,
+        "failed_indices": [],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/residual-reserve/tabletop_pick_place_reserve_31_37_41@v1-20261128-171033-4fb69707ac2a47d9a87dee13aad1e6a4.json",
+          "sha256": "d7f030ed02e93cc5159aba797551a989fffe8ac63c0b74ad12953585b3e3f0f5"
+        },
+        "pick_sha256": "8722e662be64e8270766977aa60f9decf6f1b27a7ffb539aff71a19f9b8c20bb",
+        "effective_task_seeds": [
+          31,
+          37,
+          41
+        ],
+        "source_task_file_sha256": "876867ddacb77d9bb97ff490772bcc037d74cfb2f7f0d0e9ab00fd51d09b4950"
+      },
+      "seed1001-step1000-holdout": {
+        "runtime_report_commit": "463199e",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 5,
+        "total": 30,
+        "failed_indices": [
+          1,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          10,
+          11,
+          12,
+          13,
+          14,
+          16,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/seed1001-step1000-holdout/tabletop_pick_place_holdout_13_17_23@v1-20261128-153807-de1dfd332bbf4484b2cf49856b4c6094.json",
+          "sha256": "c95b55593769e50a3c16fd9ec79af577213506905dd3f487f0591bebb4374467"
+        },
+        "model_sha256": "6b7210f5ce8317cdd7cb0897b362a1d77f99b71f6697dbf8347fe2f616749fad",
+        "prefix": 50,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "seed1001-step2000-holdout": {
+        "runtime_report_commit": "463199e",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 21,
+        "total": 30,
+        "failed_indices": [
+          2,
+          6,
+          9,
+          15,
+          17,
+          23,
+          24,
+          29,
+          30
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/seed1001-step2000-holdout/tabletop_pick_place_holdout_13_17_23@v1-20261128-155720-bc3a2a7021834b0a8ea3b3099fa1dd58.json",
+          "sha256": "b1102f2d4fbadeda66d4769ee1ec8561c32fa90b4dee412da4daeb6162fc44a4"
+        },
+        "model_sha256": "f231fc443dfd91bcc90e5babdeb6e1b8dc519b1bc5b487b96310ade3cdea4525",
+        "prefix": 50,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "seed1001-step3000-holdout": {
+        "runtime_report_commit": "6eeb090",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 16,
+        "total": 30,
+        "failed_indices": [
+          1,
+          4,
+          5,
+          10,
+          11,
+          12,
+          13,
+          19,
+          22,
+          23,
+          24,
+          25,
+          27,
+          30
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/seed1001-step3000-holdout/tabletop_pick_place_holdout_13_17_23@v1-20261128-164850-7c0882dc1157472ab49ab5f4ebadac4a.json",
+          "sha256": "bb0dcc03a10961805e45b3429faffc533ae5f6ff3400084b616a1aa7d8f4525c"
+        },
+        "model_sha256": "09b975ae57744baad16298e86ac3264b1bdffe8c2ad3edf58e6d4141e7ad71c7",
+        "prefix": 50,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "seed1001-step4000-holdout": {
+        "runtime_report_commit": "85a63e2",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 12,
+        "total": 30,
+        "failed_indices": [
+          2,
+          4,
+          5,
+          6,
+          7,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          23,
+          24,
+          27,
+          30
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/seed1001-step4000-holdout/tabletop_pick_place_holdout_13_17_23@v1-20261128-171901-505ac64cb05f4522a01b1b7172f2ee74.json",
+          "sha256": "6e7b5fbad66181c88fee3bce9356ba3b56018a4836c3df2e0fdb9be593023f12"
+        },
+        "model_sha256": "687e44b301dba94ac7e6476c9f5838597e8be7d3cd855ebf9022315499ad381d",
+        "prefix": 50,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "temporal-s5-d001-holdout": {
+        "runtime_report_commit": "77b754d",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 25,
+        "total": 30,
+        "failed_indices": [
+          1,
+          6,
+          10,
+          11,
+          24
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/temporal-s5-d001-holdout/tabletop_pick_place_holdout_13_17_23@v1-20261128-162927-1e954fdd66294a078d12d9617d65ad6d.json",
+          "sha256": "62283924129ace5ba10830e635ad2fb360132af44f21b70ea91b8411248578d4"
+        },
+        "model_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+        "stride": 5,
+        "decay": 0.01,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "v1-reserve": {
+        "runtime_report_commit": "723cc80",
+        "task_id": "tabletop_pick_place_reserve_31_37_41@v1",
+        "wins": 28,
+        "total": 30,
+        "failed_indices": [
+          2,
+          14
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/v1-reserve/tabletop_pick_place_reserve_31_37_41@v1-20261128-171124-71c9663959874caf8698ed07736a4e6e.json",
+          "sha256": "264fd0c75740005b098e9da9c52399ad52a42e86ead24bf3ae4cb065dac2e984"
+        },
+        "effective_task_seeds": [
+          31,
+          37,
+          41
+        ],
+        "source_task_file_sha256": "876867ddacb77d9bb97ff490772bcc037d74cfb2f7f0d0e9ab00fd51d09b4950"
+      },
+      "warm-step200-holdout": {
+        "runtime_report_commit": "723cc80",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 28,
+        "total": 30,
+        "failed_indices": [
+          6,
+          24
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/warm-step200-holdout/tabletop_pick_place_holdout_13_17_23@v1-20261128-170048-725c3eb25f874617a0b82a8a828ee864.json",
+          "sha256": "661369e9d0c8815932e0cdcf963bc7083e53585af285cbc96a504e4437a15da2"
+        },
+        "model_sha256": "10a4010735e23e3ae13a5ddfa0520cd082de4cd674f92d5e69e8863dcc2136f2",
+        "prefix": 50,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      },
+      "warm-step400-holdout": {
+        "runtime_report_commit": "723cc80",
+        "task_id": "tabletop_pick_place_holdout_13_17_23@v1",
+        "wins": 23,
+        "total": 30,
+        "failed_indices": [
+          1,
+          4,
+          5,
+          19,
+          22,
+          23,
+          25
+        ],
+        "raw_report": {
+          "path": "outputs/act-study-20261128/warm-step400-holdout/tabletop_pick_place_holdout_13_17_23@v1-20261128-171359-0ca0a54c3fdc479589819cd27093b34e.json",
+          "sha256": "a6b58a3e693253bea05be86a3e10569cb1704882bfb6f0d50692ec63d7f3b8ad"
+        },
+        "model_sha256": "2620215df7d3630f32a7896c583e8a831b5efa062308f8e9d193f76e93f1071d",
+        "prefix": 50,
+        "seeds": [
+          13,
+          17,
+          23
+        ],
+        "per_seed": 10,
+        "perception": "truth",
+        "effective_task_seeds": [
+          13,
+          17,
+          23
+        ],
+        "source_task_file_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0"
+      }
+    },
+    "earlier_single_cpu": {
+      "source_commit": "097111f41f661ed5641d84ec0e073ddf71012c9b",
+      "truth_control": {
+        "scripted": [
+          30,
+          30
+        ],
+        "learned_dual": [
+          30,
+          30
+        ]
+      },
+      "dual_color": {
+        "complete": false,
+        "report_written": false,
+        "symptom": "next reset raised observation_worker_busy after first task failed",
+        "rate": null
+      },
+      "remote_artifact": "policy-097111f41f66/progress.json"
+    }
+  },
+  "deployment": {
+    "permanent_runtime_commit": "723cc800910338b0b35d1a168ef2c6d9dd1dfb7a",
+    "permanent_control": "isolated MuJoCo, scripted pick/place, sim truth, offline planning, mock audio",
+    "learning_weights_activated_on_permanent_instance": false,
+    "field_hardware_verified": false
+  },
+  "task_fingerprint_convention": "sha256 is the input as read on the host. lf_sha256 normalizes CRLF to LF for cross-platform storage; git_blob identifies the exact repository object.",
+  "linux_component_timing": {
+    "commit": "8618b8afa8ee5a64fc068c83a0465bf12c2ff402",
+    "image_id": "sha256:67a4c2767cbb9d05e6355d6d6f790854312c092c174acd474f90452c56b972f8",
+    "cpu_limit": 1,
+    "returncode": 0,
+    "startup": [
+      {
+        "stage": "control_ready",
+        "elapsed_s": 2.9314
+      },
+      {
+        "stage": "color_and_render_ready",
+        "elapsed_s": 5.3467
+      }
+    ],
+    "scenes": {
+      "0": {
+        "visible": [
+          "obj_cube"
+        ],
+        "stages": [
+          {
+            "stage": "rgbd_ipc",
+            "elapsed_s": 0.7548
+          },
+          {
+            "stage": "detection_ipc",
+            "elapsed_s": 0.1223
+          },
+          {
+            "stage": "reset_and_fresh_observation",
+            "elapsed_s": 0.9444
+          }
+        ]
+      },
+      "1": {
+        "visible": [
+          "obj_cube"
+        ],
+        "stages": [
+          {
+            "stage": "rgbd_ipc",
+            "elapsed_s": 0.4236
+          },
+          {
+            "stage": "detection_ipc",
+            "elapsed_s": 0.1148
+          },
+          {
+            "stage": "reset_and_fresh_observation",
+            "elapsed_s": 0.5504
+          }
+        ]
+      },
+      "2": {
+        "visible": [
+          "obj_cube"
+        ],
+        "stages": [
+          {
+            "stage": "rgbd_ipc",
+            "elapsed_s": 0.4249
+          },
+          {
+            "stage": "detection_ipc",
+            "elapsed_s": 0.1218
+          },
+          {
+            "stage": "reset_and_fresh_observation",
+            "elapsed_s": 0.5577
+          }
+        ]
+      },
+      "3": {
+        "visible": [
+          "obj_cube"
+        ],
+        "stages": [
+          {
+            "stage": "rgbd_ipc",
+            "elapsed_s": 0.5811
+          },
+          {
+            "stage": "detection_ipc",
+            "elapsed_s": 0.2025
+          },
+          {
+            "stage": "reset_and_fresh_observation",
+            "elapsed_s": 0.7961
+          }
+        ]
+      },
+      "4": {
+        "visible": [
+          "obj_cube"
+        ],
+        "stages": [
+          {
+            "stage": "rgbd_ipc",
+            "elapsed_s": 0.4861
+          },
+          {
+            "stage": "detection_ipc",
+            "elapsed_s": 0.1024
+          },
+          {
+            "stage": "reset_and_fresh_observation",
+            "elapsed_s": 0.6003
+          }
+        ]
+      }
+    },
+    "observation_budget_s": 1,
+    "compute_budget_s": 2
+  }
+}
