@@ -1,0 +1,212 @@
+{
+  "qualified_commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+  "source_tree": "542a5f1411d23913b4472abe334bc28fef352706",
+  "ruff": "passed",
+  "proto_generation": "5 files",
+  "full_suite": {
+    "tests": 960,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "junit_sha256": "c8776ec4f3046a0703756bcfbd9b8c44429a9d8a44c3945591a24a5d27e23718"
+  },
+  "rpc_suite": {
+    "tests": 50,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "junit_sha256": "e41e060c02454e9995e5ae233d35d9bba8897bb9fb7654111489643d8c03922d"
+  },
+  "fault_matrix": {
+    "groups": 16,
+    "tests": 314,
+    "zero_skips": true,
+    "report_sha256": "a6e9a8a8bebe277b8221ce3c8a32b81bbc9947de02b8cb9512802e91831d7af0",
+    "p1_complete": false,
+    "open_gates": [
+      "Real storage-medium I/O failure and power loss",
+      "Independent hardware stop (SG-0) and real-device physical controller faults",
+      "Real physical camera disconnection and hardware PTP/NTP clock synchronization (software cross-host clock-domain, skew/RTT freshness, and RPC per-object evidence contract verified in D036)",
+      "Field-device evidence for controlled single-step recovery after a physical stop and current effect check",
+      "Real network partition and field-device supervision",
+      "Real-hardware physical stop latency and field-deployment episode data loss metrics (simulation isolated-process baseline measured in D035)",
+      "Field hardware/firmware OTA activation and model/driver compatibility on actual devices"
+    ]
+  },
+  "regressions": {
+    "script": {
+      "wins": 30,
+      "total": 30,
+      "failure_indexes": [],
+      "reasons": [],
+      "sha256": "678c58fa092b4fbf3c1e91b99fa44cc743538b26777593423b97476d4b832187"
+    },
+    "pick-v1": {
+      "wins": 29,
+      "total": 30,
+      "failure_indexes": [
+        14
+      ],
+      "reasons": [
+        "policy_horizon"
+      ],
+      "sha256": "57c904b2e3481823695fe74fd5e064dd0c2807fcb507cf9dd354ae7066207a34"
+    },
+    "color": {
+      "wins": 30,
+      "total": 30,
+      "failure_indexes": [],
+      "reasons": [],
+      "sha256": "d4eeff99df11e4f0c190ac82b49eb3697322acfd71c1e48fc2a5bc99c48d7b80"
+    }
+  },
+  "task_sha256": "813efb6591c051a7eebe9bf92d4140d4c06aaf1b20d2a59284da77e7279e16b0",
+  "pick_v1_sha256": "a1ec6f2ef5a00e1ba666149d1adfb8c2ec02b77e0e27b32024fe55493eb5d3bd",
+  "environmental_observations": {
+    "windows_first_full_suite": {
+      "tests": 960,
+      "errors": 0,
+      "failures": 1,
+      "skipped": 0,
+      "junit_sha256": "8669d7d6c4781a46e172ea3271c7906e0a443ea2c81e81673b4de184ba2564de"
+    },
+    "case": "test_timeout_keeps_worker_tracked_without_queue_and_drops_late_result",
+    "observed": "The second read exceeded its 50ms test deadline while training was running. The unchanged case and full suite passed with training suspended.",
+    "unchanged_case_rerun": {
+      "tests": 1,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "junit_sha256": "4fa819df607a35886dfbffad33646bea5fd97d7b74be34cf46750f8e730cb11b"
+    },
+    "linux_initial_test_fixture": "One existing CLI test could not create its runtime ledger with a read-only /app/outputs. The same image passed the full selected set using a writable /app/outputs tmpfs."
+  },
+  "linux_candidate": {
+    "image_id": "sha256:4def79751cf0a032930e0e8bf7991cf7bb0b5c9f43c3c99d4fef418d7a0b52b4",
+    "reference_runtime": {
+      "environment": "simulation",
+      "planner": "offline",
+      "audio": "mock",
+      "control_isolation": "process"
+    },
+    "isolated_compute_passed": true,
+    "physical_control_passed": true,
+    "other_container_set_unchanged": true,
+    "candidate_smoke_sha256": "7d73f74ebd39bd084195adf631782c5304bd6a7148d208089b4ff07332292980"
+  },
+  "linux_tests": {
+    "commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+    "test_image_id": "sha256:8b6f22f1d3ca20b255e6a5a449b02c144bfc9befde70efd0279a018e8fbe1bf9",
+    "test_image": "embodied-v3-test:463199e2fc41",
+    "tests": 50,
+    "skipped": 0,
+    "errors": 0,
+    "failures": 0,
+    "junit_sha256": "a10720372bb169cb46ec541e3edde426256fca08e6b5fe81d8a9b82a3ea7d5f0",
+    "files": [
+      "tests/runtime/test_attempt_schema.py",
+      "tests/control/test_controlled_step_retry.py",
+      "tests/rpc/test_rpc_mtls_authorization.py",
+      "tests/data_engine/test_interactive.py",
+      "tests/hri/test_server.py",
+      "tests/data_engine/test_failure_index.py",
+      "tests/runtime/test_release_compatibility.py"
+    ]
+  },
+  "live_snapshot_rehearsal": {
+    "commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+    "before": {
+      "version": 2,
+      "all_tables_sha256": "1358ccc465b89ef7ab4fef343ed341cb891277175aaf0bb8516b7bde5e25c230",
+      "legacy_history_sha256": "df714a9388a5d98fa2ba0df9f90fc77fa11764b3fd9761d4e71e25b5a04201a4",
+      "row_counts": {
+        "schema_version": 1,
+        "tasks": 20,
+        "operations": 36,
+        "attempts": 36,
+        "operation_events": 139,
+        "task_plans": 14,
+        "task_events": 77
+      },
+      "running_operations": 0,
+      "unconfirmed_stops": 0,
+      "integrity_ok": true
+    },
+    "dry_run_preserves_v2": true,
+    "clean_downgrade_exact": true,
+    "websocket_and_replay": {
+      "steps": [
+        "ok",
+        "ok"
+      ],
+      "recorded_samples": 370,
+      "capture_state": "complete",
+      "dropped": 0
+    },
+    "written_downgrade_refusal": "v3_downgrade_would_discard_history",
+    "corrupt_downgrade_refusal": "v3_downgrade_history_unproven",
+    "after": {
+      "version": 3,
+      "all_tables_sha256": "12b230ce1fb9ea1b184780c3303844f332f9c332543fe39b32b6da6aef682b0e",
+      "legacy_history_sha256": "8eafa4fbdba99226f22d34174f3f261ab9eb0d627765758ef6baa9fecf23edc2",
+      "row_counts": {
+        "schema_version": 1,
+        "tasks": 22,
+        "operations": 40,
+        "attempts": 40,
+        "operation_events": 153,
+        "task_plans": 16,
+        "task_events": 89,
+        "recovery_grants": 0
+      },
+      "running_operations": 0,
+      "unconfirmed_stops": 0,
+      "integrity_ok": true
+    },
+    "original_business_rows_all_preserved": true,
+    "corrupt_v3_restore_exact": true,
+    "schema_version": 3,
+    "previous_image_refused_v3": true,
+    "source_snapshot_sha256": "88c9e3453f536503df274bbb1cad23de7df1193474a2b8a7574306343c4f117a"
+  },
+  "cross_host_operator": {
+    "commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+    "client": "Windows",
+    "server": "Linux Docker / isolated MuJoCo",
+    "transport": "gRPC mTLS via SSH TCP forward",
+    "roles_denied": {
+      "agent": "PERMISSION_DENIED",
+      "op_effect": "PERMISSION_DENIED"
+    },
+    "attempts": [
+      {
+        "attempt_no": 1,
+        "state": "OUTCOME_UNKNOWN",
+        "stop_state": "MOTION_STOPPED_OBSERVED",
+        "effect_verdict": "unsat"
+      },
+      {
+        "attempt_no": 2,
+        "state": "RETURNED",
+        "stop_state": "NOT_REQUESTED",
+        "effect_verdict": "sat"
+      }
+    ],
+    "duplicate_error": "operator_challenge_unavailable",
+    "workflow": "INTERRUPTED",
+    "automatic_resume_allowed": false
+  },
+  "hardware_verified": false,
+  "push_ci": "https://github.com/SuperdeMan/embodied-agent/actions/runs/46160743162",
+  "d039_d040": {
+    "failure_index_at_42694e7": {
+      "local_historical_failures": 66,
+      "policy_horizon": 58,
+      "unclassified": 6,
+      "timeout": 1,
+      "observation_stale": 1,
+      "read_errors": 0
+    },
+    "interactive_reference": "See live_snapshot_rehearsal.websocket_and_replay for the candidate console recording."
+  }
+}

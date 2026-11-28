@@ -1,4 +1,4 @@
-# 受控恢复与账本 v3 提案
+# 受控单步恢复与账本 v3
 
 2026-11-28 已批准实现、隔离演练及通过验收后的常驻库迁移。迁移前运行格式为 v2。任务恢复审查只读，既有维护作用域分别处理停止对账和效果重查。
 
@@ -23,3 +23,7 @@
 - 单步重试限于已结束或中断计划中、具有确定性状态谓词的受跟踪技能。先取得原 UNKNOWN 尝试的停止实证，完成独立效果重查并得到当前 UNSAT，再以明确授予 `retry_step` 的操作者申请。消费时重新观测效果并校验原对象绑定。需要单独危险动作确认的技能保持原有重试限制。
 - 受控 HTTP 复用 `/api/operator/authorizations` 与 `/api/operator/confirmations`。mTLS 使用 `PrepareStepRetry` 与 `ConfirmStepRetry`。CLI `embodied retry-step --remote HOST --task TASK --operation OP --attempt ATTEMPT` 配合操作者 TLS 参数，展示具体技能与参数，录入明确答复后提交。无鉴权回环开发服务不能为这两个 RPC 签发授权。
 - 查询 `GET /api/tasks/{task_id}` 或 `GetTask` 可逐次查看结果和证据，原操作的普通重发只读取已有结果。受损 v3 用认证 v3 备份恢复。回到 v2 要求迁移前认证备份、完整 v3 库、相同历史投影以及零笔迁移后业务写入。
+
+## 2026-11-28 验收
+
+`463199e` 本机 960 项完整测试、50 项 RPC 与 16 组 314 项故障矩阵通过。Linux 候选容器完成真实常驻数据副本迁移、有新写入的降级拒绝、八表认证恢复，并通过 50 项专项测试。Windows 客户端经 mTLS 在 Linux 隔离仿真完成单步重试，原尝试保持 UNKNOWN，新尝试返回 SAT，同一份确认再次提交被拒绝。[软件与副本证据](../eval/controlled-step-retry-20261128.json) · [常驻库迁移与重启证明](../eval/cloud-v3-upgrade-20261128.json)。

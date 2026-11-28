@@ -33,7 +33,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID
 uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID --cancel
 ```
 
-**远端状态与云端入口**：D019 和 D036 提供远端仿真快照及逐对象感知时效验证。最近一次常驻激活为 2026-11-22 的 `cb05aee`，私网 HTTPS 8449，采用离线规划和模拟音频。部署范围、运行配置及回执见[云端部署记录](docs/cloud-deployment.md)。
+**远端状态与云端入口**：D019/D036 提供带逐对象时效验证的远端仿真快照。2026-11-28 私网 HTTPS 8449 常驻控制台升级至 `463199e`，使用 v3 账本、离线规划与模拟音频。部署与恢复回执见[云端部署记录](docs/cloud-deployment.md)。
 
 **停止对账（D021）**：已实现受信仿真 profile 的确认式停止观测：等待实际工作线程退出，观测关节速度与夹持接触，证据落账后才释放资源。原操作仍保持 UNKNOWN，不自动重放，也不解除 Guard 闩锁。使用方式与验证范围见[停止与受信恢复](docs/stop-reconciliation.md)。
 
@@ -47,7 +47,7 @@ uv run --group rpc embodied operation --remote 127.0.0.1:8391 --id OPERATION_ID 
 
 **纯计算隔离（D026）**：检测、ONNX 推理和状态副本渲染/JPEG 编码移入受控子进程，执行许可与账本留在父进程；失败后回收，显式恢复不重放动作。范围见[进程隔离](docs/isolated-compute.md)。
 
-**任务日志与只读恢复（D027）**：计划版本、步骤意图和执行器回执持久化；HTTP/RPC 可查询历史及已有证据当前资格。重启不续跑，历史 SAT 不授予当前执行权限。旧账本须显式升级至 v2，流程见[任务恢复](docs/task-recovery.md)。
+**任务日志与受控恢复（D027/D041）**：只读报告展示每次尝试的回执、停止和效果证据。v3 中，具备 `retry_step` 作用域的操作者可在复核停止与当前效果后确认一次单步重试。普通重发只返回已有结果。迁移及使用入口见[单步恢复与账本 v3](docs/controlled-recovery-v3.md)。
 
 **存储故障与取消（D028）**：批量取消先撤销全部许可，单项账本异常不再跳过后续调用或 Guard 闩锁；参考检查与未关闭门禁见 [P1 故障矩阵](docs/p1-fault-matrix.md)。
 

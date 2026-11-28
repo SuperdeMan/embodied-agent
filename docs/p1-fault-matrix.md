@@ -69,3 +69,7 @@ Linux 隔离容器的实际 SQLite FULL 验证了两项许可先撤销、全部�
 ## D037 增量
 
 `75853f5` 新增 `release_compatibility_and_rollback` 组，矩阵扩展为 15 组 299 项全部通过（零跳过，`p1_complete: false`）。覆盖 `ModelBundle` 超越张量维度的物理语义与权重哈希校验、`ReleaseBundle` 维护态独占锁/活跃操作/未确认停止/配置与资产摘要预检、新 v2 写入后拒止 v1-only 降级与未验证回滚目标、全七表在线备份与受损账本（含脏 `-wal`）认证原子恢复，以及 Linux Docker 真实双镜像（`75853f5` ↔ `cb05aee`）降级读写与恢复演练；真机固件 OTA、真机 SG-0 急停、物理相机断连与未来 schema v3→v2 降级门禁仍保留未关闭。证据见[本批证据](../eval/release-compatibility-20261122.json)。
+
+## D041 增量
+
+`463199e` 运行 16 组 314 项，零跳过。新增了 v3 历史投影、降级保护、跨重启、授权消费、迟到回执及故障注入案例，mTLS 组另行覆盖具体操作者作用域。跨主机和常驻当前证据见[验收](../eval/controlled-step-retry-20261128.json)。`p1_complete=false`，现场停止、时钟、网络、存储与 OTA 仍需设备实测。

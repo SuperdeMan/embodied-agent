@@ -1,0 +1,250 @@
+{
+  "status": "active",
+  "application_commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+  "activation": {
+    "activation_id": "d041-20261128T153630Z",
+    "commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+    "previous_commit": "cb05aeeb3ada4c8a64930f3e00006b97773463a6",
+    "image_id": "sha256:4def79751cf0a032930e0e8bf7991cf7bb0b5c9f43c3c99d4fef418d7a0b52b4",
+    "compose_sha256": "55a9bea3a639e02dc99b38ba9a6d07e73c608645b4f9fd8587a119755be7b0b7",
+    "other_containers_unchanged": true,
+    "other_container_count": 39,
+    "serve_other_mappings_unchanged": true,
+    "funnel": false,
+    "schema_before": 2,
+    "schema_after": 3,
+    "before_counts": {
+      "schema_version": 1,
+      "tasks": 20,
+      "operations": 36,
+      "attempts": 36,
+      "operation_events": 139,
+      "task_plans": 14,
+      "task_events": 77
+    },
+    "after_counts": {
+      "schema_version": 1,
+      "tasks": 20,
+      "operations": 36,
+      "attempts": 36,
+      "operation_events": 139,
+      "task_plans": 14,
+      "task_events": 77,
+      "recovery_grants": 0
+    },
+    "before_all_tables_sha256": "1358ccc465b89ef7ab4fef343ed341cb891277175aaf0bb8516b7bde5e25c230",
+    "migration_v2_projection_sha256": "1358ccc465b89ef7ab4fef343ed341cb891277175aaf0bb8516b7bde5e25c230",
+    "backup_sha256": "88c9e3453f536503df274bbb1cad23de7df1193474a2b8a7574306343c4f117a",
+    "preflight_v2_allowed": true,
+    "preflight_v3_allowed": true,
+    "retained_named_volume": true,
+    "scopes": [
+      "reconcile_effect",
+      "reconcile_stop"
+    ],
+    "qualified_evidence_sha256": "ffd7e35f7ab72a652c369bbb0ef28d15df5f0a75f3a52a6b4327f4c4c7fba7d0"
+  },
+  "restart": {
+    "commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+    "activation_id": "d041-20261128T153630Z",
+    "all_eight_tables_unchanged": true,
+    "all_tables_sha256": "9fb825bc68abff900904caa7c67f12db5384a87bfe8fda144038f4e48da41ddd",
+    "row_counts": {
+      "schema_version": 1,
+      "tasks": 21,
+      "operations": 38,
+      "attempts": 38,
+      "operation_events": 146,
+      "task_plans": 15,
+      "task_events": 83,
+      "recovery_grants": 0
+    },
+    "original_business_rows_preserved": true,
+    "integrity_ok": true,
+    "other_containers_unchanged": true,
+    "other_container_count": 39,
+    "serve_other_mappings_unchanged": true,
+    "funnel": false
+  },
+  "external_https_wss": [
+    {
+      "commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+      "stage": "before_restart",
+      "task_id": "7bf9f8db1c2745f48c3dcc508c320738",
+      "websocket_steps": [
+        {
+          "step_id": "s1",
+          "skill": "skill.manip.pick",
+          "status": "ok",
+          "operation_id": "f6b62f6b79cd52a68aefff47fd109725",
+          "attempt_id": "d845dfb43aa1472192d3715da9976061"
+        },
+        {
+          "step_id": "s2",
+          "skill": "skill.manip.place",
+          "status": "ok",
+          "operation_id": "935631c4dbf4554a93c05ce456c6f558",
+          "attempt_id": "a479a4dd79ba430d8d107cdd10bf9297"
+        }
+      ],
+      "runtime": {
+        "environment": "simulation",
+        "planner": "offline",
+        "audio": "mock",
+        "control_isolation": "process"
+      },
+      "https_health": true,
+      "jpeg_bytes": 31088,
+      "preview_statuses": [
+        200
+      ],
+      "actual_serve_identity": true,
+      "scopes": [
+        "reconcile_effect",
+        "reconcile_stop"
+      ],
+      "v3_attempts": [
+        [
+          "RETURNED",
+          "sat"
+        ],
+        [
+          "RETURNED",
+          "sat"
+        ]
+      ],
+      "workflow": "FINISHED",
+      "context_matches": true,
+      "automatic_resume_allowed": false,
+      "task_execution_authorized": false
+    },
+    {
+      "commit": "463199e2fc41d7387f3541f314c79bf70bf629fe",
+      "stage": "after_restart",
+      "task_id": "7bf9f8db1c2745f48c3dcc508c320738",
+      "websocket_steps": [
+        {
+          "step_id": "s1",
+          "skill": "skill.manip.pick",
+          "status": "ok",
+          "operation_id": "f6b62f6b79cd52a68aefff47fd109725",
+          "attempt_id": "d845dfb43aa1472192d3715da9976061"
+        },
+        {
+          "step_id": "s2",
+          "skill": "skill.manip.place",
+          "status": "ok",
+          "operation_id": "935631c4dbf4554a93c05ce456c6f558",
+          "attempt_id": "a479a4dd79ba430d8d107cdd10bf9297"
+        }
+      ],
+      "runtime": {
+        "environment": "simulation",
+        "planner": "offline",
+        "audio": "mock",
+        "control_isolation": "process"
+      },
+      "https_health": true,
+      "jpeg_bytes": 31088,
+      "preview_statuses": [
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        503,
+        200
+      ],
+      "actual_serve_identity": true,
+      "scopes": [
+        "reconcile_effect",
+        "reconcile_stop"
+      ],
+      "v3_attempts": [
+        [
+          "RETURNED",
+          "sat"
+        ],
+        [
+          "RETURNED",
+          "sat"
+        ]
+      ],
+      "workflow": "FINISHED",
+      "context_matches": false,
+      "automatic_resume_allowed": false,
+      "task_execution_authorized": false
+    }
+  ],
+  "cold_preview_observation": "The initial single-read preview assertion failed before sending a task; its HTTP status was not captured. After restart the preview returned 503 ten times before 200. No motion was replayed during preview recovery.",
+  "scope": "Private MuJoCo simulation with offline planning and mock audio. The live operator policy retains reconcile_effect and reconcile_stop. The retry_step grant was exercised in the isolated cross-host mTLS test.",
+  "hardware_verified": false,
+  "browser_followup": {
+    "status": "open",
+    "edge": "Connected indicator, scene and sent text visible; no task receipt observed. Read-only ledger check remained 21 tasks / 38 operations.",
+    "in_app_browser": "Connected indicator and sent non-action prompts visible, no reply observed in the tracked UI.",
+    "ws_control": [
+      {
+        "requested_compress": 15,
+        "negotiated": 15,
+        "result": "reply",
+        "frames": [
+          "turn_start",
+          "reply"
+        ],
+        "elapsed_s": 0.12
+      },
+      {
+        "requested_compress": 0,
+        "negotiated": 0,
+        "result": "reply",
+        "frames": [
+          "turn_start",
+          "reply"
+        ],
+        "elapsed_s": 0.11
+      }
+    ],
+    "ws_idle_with_preview": {
+      "delays": [
+        {
+          "idle_s": 1,
+          "frames": [
+            "turn_start",
+            "reply"
+          ],
+          "elapsed_s": 0.01
+        },
+        {
+          "idle_s": 50,
+          "frames": [
+            "tts_start",
+            "tts_end",
+            "turn_start",
+            "reply"
+          ],
+          "elapsed_s": 0.02
+        },
+        {
+          "idle_s": 65,
+          "frames": [
+            "tts_start",
+            "tts_end",
+            "turn_start",
+            "reply"
+          ],
+          "elapsed_s": 0.01
+        }
+      ],
+      "preview_counts": {
+        "200": 120,
+        "503": 209
+      }
+    },
+    "microphone_and_speaker_hardware_verified": false
+  }
+}

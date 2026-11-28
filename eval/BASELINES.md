@@ -71,3 +71,6 @@
 | 2026-11-22 | 75853f5 | tabletop_pick_place@v1 | 30/30 | PASS | D037 ReleaseBundle/ModelBundle 兼容预检与 v2 降级恢复演练；默认隔离物理控制 + scripted_truth；干净提交，原任务预算与物理参数不变。结果 outputs/eval/tabletop_pick_place@v1-20261122-065144.json；936 项测试，证据见 `eval/release-compatibility-20261122.json` |
 | 2026-11-22 | 75853f5 | tabletop_pick_place@v1 | 29/30 | PASS* | D037 ReleaseBundle/ModelBundle 兼容预检与 v2 降级恢复演练；默认隔离物理控制 + isolated_pick_v1_truth；干净提交，保留第 14 局 horizon reached，未达不劣于脚本目标。结果 outputs/eval/tabletop_pick_place@v1-20261122-065225.json；证据见 `eval/release-compatibility-20261122.json` |
 | 2026-11-22 | 75853f5 | tabletop_pick_place@v1 | 30/30 | PASS | D037 ReleaseBundle/ModelBundle 兼容预检与 v2 降级恢复演练；默认隔离物理控制 + isolated_color（物理/渲染/检测全跨进程）；干净提交，原任务预算与物理参数不变。结果 outputs/eval/tabletop_pick_place@v1-20261122-065341.json；证据见 `eval/release-compatibility-20261122.json` |
+| 2026-11-28 | 463199e | tabletop_pick_place@v1 | 30/30 | PASS | D041，隔离物理控制，脚本 + 真值。完整与 Linux 证据见 `eval/controlled-step-retry-20261128.json`。 |
+| 2026-11-28 | 463199e | tabletop_pick_place@v1 | 29/30 | PASS* | 隔离 pick-v1 + 脚本放置 + 真值。第 14 局 seed 1 达到策略时域上限，M2 不劣于脚本目标仍待达成。 |
+| 2026-11-28 | 463199e | tabletop_pick_place@v1 | 30/30 | PASS | 隔离 ColorBlob + 脚本，使用独立真值裁判。 |
